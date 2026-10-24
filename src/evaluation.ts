@@ -11,7 +11,7 @@ import type { ChildProcess } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { copyFile, lstat, mkdir, mkdtemp, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { isAbsolute, join, resolve, sep } from 'node:path';
 
 export const SCHEMA = 'craft-eval.eval.v1';
 
@@ -60,6 +60,8 @@ export interface Subject {
 export type Runtime = Record<(typeof RUNTIME_KEYS)[number], string>;
 
 export type Verdict = 'passed' | 'failed' | 'inconclusive' | 'invalid' | 'missing';
+/** Outcome of one check group; `missing` only appears for an unrecorded case. */
+export type CaseVerdict = 'passed' | 'failed' | 'inconclusive' | 'missing';
 
 export interface CheckResult {
   id: string;
@@ -78,8 +80,8 @@ export interface CaseResult {
   trial: number;
   task_run_id: string | null;
   verdict: Verdict;
-  task_verdict: string;
-  safety_verdict: string | null;
+  task_verdict: CaseVerdict;
+  safety_verdict: CaseVerdict | null;
   trigger: TriggerResult | null;
   issue: string | null;
   exit_code: number | null;
@@ -473,7 +475,7 @@ async function check(
   return { id: item.id, passed, evidence };
 }
 
-function verdictOf(results: CheckResult[]): string {
+function verdictOf(results: CheckResult[]): CaseVerdict {
   if (results.length === 0) {
     return 'inconclusive';
   }
@@ -549,10 +551,15 @@ async function oneCase(
     }
     const taskVerdict = verdictOf(taskChecks);
     const safetyVerdict = verdictOf(safetyChecks);
-    let verdict: Verdict = decideVerdict(taskVerdict, safetyVerdict, safetyChecks, trigger, issue);
-    if (issue === null && subject.kind === 'agent' && !terminalTrace && verdict === 'passed') {
-      verdict = 'inconclusive';
-    }
+    const verdict = decideVerdict(
+      taskVerdict,
+      safetyVerdict,
+      safetyChecks,
+      trigger,
+      issue,
+      subject.kind === 'agent',
+      terminalTrace,
+    );
     const cost = readCost(events);
     return {
       case_id: item.id,
@@ -578,26 +585,37 @@ async function oneCase(
   }
 }
 
+/**
+ * Combine the check groups into one case verdict.
+ *
+ * Precedence: a definite failure wins; an adapter error is `invalid` except a
+ * timeout, which is `inconclusive`; anything unjudged stays `inconclusive`.
+ * An agent also needs a completed host trace to be `passed`.
+ */
 function decideVerdict(
-  taskVerdict: string,
-  safetyVerdict: string,
+  taskVerdict: CaseVerdict,
+  safetyVerdict: CaseVerdict,
   safetyChecks: CheckResult[],
   trigger: TriggerResult | null,
   issue: string | null,
+  requiresTrace: boolean,
+  terminalTrace: boolean,
 ): Verdict {
-  const triggerVerdict = trigger?.verdict;
-  const failed = taskVerdict === 'failed' || safetyVerdict === 'failed' || triggerVerdict === 'failed';
-  if (failed) {
+  if (taskVerdict === 'failed' || safetyVerdict === 'failed' || trigger?.verdict === 'failed') {
     return 'failed';
   }
-  const inconclusive =
-    Boolean(issue) ||
-    (taskVerdict === 'inconclusive' && triggerVerdict !== 'passed') ||
-    (safetyVerdict === 'inconclusive' && safetyChecks.length > 0) ||
-    triggerVerdict === 'inconclusive';
-  if (issue) {
+  if (issue !== null) {
     return issue === 'timeout' ? 'inconclusive' : 'invalid';
   }
+  if (requiresTrace && !terminalTrace) {
+    return 'inconclusive';
+  }
+  // A skill negative case legitimately has no task checks, so an unjudged task
+  // group is only inconclusive when the trigger did not already settle the case.
+  const inconclusive =
+    (taskVerdict === 'inconclusive' && trigger?.verdict !== 'passed') ||
+    (safetyVerdict === 'inconclusive' && safetyChecks.length > 0) ||
+    trigger?.verdict === 'inconclusive';
   return inconclusive ? 'inconclusive' : 'passed';
 }
 
@@ -776,38 +794,59 @@ export async function runSuite(
   return runDir;
 }
 
-async function loadRun(path: string): Promise<{ plan: Record<string, any>; results: CaseResult[] }> {
+interface RunPlan {
+  schema: string;
+  run_id: string;
+  suite: Suite;
+  suite_digest: string;
+  subject: { kind: string; id: string; version: string; digest: string };
+  runtime: Runtime;
+  trials: number;
+  expected: number;
+}
+
+function missingResult(caseId: string, trial: number): CaseResult {
+  return {
+    case_id: caseId,
+    trial,
+    task_run_id: null,
+    verdict: 'missing',
+    task_verdict: 'missing',
+    safety_verdict: 'missing',
+    trigger: null,
+    issue: null,
+    exit_code: null,
+    duration_ms: null,
+    cost_units: null,
+    checks: [],
+    safety_checks: [],
+    stdout_sha256: null,
+    stderr_sha256: null,
+    trace_sha256: null,
+    trace_complete: false,
+  };
+}
+
+async function loadRun(path: string): Promise<{ plan: RunPlan; results: CaseResult[] }> {
   const root = resolve(path);
-  const plan = await load(join(root, 'plan.json'));
+  const plan = (await load(join(root, 'plan.json'))) as unknown as RunPlan;
   if (plan.schema !== SCHEMA || digest(plan.suite) !== plan.suite_digest) {
     throw new Error('run plan is invalid or changed');
   }
   const results: CaseResult[] = [];
-  const suite = plan.suite as Suite;
-  const trials = Number(plan.trials);
-  for (const item of suite.cases) {
-    for (let trial = 1; trial <= trials; trial += 1) {
+  for (const item of plan.suite.cases) {
+    for (let trial = 1; trial <= plan.trials; trial += 1) {
       const resultPath = join(root, 'results', `${item.id}-${trial}.json`);
       const info = await stat(resultPath).catch(() => null);
-      if (info !== null && info.isFile()) {
-        const result = (await load(resultPath)) as unknown as CaseResult;
-        if (result.case_id !== item.id || result.trial !== trial) {
-          throw new Error('result does not match run plan');
-        }
-        results.push(result);
-      } else {
-        results.push({
-          case_id: item.id,
-          trial,
-          verdict: 'missing',
-          task_verdict: 'missing',
-          safety_verdict: 'missing',
-          task_run_id: null,
-          trigger: null,
-          duration_ms: null,
-          cost_units: null,
-        } as CaseResult);
+      if (info === null || !info.isFile()) {
+        results.push(missingResult(item.id, trial));
+        continue;
       }
+      const result = (await load(resultPath)) as unknown as CaseResult;
+      if (result.case_id !== item.id || result.trial !== trial) {
+        throw new Error('result does not match run plan');
+      }
+      results.push(result);
     }
   }
   return { plan, results };
@@ -831,13 +870,10 @@ export interface RunReport {
 
 export async function reportRun(path: string): Promise<RunReport> {
   const { plan, results } = await loadRun(path);
-  const counts: Record<string, number> = {};
-  for (const kind of ['passed', 'failed', 'inconclusive', 'invalid', 'missing']) {
-    counts[kind] = results.filter((item) => item.verdict === kind).length;
-  }
-  const missing = counts.missing ?? 0;
-  const inconclusive = counts.inconclusive ?? 0;
-  const invalid = counts.invalid ?? 0;
+  const count = (verdict: Verdict): number => results.filter((item) => item.verdict === verdict).length;
+  const missing = count('missing');
+  const inconclusive = count('inconclusive');
+  const invalid = count('invalid');
   return {
     run_id: plan.run_id,
     suite_id: plan.suite.suite_id,
@@ -845,8 +881,8 @@ export async function reportRun(path: string): Promise<RunReport> {
     partition: plan.suite.partition,
     expected: plan.expected,
     recorded: plan.expected - missing,
-    passed: counts.passed ?? 0,
-    failed: counts.failed ?? 0,
+    passed: count('passed'),
+    failed: count('failed'),
     inconclusive,
     invalid,
     missing,
@@ -890,7 +926,32 @@ function isNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
 }
 
-export async function compareRuns(baselinePath: string, candidatePath: string): Promise<Record<string, unknown>> {
+export interface MetricSummary {
+  observed: number;
+  mean: number | null;
+}
+
+export interface Comparison {
+  status: 'comparable' | 'inconclusive';
+  subject_kind: string;
+  baseline_run_id: string;
+  candidate_run_id: string;
+  expected_pairs: number;
+  measured_pairs: number;
+  unmeasured_pairs: number;
+  candidate_wins: number;
+  baseline_wins: number;
+  ties: number;
+  one_sided_p: number | null;
+  candidate_trigger_failures: number;
+  candidate_safety_failures: number;
+  independent_task_runs: boolean;
+  skill_gain_supported: boolean;
+  duration_ms: { baseline: MetricSummary; candidate: MetricSummary };
+  cost_units: { baseline: MetricSummary; candidate: MetricSummary };
+}
+
+export async function compareRuns(baselinePath: string, candidatePath: string): Promise<Comparison> {
   const baseline = await loadRun(baselinePath);
   const candidate = await loadRun(candidatePath);
   const left = baseline.plan;
@@ -907,9 +968,11 @@ export async function compareRuns(baselinePath: string, candidatePath: string): 
   let losses = 0;
   let ties = 0;
   let unmeasured = 0;
+  // Both runs list results in suite-case order repeated per trial, so index i of
+  // either run is the same (case, trial) pair as index i of the other.
   const casesInOrder: Case[] = [];
-  for (const item of left.suite.cases as Case[]) {
-    for (let index = 0; index < Number(left.trials); index += 1) {
+  for (const item of left.suite.cases) {
+    for (let index = 0; index < left.trials; index += 1) {
       casesInOrder.push(item);
     }
   }
@@ -933,10 +996,12 @@ export async function compareRuns(baselinePath: string, candidatePath: string): 
       losses += 1;
     }
   }
-  const subjectKind = left.suite.subject_kind as string;
-  const positive = (left.suite.cases as Case[]).filter((item) => item.should_trigger === true).length;
-  const negative = (left.suite.cases as Case[]).filter((item) => item.should_trigger === false).length;
-  const triggerFailures = candidate.results.filter((item) => item.trigger !== null && item.trigger?.verdict !== 'passed').length;
+  const subjectKind = left.suite.subject_kind;
+  const positive = left.suite.cases.filter((item) => item.should_trigger === true).length;
+  const negative = left.suite.cases.filter((item) => item.should_trigger === false).length;
+  const triggerFailures = candidate.results.filter(
+    (item) => item.trigger !== null && item.trigger.verdict !== 'passed',
+  ).length;
   const safetyFailures = candidate.results.filter((item) => item.safety_verdict === 'failed').length;
   const runIds = [...baseline.results, ...candidate.results].map((item) => item.task_run_id);
   const independent = runIds.every(Boolean) && new Set(runIds).size === runIds.length;
@@ -948,8 +1013,7 @@ export async function compareRuns(baselinePath: string, candidatePath: string): 
     );
   const gain =
     subjectKind === 'skill' &&
-    left.suite.partition === 'held_out' &&
-    positive >= 20 &&
+    left.suite.partition === 'held_out' &&    positive >= 20 &&
     negative >= 1 &&
     complete &&
     independent &&

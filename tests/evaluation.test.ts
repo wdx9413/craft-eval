@@ -8,9 +8,26 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { compareRuns, loadSuite, reportRun, runSuite, signProbability } from '../src/evaluation.js';
+import type { CaseResult, CheckResult } from '../src/evaluation.js';
 import { main } from '../src/cli.js';
 
 const RUNTIME_KEYS = ['environment_digest', 'budget_digest', 'host_digest', 'model_digest', 'tools_digest'];
+
+/** Asserting accessor: a run that produced no result is a broken run, not a soft miss. */
+function only<T>(values: T[], description = 'result'): T {
+  assert.equal(values.length, 1, `expected exactly one ${description}`);
+  const value = values[0];
+  assert.ok(value !== undefined, `expected one ${description}`);
+  return value;
+}
+
+async function firstResult(runDir: string): Promise<CaseResult> {
+  return only((await reportRun(runDir)).results, 'case result');
+}
+
+async function firstCheck(runDir: string): Promise<CheckResult> {
+  return only((await firstResult(runDir)).checks, 'check result');
+}
 
 /**
  * The host shell may run Node inside an Electron wrapper, where process.execPath
@@ -173,8 +190,7 @@ test('software executes in copy and reports observed failures', async () => {
   const fx = new Fixture();
   await fx.setup();
   try {
-    await fx.project(`import { writeFileSync } from 'node:fs';
-import { mkdirSync } from 'node:fs';
+    await fx.project(`import { mkdirSync, writeFileSync } from 'node:fs';
 const id = process.env.CRAFT_EVAL_CASE_ID;
 mkdirSync('outputs', { recursive: true });
 writeFileSync('outputs/state.json', JSON.stringify({ ok: id === 'fixed' }));
@@ -198,8 +214,11 @@ process.exit(id === 'fixed' ? 0 : 3);
     );
     assert.equal(report.status, 'complete');
     assert.equal(existsSync(join(fx.workspace, 'outputs')), false);
-    assert.equal((report.results as any[])[0].safety_verdict, 'passed');
-    assert.ok((report.results as any[])[0].stdout_sha256);
+    // Two cases run here; the first is the healthy one with a safety check.
+    const healthy = report.results[0];
+    assert.ok(healthy !== undefined);
+    assert.equal(healthy.safety_verdict, 'passed');
+    assert.ok(healthy.stdout_sha256);
     await captureStdout(async () => assert.equal(await main(['validate', join(fx.root, 'software-suite.json')]), 0));
     await captureStdout(async () => assert.equal(await main(['report', run]), 0));
   } finally {
@@ -226,7 +245,7 @@ writeFileSync(process.env.CRAFT_EVAL_TRACE_PATH, events.map((e) => JSON.stringif
       { id: 'tool', kind: 'trace_event', event: 'tool.called', present: true },
     ];
     const run = await fx.runEval('agent', [caseDoc('do-task', { checks })]);
-    const result = (await reportRun(run)).results[0] as any;
+    const result = await firstResult(run);
     assert.deepEqual(
       [result.verdict, result.task_verdict, result.cost_units, result.trace_complete],
       ['passed', 'passed', 2.5, true],
@@ -246,8 +265,8 @@ writeFileSync(process.env.CRAFT_EVAL_TRACE_PATH, JSON.stringify({ source: 'host'
     const run = await fx.runEval('skill', [
       caseDoc('adjacent', { checks: [], should_trigger: false, skill_id: 'answer-skill' }),
     ]);
-    const result = (await reportRun(run)).results[0] as any;
-    assert.deepEqual([result.verdict, result.trigger.verdict], ['inconclusive', 'inconclusive']);
+    const result = await firstResult(run);
+    assert.deepEqual([result.verdict, result.trigger?.verdict], ['inconclusive', 'inconclusive']);
   } finally {
     await fx.cleanup();
   }
@@ -263,7 +282,7 @@ writeFileSync('outputs/result.json', JSON.stringify({ done: true }));
 `);
     const checks = [{ id: 'result', kind: 'json_equals', path: 'outputs/result.json', key: 'done', equals: true }];
     const run = await fx.runEval('agent', [caseDoc('agent', { checks })]);
-    const result = (await reportRun(run)).results[0] as any;
+    const result = await firstResult(run);
     assert.deepEqual([result.task_verdict, result.verdict, result.trace_complete], ['passed', 'inconclusive', false]);
   } finally {
     await fx.cleanup();
@@ -301,7 +320,7 @@ writeFileSync(process.env.CRAFT_EVAL_TRACE_PATH, events.map((e) => JSON.stringif
       [20, 20, 0],
     );
     assert.equal(compared.skill_gain_supported, true);
-    assert.ok((compared.one_sided_p as number) < 0.05);
+    assert.ok((compared.one_sided_p ?? 1) < 0.05);
     assert.equal(compared.independent_task_runs, true);
     await captureStdout(async () => assert.equal(await main(['compare', baseline, candidate]), 0));
   } finally {
@@ -398,7 +417,7 @@ test('timeout and untrusted trace cannot count as success', async () => {
     const slow = caseDoc('slow');
     slow.timeout_s = 0.5;
     const run = await fx.runEval('software', [slow]);
-    const result = (await reportRun(run)).results[0] as any;
+    const result = await firstResult(run);
     assert.deepEqual([result.issue, result.verdict], ['timeout', 'inconclusive']);
     await fx.project(`import { writeFileSync } from 'node:fs';
 writeFileSync(process.env.CRAFT_EVAL_TRACE_PATH, JSON.stringify({ source: 'agent', task_run_id: process.env.CRAFT_EVAL_TASK_RUN_ID, event: 'run.finished' }) + '\\n');
@@ -406,7 +425,7 @@ writeFileSync(process.env.CRAFT_EVAL_TRACE_PATH, JSON.stringify({ source: 'agent
     const second = await fx.runEval('skill', [
       caseDoc('negative', { checks: [], should_trigger: false, skill_id: 'answer-skill' }),
     ]);
-    assert.equal(((await reportRun(second)).results[0] as any).trigger.verdict, 'inconclusive');
+    assert.equal((await firstResult(second)).trigger?.verdict, 'inconclusive');
   } finally {
     await fx.cleanup();
   }
@@ -438,9 +457,9 @@ symlinkSync(process.env.OUTSIDE_DIR, 'outputs/linked', 'junction');
       ],
       { OUTSIDE_DIR: outside },
     );
-    const result = (await reportRun(run)).results[0] as any;
-    assert.equal(result.checks[0].passed, false, 'reading through a link must not pass');
-    assert.equal(result.task_verdict, 'failed');
+    const check = await firstCheck(run);
+    assert.equal(check.passed, false, 'reading through a link must not pass');
+    assert.equal((await firstResult(run)).task_verdict, 'failed');
   } finally {
     await fx.cleanup();
   }
@@ -454,7 +473,8 @@ test('contract rejects all invalid case and check shapes', async () => {
     const variants: [unknown, RegExp][] = [
       [[], /JSON object/],
       [{ ...base, cases: [null] }, /case must/],
-      [{ ...base, cases: [caseDoc('a', { checks: 'bad' as unknown as unknown[] })] }, /array/],
+      // Deliberately malformed: checks must be an array, so bypass the helper's typing.
+      [{ ...base, cases: [{ ...caseDoc('a'), checks: 'not-an-array' }] }, /array/],
       [{ ...base, cases: [caseDoc('a', { checks: [null] })] }, /objects/],
       [{ ...base, cases: [caseDoc('a', { checks: [{ id: 'x', kind: 'exit_code', equals: true }] })] }, /integer/],
       [
@@ -570,7 +590,7 @@ symlinkSync(process.env.OUTSIDE_DIR, 'outputs/folder/linked', 'junction');
       [caseDoc('bad', { checks })],
       { OUTSIDE_DIR: join(fx.root, 'outside-dir') },
     );
-    const result = (await reportRun(run)).results[0] as any;
+    const result = await firstResult(run);
     assert.deepEqual(
       result.checks.map((item: any) => item.passed),
       [false, false, false, null],

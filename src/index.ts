@@ -10,8 +10,11 @@ export {
 export type {
   Case,
   CaseResult,
+  CaseVerdict,
   Check,
   CheckResult,
+  Comparison,
+  MetricSummary,
   RunOptions,
   RunReport,
   Runtime,
