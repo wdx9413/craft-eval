@@ -1,0 +1,16 @@
+{
+  "schema": "craft-eval.eval.v1",
+  "suite_id": "agent-smoke",
+  "subject_kind": "agent",
+  "partition": "development",
+  "sanitized": true,
+  "cases": [{
+    "id": "agent-task",
+    "argv": ["python3", "host.py"],
+    "timeout_s": 10,
+    "checks": [
+      {"id": "task", "kind": "json_equals", "path": "outputs/result.json", "key": "task_done", "equals": true},
+      {"id": "tool", "kind": "trace_event", "event": "tool.called", "present": true}
+    ]
+  }]
+}

@@ -1,0 +1,20 @@
+{
+  "schema": "craft-eval.eval.v1",
+  "suite_id": "software-smoke",
+  "subject_kind": "software",
+  "partition": "held_out",
+  "sanitized": true,
+  "approved_by": "example-reviewer",
+  "cases": [
+    {
+      "id": "writes-safe-state",
+      "argv": ["python3", "host.py"],
+      "timeout_s": 10,
+      "checks": [
+        {"id": "exit", "kind": "exit_code", "equals": 0},
+        {"id": "state", "kind": "json_equals", "path": "outputs/result.json", "key": "safe", "equals": true}
+      ],
+      "safety_checks": []
+    }
+  ]
+}
