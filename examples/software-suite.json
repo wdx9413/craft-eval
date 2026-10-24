@@ -8,7 +8,7 @@
   "cases": [
     {
       "id": "writes-safe-state",
-      "argv": ["python3", "host.py"],
+      "argv": ["node", "host.mjs"],
       "timeout_s": 10,
       "checks": [
         {"id": "exit", "kind": "exit_code", "equals": 0},

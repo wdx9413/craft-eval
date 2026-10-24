@@ -6,7 +6,7 @@
   "sanitized": true,
   "cases": [{
     "id": "agent-task",
-    "argv": ["python3", "host.py"],
+    "argv": ["node", "host.mjs"],
     "timeout_s": 10,
     "checks": [
       {"id": "task", "kind": "json_equals", "path": "outputs/result.json", "key": "task_done", "equals": true},

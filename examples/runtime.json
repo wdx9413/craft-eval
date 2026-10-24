@@ -1,1 +1,1 @@
-{"environment_digest":"example-local-python-3.11","budget_digest":"example-10s","host_digest":"example-script-host","model_digest":"none","tools_digest":"python3"}
+{"environment_digest":"example-local-node-22","budget_digest":"example-10s","host_digest":"example-script-host","model_digest":"none","tools_digest":"node"}

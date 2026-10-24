@@ -1,0 +1,34 @@
+{
+  "name": "craft-eval",
+  "version": "0.1.0",
+  "description": "Evidence-backed evaluation for software, agents and skills",
+  "type": "module",
+  "bin": {
+    "craft-eval": "./dist/src/cli.js"
+  },
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "import": "./dist/src/index.js"
+    }
+  },
+  "files": [
+    "dist/src"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "tsc -p tsconfig.json",
+    "prepublishOnly": "npm run clean && npm run build",
+    "test": "npm run build && node --test dist/tests/*.test.js"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "typescript": "^7.0.2"
+  }
+}

@@ -1,9 +1,6 @@
-__pycache__/
-*.pyc
-.venv/
-.coverage
-htmlcov/
+node_modules/
 dist/
-build/
-*.egg-info/
+coverage/
 runs/
+*.log
+*.tsbuildinfo
