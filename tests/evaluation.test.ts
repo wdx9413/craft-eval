@@ -1,16 +1,15 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { spawnSync } from 'node:child_process';
-import { mkdir, mkdtemp, readFile, readdir, rm, stat, symlink, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, symlink, unlink, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { pathToFileURL, fileURLToPath } from 'node:url';
+import { fileURLToPath } from 'node:url';
 
-import { compareRuns, digest, loadSuite, reportRun, runSuite, signProbability } from '../src/evaluation.js';
+import { compareRuns, loadSuite, reportRun, runSuite, signProbability } from '../src/evaluation.js';
 import { main } from '../src/cli.js';
 
-const CLI = new URL('../src/cli.js', import.meta.url).href;
 const RUNTIME_KEYS = ['environment_digest', 'budget_digest', 'host_digest', 'model_digest', 'tools_digest'];
 
 /**
@@ -149,18 +148,24 @@ async function captureStderr<T>(work: () => Promise<T>): Promise<{ value: T; tex
   }
 }
 
-/** Windows often forbids symlink creation without Developer Mode or admin rights. */
-async function canSymlink(root: string): Promise<boolean> {
-  const target = join(root, '.symlink-probe-target');
-  const link = join(root, '.symlink-probe-link');
+/**
+ * Directory links are the capability the guards actually rely on: jobs are
+ * created as directory junctions on Windows, which need no elevation, whereas a
+ * file symlink requires Developer Mode or admin rights. Both traverse the same
+ * `lstat().isSymbolicLink()` check, so a junction exercises the guard.
+ */
+async function canCreateDirectoryLink(root: string): Promise<boolean> {
+  const target = join(root, '.probe-dir');
+  const link = join(root, '.probe-dir-link');
   try {
-    await writeFile(target, 'x');
-    await symlink(target, link);
-    await unlink(link);
-    await unlink(target);
+    await mkdir(target, { recursive: true });
+    await symlink(target, link, 'junction');
     return true;
   } catch {
     return false;
+  } finally {
+    await rm(link, { recursive: true, force: true });
+    await rm(target, { recursive: true, force: true });
   }
 }
 
@@ -407,25 +412,35 @@ writeFileSync(process.env.CRAFT_EVAL_TRACE_PATH, JSON.stringify({ source: 'agent
   }
 });
 
-test('artifact symlinks cannot read outside workspace', async (t) => {
+test('artifact links cannot read outside workspace', async (t) => {
   const fx = new Fixture();
   await fx.setup();
   try {
-    if (!(await canSymlink(fx.root))) {
-      // Creating symlinks needs Developer Mode or admin rights on Windows.
-      t.skip('symlinks are unavailable to this platform account');
+    if (!(await canCreateDirectoryLink(fx.root))) {
+      t.skip('directory links are not creatable on this platform');
       return;
     }
-    const outside = join(fx.root, 'secret.json');
-    await writeFile(outside, '{"safe":true}', 'utf8');
-    await fx.project(`import { writeFileSync, mkdirSync, symlinkSync } from 'node:fs';
+    const outside = join(fx.root, 'secret');
+    await mkdir(outside, { recursive: true });
+    await writeFile(join(outside, 'result.json'), '{"safe":true}', 'utf8');
+    await fx.project(`import { mkdirSync, symlinkSync } from 'node:fs';
 mkdirSync('outputs', { recursive: true });
-symlinkSync(process.env.OUTSIDE_FILE, 'outputs/leak.json');
+symlinkSync(process.env.OUTSIDE_DIR, 'outputs/linked', 'junction');
 `);
-    const checks = [{ id: 'leak', kind: 'json_equals', path: 'outputs/leak.json', key: 'safe', equals: true }];
-    const run = await fx.runEval('software', [caseDoc('leak', { checks })], { OUTSIDE_FILE: outside });
+    const run = await fx.runEval(
+      'software',
+      [
+        caseDoc('leak', {
+          checks: [
+            { id: 'leak', kind: 'json_equals', path: 'outputs/linked/result.json', key: 'safe', equals: true },
+          ],
+        }),
+      ],
+      { OUTSIDE_DIR: outside },
+    );
     const result = (await reportRun(run)).results[0] as any;
-    assert.deepEqual([result.task_verdict, result.checks[0].passed], ['failed', false]);
+    assert.equal(result.checks[0].passed, false, 'reading through a link must not pass');
+    assert.equal(result.task_verdict, 'failed');
   } finally {
     await fx.cleanup();
   }
@@ -516,8 +531,9 @@ test('subject workspace trials and cli errors', async () => {
       runSuite(suitePath, subjectPath, fx.runtimePath, join(fx.root, 'missing'), fx.output),
       /workspace/,
     );
-    if (await canSymlink(fx.root)) {
-      await symlink(fx.root, join(fx.workspace, 'linked'), 'dir');
+    // A workspace containing a directory link must be rejected before copying.
+    if (await canCreateDirectoryLink(fx.root)) {
+      await symlink(fx.root, join(fx.workspace, 'linked'), 'junction');
       await assert.rejects(runSuite(suitePath, subjectPath, fx.runtimePath, fx.workspace, fx.output), /symlinks/);
     }
     const failed = await captureStderr(async () => main(['validate', join(fx.root, 'missing.json')]));
@@ -527,22 +543,33 @@ test('subject workspace trials and cli errors', async () => {
   }
 });
 
-test('artifact and trace failure modes', async () => {
+test('artifact and trace failure modes', async (t) => {
   const fx = new Fixture();
   await fx.setup();
   try {
+    if (!(await canCreateDirectoryLink(fx.root))) {
+      t.skip('directory links are not creatable on this platform');
+      return;
+    }
+    // A link pointing outside the workspace must never satisfy file_exists.
+    await mkdir(join(fx.root, 'outside-dir'), { recursive: true });
+    await writeFile(join(fx.root, 'outside-dir', 'linked.json'), '{}', 'utf8');
     await fx.project(`import { writeFileSync, mkdirSync, symlinkSync } from 'node:fs';
 mkdirSync('outputs/folder', { recursive: true });
 writeFileSync('outputs/folder/result.json', '{bad json');
-try { symlinkSync('/tmp', 'outputs/folder/linked.json'); } catch {}
+symlinkSync(process.env.OUTSIDE_DIR, 'outputs/folder/linked', 'junction');
 `);
     const checks = [
       { id: 'missing', kind: 'file_exists', path: 'outputs/missing' },
       { id: 'bad', kind: 'json_equals', path: 'outputs/folder/result.json', key: 'x', equals: true },
-      { id: 'linked', kind: 'file_exists', path: 'outputs/folder/linked.json' },
+      { id: 'linked', kind: 'file_exists', path: 'outputs/folder/linked/linked.json' },
       { id: 'no-trace', kind: 'trace_event', event: 'tool.called', present: false },
     ];
-    const run = await fx.runEval('software', [caseDoc('bad', { checks })]);
+    const run = await fx.runEval(
+      'software',
+      [caseDoc('bad', { checks })],
+      { OUTSIDE_DIR: join(fx.root, 'outside-dir') },
+    );
     const result = (await reportRun(run)).results[0] as any;
     assert.deepEqual(
       result.checks.map((item: any) => item.passed),
@@ -613,9 +640,3 @@ test('development suite and command entry points', async () => {
     await fx.cleanup();
   }
 });
-
-void CLI;
-void readdir;
-void stat;
-void digest;
-void pathToFileURL;
