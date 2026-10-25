@@ -1,21 +1,19 @@
 # Real-world evaluation suites
 
 Four suites that exercise `craft-eval` against third-party code instead of its
-own examples. They exist to prove the evaluator generalises: the subjects were
-written by other people, in three languages, and none of them was modified to
-make grading easier.
+own examples. **94 independent cases** in total, each graded on its own checks.
 
 ## Subjects
 
 The checkouts live outside this repo at `../eval-subjects/` (sibling of
 `craft-eval/`), so they are not vendored here:
 
-| Subject | Repo | Language | What is graded |
-| --- | --- | --- | --- |
-| `mcp-filesystem` | [modelcontextprotocol/servers](https://github.com/modelcontextprotocol/servers) (`src/filesystem`) | TypeScript | MCP protocol handshake, tool listing, file write/read round-trip |
-| `claude-seo` | [AgriciDaniel/claude-seo](https://github.com/AgriciDaniel/claude-seo) | Python | Full `pytest` run: collection, pass rate, absence of internal errors |
-| `pocketflow` | [The-Pocket/PocketFlow](https://github.com/The-Pocket/PocketFlow) | Python | Full `unittest` discovery: every test passes |
-| `craft-eval` | this repo | TypeScript | Self-check: `npm run build` succeeds and the whole suite passes |
+| Suite | Subject | Language | Cases | What each case grades |
+| --- | --- | --- | --- | --- |
+| `mcp-filesystem` | [modelcontextprotocol/servers](https://github.com/modelcontextprotocol/servers) (`src/filesystem`) | TypeScript | 24 | One MCP behaviour: handshake, tool listing, each of 12 tools, error paths, path confinement |
+| `claude-seo` | [AgriciDaniel/claude-seo](https://github.com/AgriciDaniel/claude-seo) | Python | 24 | One capability area's pytest group (agentic output, auth hardening, cost tracking, …) |
+| `pocketflow` | [The-Pocket/PocketFlow](https://github.com/The-Pocket/PocketFlow) | Python | 23 | One graph semantic (walk, conditional, retry, batch, async fan-out) + its own unit files |
+| `craft-eval` | this repo | TypeScript | 23 | One evaluator capability (trace handling, artifact guards, MCP mocking, …) |
 
 ## Running
 
@@ -29,57 +27,82 @@ git clone --depth 1 https://github.com/The-Pocket/PocketFlow.git          ../eva
 cd ../eval-subjects/mcp-servers/src/filesystem && npm install && npm run build
 
 # then, from the repo root
+npm run build
+# mcp-filesystem's per-case workspaces are generated, not committed
+powershell -File examples/real-world/mcp-filesystem/materialize.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File examples/real-world/run-all.ps1
 ```
 
-`run-all.ps1` prints one row per suite and exits non-zero if any suite is not
-`complete` or has failures.
+`run-all.ps1` prints one row per suite plus a total, and exits non-zero if any
+suite is not `complete` or has failures.
 
-## What each suite demonstrates
+Expected result on a machine without `gcloud` and without outbound whois:
 
-### `mcp-filesystem` — server mode
+```
+Suite          Cases Status   Passed Failed
+-----          ----- ------   ------ ------
+mcp-filesystem    24 complete     24      0
+claude-seo        24 complete     22      2
+pocketflow        23 complete     23      0
+craft-eval        23 complete     23      0
 
-The subject is a long-running stdio server, not a script that exits. This is the
-case the `driver` field was added for: the evaluator starts `argv` as a service,
-runs `driver.argv` to completion, then terminates the service. The driver is an
-MCP client that performs `initialize`, `tools/list`, `write_file` and
-`read_file`, and records the results in `outputs/mcp-result.json`; the checks
-grade that JSON.
+total: 92/94 cases passed
+```
 
-Verdicts are attributed to the driver, which is what makes a server testable at
-all — a server never exits on its own, so "exit code" would otherwise be
-meaningless.
+## Why cases, not one blob per repo
 
-### `claude-seo` — pass-rate grading over a large suite
+A suite with one case per repo answers "did anything break". A suite with one
+case per behaviour answers "what broke", and lets a consumer act on the report:
 
-1053 tests. The adapter runs pytest with `--junitxml` and converts the report to
-JSON, so grading does not depend on scraping console output.
+- `mcp-filesystem`: the four security cases (dotdot, absolute-outside-root,
+  write-outside-root, mkdir-outside-root) fail independently of the twelve
+  happy-path tool cases, so a confinement regression cannot hide behind a
+  passing round-trip.
+- `claude-seo`: the two failing cases are `webmaster-integrations` and
+  `gcloud-adc`. Both are environment limits — no `gcloud` binary, no outbound
+  whois — not subject defects. Every other capability area passes.
+- `pocketflow`: thirteen cases probe the library's own semantics (including
+  non-obvious ones like "retry counts attempts, not retries" and "Flow walks
+  copies of the start node"), ten run its own unit files per area.
+- `craft-eval`: one case per evaluator capability, so a regression in trace
+  validation reports as `03-missing-terminal-trace-…` rather than "tests failed".
 
-Nine tests fail in this environment for reasons unrelated to the subject: the
-`lxml` parser and the `gcloud` CLI are absent. The pass-rate script therefore
-accepts >= 98%, and a separate check asserts `errors == 0` so a collection
-crash (which is a real defect) cannot hide inside a tolerable failure count.
+## Per-case workspaces
 
-### `pocketflow` — zero-dependency determinism
+`mcp-filesystem` gives every case its own directory under `workspaces/`, because
+each probe needs different seed files (a file to move, a directory to list, a
+missing path to reject). A case names its workspace with the `workspace` field,
+resolved under `--workspace`; a path that escapes it is rejected at load time.
 
-56 tests, no API keys, no network. The suite asserts both that the count is
-sane (`>= 30`) and that `ok` is true, so deleting tests cannot turn a red suite
-green.
+`craft-eval` builds and runs its own suite, which needs `node_modules` and
+`dist` — both excluded from the sandbox copy. Those cases set `in_place: true`,
+which runs them against the checkout itself. Their `outputs/` is redirected
+outside the checkout so the subject is never written to.
 
-### `craft-eval` — self-application
+## Regenerating a suite
 
-Builds the evaluator and runs its own 22 tests through the same machinery. This
-is the regression guard for the other three: if a change breaks the runner, this
-suite fails first and locally.
+Each suite's cases are generated from a script, so adding a case is a one-line
+change rather than hand-edited JSON:
+
+```powershell
+node examples/real-world/mcp-filesystem/build-probes.mjs   # probe definitions
+powershell -File examples/real-world/mcp-filesystem/materialize.ps1  # per-case workspaces
+node examples/real-world/mcp-filesystem/build-suite.mjs    # suite.json
+node examples/real-world/claude-seo/build-suite.mjs
+node examples/real-world/pocketflow/build-suite.mjs
+node examples/real-world/craft-eval/build-suite.mjs
+```
 
 ## Platform notes
 
 - Interpreters are passed explicitly (`py -3`) rather than relying on `python`:
   on this Windows host `python.exe` resolves to the Microsoft Store stub, which
-  fails inside a spawned child. This is exactly what the `interpreter` field on
-  `script` checks exists for.
+  fails inside a spawned child. This is what the `interpreter` field on `script`
+  checks exists for.
 - `subject.env` may not use the `CRAFT_EVAL_` prefix — those variables are
   evaluator controls and are rejected at load time. The filesystem driver
   receives its connection descriptor through `EVAL_SUBJECT_SERVER` instead.
 - `npm`/`cmd` output on Windows is not UTF-8 by default; adapters that capture
   it must pass `encoding="utf-8", errors="replace"`.
+- `process.execPath` is the embedding host when a script runs under one, so the
+  suite generators use `node` from `PATH` rather than `process.execPath`.

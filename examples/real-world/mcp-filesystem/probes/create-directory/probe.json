@@ -1,0 +1,9 @@
+[
+  {
+    "id": "mkdir",
+    "tool": "create_directory",
+    "arguments": {
+      "path": "nested/deep/dir"
+    }
+  }
+]

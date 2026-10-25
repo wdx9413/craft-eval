@@ -1011,3 +1011,79 @@ test('stdout assertions work for a bare-print adapter', async () => {
     await fx.cleanup();
   }
 });
+
+test('per-case workspace isolates state and in_place skips the copy', async () => {
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    // Two cases, each with its own seeded workspace, plus one in-place case.
+    await mkdir(join(fx.workspace, 'ws-a'), { recursive: true });
+    await mkdir(join(fx.workspace, 'ws-b'), { recursive: true });
+    await writeFile(join(fx.workspace, 'ws-a', 'seed.txt'), 'from-a');
+    await writeFile(join(fx.workspace, 'ws-b', 'seed.txt'), 'from-b');
+    await writeFile(
+      join(fx.workspace, 'ws-a', 'host.mjs'),
+      `import { readFileSync, writeFileSync } from 'node:fs';
+const seed = readFileSync('seed.txt', 'utf8');
+writeFileSync('outputs/seen.json', JSON.stringify({ seed }));
+`,
+    );
+    await writeFile(
+      join(fx.workspace, 'ws-b', 'host.mjs'),
+      `import { readFileSync, writeFileSync } from 'node:fs';
+const seed = readFileSync('seed.txt', 'utf8');
+writeFileSync('outputs/seen.json', JSON.stringify({ seed }));
+`,
+    );
+    const cases = [
+      caseDoc('a', {
+        workspace: 'ws-a',
+        checks: [{ id: 'seed', kind: 'json_equals', path: 'outputs/seen.json', key: 'seed', equals: 'from-a' }],
+      }),
+      caseDoc('b', {
+        workspace: 'ws-b',
+        checks: [{ id: 'seed', kind: 'json_equals', path: 'outputs/seen.json', key: 'seed', equals: 'from-b' }],
+      }),
+    ];
+    const run = await fx.runEval('software', cases);
+    const report = await reportRun(run);
+    assert.deepEqual([report.passed, report.failed], [2, 0]);
+
+    // A workspace that escapes --workspace must be rejected, not resolved.
+    await assert.rejects(
+      fx.runEval('software', [caseDoc('escape', { workspace: '../outside' })]),
+      /leaves --workspace/,
+    );
+  } finally {
+    await fx.cleanup();
+  }
+});
+
+test('in_place cases run in the subject and never write outputs into it', async () => {
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    // The marker file exists only in the source workspace; a copy would carry it
+    // too, so the observable difference is that outputs must not land there.
+    await writeFile(join(fx.workspace, 'marker.txt'), 'source');
+    await fx.project(`import { readFileSync, writeFileSync } from 'node:fs';
+const marker = readFileSync('marker.txt', 'utf8');
+writeFileSync(process.env.CRAFT_EVAL_OUTPUT_DIR + '/ran.json', JSON.stringify({ marker }));
+`);
+    const run = await fx.runEval('software', [
+      caseDoc('in-place', {
+        in_place: true,
+        checks: [
+          { id: 'exit', kind: 'exit_code', equals: 0 },
+          { id: 'ran', kind: 'json_equals', path: 'outputs/ran.json', key: 'marker', equals: 'source' },
+        ],
+      }),
+    ]);
+    const result = await firstResult(run);
+    assert.equal(result.verdict, 'passed', JSON.stringify(result.checks));
+    // The subject checkout must not gain an outputs directory.
+    assert.equal(existsSync(join(fx.workspace, 'outputs')), false);
+  } finally {
+    await fx.cleanup();
+  }
+});

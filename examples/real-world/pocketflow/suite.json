@@ -1,17 +1,464 @@
 {
   "schema": "craft-eval.eval.v1",
-  "suite_id": "pocketflow-test-suite",
+  "suite_id": "pocketflow-semantics",
   "subject_kind": "software",
   "partition": "development",
   "sanitized": true,
   "cases": [
     {
-      "id": "unittest-full",
-      "argv": ["py", "-3", "run-tests.py"],
-      "timeout_s": 360,
+      "id": "default-transition",
+      "argv": [
+        "py",
+        "-3",
+        "probe.py",
+        "default-transition"
+      ],
+      "timeout_s": 60,
       "checks": [
-        {"id": "ran", "kind": "exit_code", "equals": 0},
-        {"id": "all-pass", "kind": "script", "path": "verify.py", "interpreter": ["py", "-3"], "pass_exit_codes": [0]}
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "ok",
+          "kind": "stdout_contains",
+          "value": "default-transition: ok"
+        }
+      ]
+    },
+    {
+      "id": "conditional-action",
+      "argv": [
+        "py",
+        "-3",
+        "probe.py",
+        "conditional-action"
+      ],
+      "timeout_s": 60,
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "ok",
+          "kind": "stdout_contains",
+          "value": "conditional-action: ok"
+        }
+      ]
+    },
+    {
+      "id": "shared-state-visible",
+      "argv": [
+        "py",
+        "-3",
+        "probe.py",
+        "shared-state-visible"
+      ],
+      "timeout_s": 60,
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "ok",
+          "kind": "stdout_contains",
+          "value": "shared-state-visible: ok"
+        }
+      ]
+    },
+    {
+      "id": "retry-succeeds",
+      "argv": [
+        "py",
+        "-3",
+        "probe.py",
+        "retry-succeeds"
+      ],
+      "timeout_s": 60,
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "ok",
+          "kind": "stdout_contains",
+          "value": "retry-succeeds: ok"
+        }
+      ]
+    },
+    {
+      "id": "fallback-on-exhaustion",
+      "argv": [
+        "py",
+        "-3",
+        "probe.py",
+        "fallback-on-exhaustion"
+      ],
+      "timeout_s": 60,
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "ok",
+          "kind": "stdout_contains",
+          "value": "fallback-on-exhaustion: ok"
+        }
+      ]
+    },
+    {
+      "id": "batch-node-iterates",
+      "argv": [
+        "py",
+        "-3",
+        "probe.py",
+        "batch-node-iterates"
+      ],
+      "timeout_s": 60,
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "ok",
+          "kind": "stdout_contains",
+          "value": "batch-node-iterates: ok"
+        }
+      ]
+    },
+    {
+      "id": "batch-flow-params",
+      "argv": [
+        "py",
+        "-3",
+        "probe.py",
+        "batch-flow-params"
+      ],
+      "timeout_s": 60,
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "ok",
+          "kind": "stdout_contains",
+          "value": "batch-flow-params: ok"
+        }
+      ]
+    },
+    {
+      "id": "async-flow-runs",
+      "argv": [
+        "py",
+        "-3",
+        "probe.py",
+        "async-flow-runs"
+      ],
+      "timeout_s": 60,
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "ok",
+          "kind": "stdout_contains",
+          "value": "async-flow-runs: ok"
+        }
+      ]
+    },
+    {
+      "id": "async-parallel-batch",
+      "argv": [
+        "py",
+        "-3",
+        "probe.py",
+        "async-parallel-batch"
+      ],
+      "timeout_s": 60,
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "ok",
+          "kind": "stdout_contains",
+          "value": "async-parallel-batch: ok"
+        }
+      ]
+    },
+    {
+      "id": "flow-composition",
+      "argv": [
+        "py",
+        "-3",
+        "probe.py",
+        "flow-composition"
+      ],
+      "timeout_s": 60,
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "ok",
+          "kind": "stdout_contains",
+          "value": "flow-composition: ok"
+        }
+      ]
+    },
+    {
+      "id": "set-params",
+      "argv": [
+        "py",
+        "-3",
+        "probe.py",
+        "set-params"
+      ],
+      "timeout_s": 60,
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "ok",
+          "kind": "stdout_contains",
+          "value": "set-params: ok"
+        }
+      ]
+    },
+    {
+      "id": "start-override",
+      "argv": [
+        "py",
+        "-3",
+        "probe.py",
+        "start-override"
+      ],
+      "timeout_s": 60,
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "ok",
+          "kind": "stdout_contains",
+          "value": "start-override: ok"
+        }
+      ]
+    },
+    {
+      "id": "unmapped-action-noop",
+      "argv": [
+        "py",
+        "-3",
+        "probe.py",
+        "unmapped-action-noop"
+      ],
+      "timeout_s": 60,
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "ok",
+          "kind": "stdout_contains",
+          "value": "unmapped-action-noop: ok"
+        }
+      ]
+    },
+    {
+      "id": "unit-flow-basic",
+      "argv": [
+        "py",
+        "-3",
+        "run-unit.py",
+        "tests/test_flow_basic.py"
+      ],
+      "timeout_s": 120,
+      "checks": [
+        {
+          "id": "passed",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "unit-flow-composition",
+      "argv": [
+        "py",
+        "-3",
+        "run-unit.py",
+        "tests/test_flow_composition.py"
+      ],
+      "timeout_s": 120,
+      "checks": [
+        {
+          "id": "passed",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "unit-batch-node",
+      "argv": [
+        "py",
+        "-3",
+        "run-unit.py",
+        "tests/test_batch_node.py"
+      ],
+      "timeout_s": 120,
+      "checks": [
+        {
+          "id": "passed",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "unit-batch-flow",
+      "argv": [
+        "py",
+        "-3",
+        "run-unit.py",
+        "tests/test_batch_flow.py"
+      ],
+      "timeout_s": 120,
+      "checks": [
+        {
+          "id": "passed",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "unit-fall-back",
+      "argv": [
+        "py",
+        "-3",
+        "run-unit.py",
+        "tests/test_fall_back.py"
+      ],
+      "timeout_s": 120,
+      "checks": [
+        {
+          "id": "passed",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "unit-async-flow",
+      "argv": [
+        "py",
+        "-3",
+        "run-unit.py",
+        "tests/test_async_flow.py"
+      ],
+      "timeout_s": 120,
+      "checks": [
+        {
+          "id": "passed",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "unit-async-batch-node",
+      "argv": [
+        "py",
+        "-3",
+        "run-unit.py",
+        "tests/test_async_batch_node.py"
+      ],
+      "timeout_s": 120,
+      "checks": [
+        {
+          "id": "passed",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "unit-async-batch-flow",
+      "argv": [
+        "py",
+        "-3",
+        "run-unit.py",
+        "tests/test_async_batch_flow.py"
+      ],
+      "timeout_s": 120,
+      "checks": [
+        {
+          "id": "passed",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "unit-async-parallel-batch-node",
+      "argv": [
+        "py",
+        "-3",
+        "run-unit.py",
+        "tests/test_async_parallel_batch_node.py"
+      ],
+      "timeout_s": 120,
+      "checks": [
+        {
+          "id": "passed",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "unit-async-parallel-batch-flow",
+      "argv": [
+        "py",
+        "-3",
+        "run-unit.py",
+        "tests/test_async_parallel_batch_flow.py"
+      ],
+      "timeout_s": 120,
+      "checks": [
+        {
+          "id": "passed",
+          "kind": "exit_code",
+          "equals": 0
+        }
       ]
     }
   ]

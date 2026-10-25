@@ -1,0 +1,9 @@
+[
+  {
+    "id": "info",
+    "tool": "get_file_info",
+    "arguments": {
+      "path": "target.txt"
+    }
+  }
+]

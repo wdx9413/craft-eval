@@ -1,19 +1,953 @@
 {
   "schema": "craft-eval.eval.v1",
-  "suite_id": "claude-seo-test-suite",
+  "suite_id": "claude-seo-areas",
   "subject_kind": "software",
   "partition": "development",
   "sanitized": true,
   "cases": [
     {
-      "id": "pytest-full",
-      "argv": ["py", "-3", "run-tests.py"],
-      "timeout_s": 720,
+      "id": "agentic-output",
+      "argv": [
+        "py",
+        "-3",
+        "run-group.py",
+        "test_agentic.py"
+      ],
+      "timeout_s": 300,
       "checks": [
-        {"id": "ran", "kind": "exit_code", "equals": 0},
-        {"id": "tests-collected", "kind": "script", "path": "collected.py", "interpreter": ["py", "-3"], "pass_exit_codes": [0]},
-        {"id": "pass-rate", "kind": "script", "path": "pass_rate.py", "interpreter": ["py", "-3"], "pass_exit_codes": [0]},
-        {"id": "no-internal-errors", "kind": "json_equals", "path": "outputs/pytest-result.json", "key": "errors", "equals": 0}
+        {
+          "id": "ran",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "collected",
+          "kind": "script",
+          "path": "assert-collected.py",
+          "interpreter": [
+            "py",
+            "-3"
+          ],
+          "args": [
+            "outputs/group-result.json"
+          ],
+          "pass_exit_codes": [
+            0
+          ]
+        },
+        {
+          "id": "passed",
+          "kind": "json_equals",
+          "path": "outputs/group-result.json",
+          "key": "ok",
+          "equals": true
+        }
+      ]
+    },
+    {
+      "id": "agent-mcp-permissions",
+      "argv": [
+        "py",
+        "-3",
+        "run-group.py",
+        "test_agent_mcp_permissions.py"
+      ],
+      "timeout_s": 300,
+      "checks": [
+        {
+          "id": "ran",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "collected",
+          "kind": "script",
+          "path": "assert-collected.py",
+          "interpreter": [
+            "py",
+            "-3"
+          ],
+          "args": [
+            "outputs/group-result.json"
+          ],
+          "pass_exit_codes": [
+            0
+          ]
+        },
+        {
+          "id": "passed",
+          "kind": "json_equals",
+          "path": "outputs/group-result.json",
+          "key": "ok",
+          "equals": true
+        }
+      ]
+    },
+    {
+      "id": "agent-untrusted-content",
+      "argv": [
+        "py",
+        "-3",
+        "run-group.py",
+        "test_agent_untrusted_content.py"
+      ],
+      "timeout_s": 300,
+      "checks": [
+        {
+          "id": "ran",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "collected",
+          "kind": "script",
+          "path": "assert-collected.py",
+          "interpreter": [
+            "py",
+            "-3"
+          ],
+          "args": [
+            "outputs/group-result.json"
+          ],
+          "pass_exit_codes": [
+            0
+          ]
+        },
+        {
+          "id": "passed",
+          "kind": "json_equals",
+          "path": "outputs/group-result.json",
+          "key": "ok",
+          "equals": true
+        }
+      ]
+    },
+    {
+      "id": "audit-instructions",
+      "argv": [
+        "py",
+        "-3",
+        "run-group.py",
+        "test_audit_instructions.py",
+        "test_audit_agent_turn_budget.py"
+      ],
+      "timeout_s": 300,
+      "checks": [
+        {
+          "id": "ran",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "collected",
+          "kind": "script",
+          "path": "assert-collected.py",
+          "interpreter": [
+            "py",
+            "-3"
+          ],
+          "args": [
+            "outputs/group-result.json"
+          ],
+          "pass_exit_codes": [
+            0
+          ]
+        },
+        {
+          "id": "passed",
+          "kind": "json_equals",
+          "path": "outputs/group-result.json",
+          "key": "ok",
+          "equals": true
+        }
+      ]
+    },
+    {
+      "id": "backlinks-auth-hardening",
+      "argv": [
+        "py",
+        "-3",
+        "run-group.py",
+        "test_backlinks_auth_hardening.py",
+        "test_backlink_score_gate.py"
+      ],
+      "timeout_s": 300,
+      "checks": [
+        {
+          "id": "ran",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "collected",
+          "kind": "script",
+          "path": "assert-collected.py",
+          "interpreter": [
+            "py",
+            "-3"
+          ],
+          "args": [
+            "outputs/group-result.json"
+          ],
+          "pass_exit_codes": [
+            0
+          ]
+        },
+        {
+          "id": "passed",
+          "kind": "json_equals",
+          "path": "outputs/group-result.json",
+          "key": "ok",
+          "equals": true
+        }
+      ]
+    },
+    {
+      "id": "banana-api-key-safety",
+      "argv": [
+        "py",
+        "-3",
+        "run-group.py",
+        "test_banana_api_key_safety.py",
+        "test_banana_key_masking.py"
+      ],
+      "timeout_s": 300,
+      "checks": [
+        {
+          "id": "ran",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "collected",
+          "kind": "script",
+          "path": "assert-collected.py",
+          "interpreter": [
+            "py",
+            "-3"
+          ],
+          "args": [
+            "outputs/group-result.json"
+          ],
+          "pass_exit_codes": [
+            0
+          ]
+        },
+        {
+          "id": "passed",
+          "kind": "json_equals",
+          "path": "outputs/group-result.json",
+          "key": "ok",
+          "equals": true
+        }
+      ]
+    },
+    {
+      "id": "banana-cost-tracking",
+      "argv": [
+        "py",
+        "-3",
+        "run-group.py",
+        "test_banana_cost_tracker.py",
+        "test_dataforseo_costs.py"
+      ],
+      "timeout_s": 300,
+      "checks": [
+        {
+          "id": "ran",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "collected",
+          "kind": "script",
+          "path": "assert-collected.py",
+          "interpreter": [
+            "py",
+            "-3"
+          ],
+          "args": [
+            "outputs/group-result.json"
+          ],
+          "pass_exit_codes": [
+            0
+          ]
+        },
+        {
+          "id": "passed",
+          "kind": "json_equals",
+          "path": "outputs/group-result.json",
+          "key": "ok",
+          "equals": true
+        }
+      ]
+    },
+    {
+      "id": "banana-install-layout",
+      "argv": [
+        "py",
+        "-3",
+        "run-group.py",
+        "test_banana_install_layout.py",
+        "test_banana_setup_mcp_atomic_write.py"
+      ],
+      "timeout_s": 300,
+      "checks": [
+        {
+          "id": "ran",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "collected",
+          "kind": "script",
+          "path": "assert-collected.py",
+          "interpreter": [
+            "py",
+            "-3"
+          ],
+          "args": [
+            "outputs/group-result.json"
+          ],
+          "pass_exit_codes": [
+            0
+          ]
+        },
+        {
+          "id": "passed",
+          "kind": "json_equals",
+          "path": "outputs/group-result.json",
+          "key": "ok",
+          "equals": true
+        }
+      ]
+    },
+    {
+      "id": "webmaster-integrations",
+      "argv": [
+        "py",
+        "-3",
+        "run-group.py",
+        "test_bing_webmaster.py",
+        "test_domain_history.py"
+      ],
+      "timeout_s": 300,
+      "checks": [
+        {
+          "id": "ran",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "collected",
+          "kind": "script",
+          "path": "assert-collected.py",
+          "interpreter": [
+            "py",
+            "-3"
+          ],
+          "args": [
+            "outputs/group-result.json"
+          ],
+          "pass_exit_codes": [
+            0
+          ]
+        },
+        {
+          "id": "passed",
+          "kind": "json_equals",
+          "path": "outputs/group-result.json",
+          "key": "ok",
+          "equals": true
+        }
+      ]
+    },
+    {
+      "id": "canonical-facts",
+      "argv": [
+        "py",
+        "-3",
+        "run-group.py",
+        "test_canonical_facts.py",
+        "test_consistency_check.py"
+      ],
+      "timeout_s": 300,
+      "checks": [
+        {
+          "id": "ran",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "collected",
+          "kind": "script",
+          "path": "assert-collected.py",
+          "interpreter": [
+            "py",
+            "-3"
+          ],
+          "args": [
+            "outputs/group-result.json"
+          ],
+          "pass_exit_codes": [
+            0
+          ]
+        },
+        {
+          "id": "passed",
+          "kind": "json_equals",
+          "path": "outputs/group-result.json",
+          "key": "ok",
+          "equals": true
+        }
+      ]
+    },
+    {
+      "id": "capture-paths",
+      "argv": [
+        "py",
+        "-3",
+        "run-group.py",
+        "test_capture_screenshot_paths.py"
+      ],
+      "timeout_s": 300,
+      "checks": [
+        {
+          "id": "ran",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "collected",
+          "kind": "script",
+          "path": "assert-collected.py",
+          "interpreter": [
+            "py",
+            "-3"
+          ],
+          "args": [
+            "outputs/group-result.json"
+          ],
+          "pass_exit_codes": [
+            0
+          ]
+        },
+        {
+          "id": "passed",
+          "kind": "json_equals",
+          "path": "outputs/group-result.json",
+          "key": "ok",
+          "equals": true
+        }
+      ]
+    },
+    {
+      "id": "cluster-escaping",
+      "argv": [
+        "py",
+        "-3",
+        "run-group.py",
+        "test_cluster_map_escaping.py"
+      ],
+      "timeout_s": 300,
+      "checks": [
+        {
+          "id": "ran",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "collected",
+          "kind": "script",
+          "path": "assert-collected.py",
+          "interpreter": [
+            "py",
+            "-3"
+          ],
+          "args": [
+            "outputs/group-result.json"
+          ],
+          "pass_exit_codes": [
+            0
+          ]
+        },
+        {
+          "id": "passed",
+          "kind": "json_equals",
+          "path": "outputs/group-result.json",
+          "key": "ok",
+          "equals": true
+        }
+      ]
+    },
+    {
+      "id": "commoncrawl-graph",
+      "argv": [
+        "py",
+        "-3",
+        "run-group.py",
+        "test_commoncrawl_graph.py"
+      ],
+      "timeout_s": 300,
+      "checks": [
+        {
+          "id": "ran",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "collected",
+          "kind": "script",
+          "path": "assert-collected.py",
+          "interpreter": [
+            "py",
+            "-3"
+          ],
+          "args": [
+            "outputs/group-result.json"
+          ],
+          "pass_exit_codes": [
+            0
+          ]
+        },
+        {
+          "id": "passed",
+          "kind": "json_equals",
+          "path": "outputs/group-result.json",
+          "key": "ok",
+          "equals": true
+        }
+      ]
+    },
+    {
+      "id": "content-quality",
+      "argv": [
+        "py",
+        "-3",
+        "run-group.py",
+        "test_content_quality.py",
+        "test_content_humanize.py"
+      ],
+      "timeout_s": 300,
+      "checks": [
+        {
+          "id": "ran",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "collected",
+          "kind": "script",
+          "path": "assert-collected.py",
+          "interpreter": [
+            "py",
+            "-3"
+          ],
+          "args": [
+            "outputs/group-result.json"
+          ],
+          "pass_exit_codes": [
+            0
+          ]
+        },
+        {
+          "id": "passed",
+          "kind": "json_equals",
+          "path": "outputs/group-result.json",
+          "key": "ok",
+          "equals": true
+        }
+      ]
+    },
+    {
+      "id": "contributors",
+      "argv": [
+        "py",
+        "-3",
+        "run-group.py",
+        "test_contributors.py"
+      ],
+      "timeout_s": 300,
+      "checks": [
+        {
+          "id": "ran",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "collected",
+          "kind": "script",
+          "path": "assert-collected.py",
+          "interpreter": [
+            "py",
+            "-3"
+          ],
+          "args": [
+            "outputs/group-result.json"
+          ],
+          "pass_exit_codes": [
+            0
+          ]
+        },
+        {
+          "id": "passed",
+          "kind": "json_equals",
+          "path": "outputs/group-result.json",
+          "key": "ok",
+          "equals": true
+        }
+      ]
+    },
+    {
+      "id": "cross-platform-hooks",
+      "argv": [
+        "py",
+        "-3",
+        "run-group.py",
+        "test_cross_platform_hooks.py"
+      ],
+      "timeout_s": 300,
+      "checks": [
+        {
+          "id": "ran",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "collected",
+          "kind": "script",
+          "path": "assert-collected.py",
+          "interpreter": [
+            "py",
+            "-3"
+          ],
+          "args": [
+            "outputs/group-result.json"
+          ],
+          "pass_exit_codes": [
+            0
+          ]
+        },
+        {
+          "id": "passed",
+          "kind": "json_equals",
+          "path": "outputs/group-result.json",
+          "key": "ok",
+          "equals": true
+        }
+      ]
+    },
+    {
+      "id": "dataforseo-tool-names",
+      "argv": [
+        "py",
+        "-3",
+        "run-group.py",
+        "test_dataforseo_tool_names.py"
+      ],
+      "timeout_s": 300,
+      "checks": [
+        {
+          "id": "ran",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "collected",
+          "kind": "script",
+          "path": "assert-collected.py",
+          "interpreter": [
+            "py",
+            "-3"
+          ],
+          "args": [
+            "outputs/group-result.json"
+          ],
+          "pass_exit_codes": [
+            0
+          ]
+        },
+        {
+          "id": "passed",
+          "kind": "json_equals",
+          "path": "outputs/group-result.json",
+          "key": "ok",
+          "equals": true
+        }
+      ]
+    },
+    {
+      "id": "drift-portability",
+      "argv": [
+        "py",
+        "-3",
+        "run-group.py",
+        "test_drift_portability.py"
+      ],
+      "timeout_s": 300,
+      "checks": [
+        {
+          "id": "ran",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "collected",
+          "kind": "script",
+          "path": "assert-collected.py",
+          "interpreter": [
+            "py",
+            "-3"
+          ],
+          "args": [
+            "outputs/group-result.json"
+          ],
+          "pass_exit_codes": [
+            0
+          ]
+        },
+        {
+          "id": "passed",
+          "kind": "json_equals",
+          "path": "outputs/group-result.json",
+          "key": "ok",
+          "equals": true
+        }
+      ]
+    },
+    {
+      "id": "extension-installer",
+      "argv": [
+        "py",
+        "-3",
+        "run-group.py",
+        "test_extension_installer_injection.py",
+        "test_extension_mirrors.py"
+      ],
+      "timeout_s": 300,
+      "checks": [
+        {
+          "id": "ran",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "collected",
+          "kind": "script",
+          "path": "assert-collected.py",
+          "interpreter": [
+            "py",
+            "-3"
+          ],
+          "args": [
+            "outputs/group-result.json"
+          ],
+          "pass_exit_codes": [
+            0
+          ]
+        },
+        {
+          "id": "passed",
+          "kind": "json_equals",
+          "path": "outputs/group-result.json",
+          "key": "ok",
+          "equals": true
+        }
+      ]
+    },
+    {
+      "id": "fetch-page-cli",
+      "argv": [
+        "py",
+        "-3",
+        "run-group.py",
+        "test_fetch_page_cli.py"
+      ],
+      "timeout_s": 300,
+      "checks": [
+        {
+          "id": "ran",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "collected",
+          "kind": "script",
+          "path": "assert-collected.py",
+          "interpreter": [
+            "py",
+            "-3"
+          ],
+          "args": [
+            "outputs/group-result.json"
+          ],
+          "pass_exit_codes": [
+            0
+          ]
+        },
+        {
+          "id": "passed",
+          "kind": "json_equals",
+          "path": "outputs/group-result.json",
+          "key": "ok",
+          "equals": true
+        }
+      ]
+    },
+    {
+      "id": "ai-crawler-claims",
+      "argv": [
+        "py",
+        "-3",
+        "run-group.py",
+        "test_ai_crawler_claims.py"
+      ],
+      "timeout_s": 300,
+      "checks": [
+        {
+          "id": "ran",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "collected",
+          "kind": "script",
+          "path": "assert-collected.py",
+          "interpreter": [
+            "py",
+            "-3"
+          ],
+          "args": [
+            "outputs/group-result.json"
+          ],
+          "pass_exit_codes": [
+            0
+          ]
+        },
+        {
+          "id": "passed",
+          "kind": "json_equals",
+          "path": "outputs/group-result.json",
+          "key": "ok",
+          "equals": true
+        }
+      ]
+    },
+    {
+      "id": "manual-install-layout",
+      "argv": [
+        "py",
+        "-3",
+        "run-group.py",
+        "test_manual_install_layout.py"
+      ],
+      "timeout_s": 300,
+      "checks": [
+        {
+          "id": "ran",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "collected",
+          "kind": "script",
+          "path": "assert-collected.py",
+          "interpreter": [
+            "py",
+            "-3"
+          ],
+          "args": [
+            "outputs/group-result.json"
+          ],
+          "pass_exit_codes": [
+            0
+          ]
+        },
+        {
+          "id": "passed",
+          "kind": "json_equals",
+          "path": "outputs/group-result.json",
+          "key": "ok",
+          "equals": true
+        }
+      ]
+    },
+    {
+      "id": "gcloud-adc",
+      "argv": [
+        "py",
+        "-3",
+        "run-group.py",
+        "test_google_gcloud_adc.py"
+      ],
+      "timeout_s": 300,
+      "checks": [
+        {
+          "id": "ran",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "collected",
+          "kind": "script",
+          "path": "assert-collected.py",
+          "interpreter": [
+            "py",
+            "-3"
+          ],
+          "args": [
+            "outputs/group-result.json"
+          ],
+          "pass_exit_codes": [
+            0
+          ]
+        },
+        {
+          "id": "passed",
+          "kind": "json_equals",
+          "path": "outputs/group-result.json",
+          "key": "ok",
+          "equals": true
+        }
+      ]
+    },
+    {
+      "id": "report-dependencies",
+      "argv": [
+        "py",
+        "-3",
+        "run-group.py",
+        "test_google_report_full_audit.py"
+      ],
+      "timeout_s": 300,
+      "checks": [
+        {
+          "id": "ran",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "collected",
+          "kind": "script",
+          "path": "assert-collected.py",
+          "interpreter": [
+            "py",
+            "-3"
+          ],
+          "args": [
+            "outputs/group-result.json"
+          ],
+          "pass_exit_codes": [
+            0
+          ]
+        },
+        {
+          "id": "passed",
+          "kind": "json_equals",
+          "path": "outputs/group-result.json",
+          "key": "ok",
+          "equals": true
+        }
       ]
     }
   ]

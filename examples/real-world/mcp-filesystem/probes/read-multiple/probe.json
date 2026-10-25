@@ -1,0 +1,12 @@
+[
+  {
+    "id": "multi",
+    "tool": "read_multiple_files",
+    "arguments": {
+      "paths": [
+        "m1.txt",
+        "m2.txt"
+      ]
+    }
+  }
+]

@@ -1,0 +1,9 @@
+[
+  {
+    "id": "traversal",
+    "tool": "read_text_file",
+    "arguments": {
+      "path": "../../../../etc/passwd"
+    }
+  }
+]

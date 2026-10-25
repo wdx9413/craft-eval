@@ -1,0 +1,9 @@
+[
+  {
+    "id": "abs",
+    "tool": "read_text_file",
+    "arguments": {
+      "path": "C:\\Windows\\win.ini"
+    }
+  }
+]

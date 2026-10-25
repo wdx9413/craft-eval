@@ -1,0 +1,9 @@
+[
+  {
+    "id": "media",
+    "tool": "read_media_file",
+    "arguments": {
+      "path": "pic.png"
+    }
+  }
+]

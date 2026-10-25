@@ -74,6 +74,19 @@ export interface Case {
    * `driver.env` is layered over the shared environment for the service process
    * only, so a host script can distinguish its role from the driver's.
    */
+  /**
+   * Per-case workspace, resolved relative to the `--workspace` directory given
+   * to `run`. Cases that need different initial state (a seeded tree, a fixture
+   * set) point at their own directory instead of sharing one mutable copy.
+   */
+  workspace?: string;
+  /**
+   * Run against the workspace in place instead of a copy. Only for cases whose
+   * subject is the checkout itself (build, own test suite): the copy skips
+   * `node_modules` and `dist`, so a build cannot succeed inside it. Such a case
+   * may write to the subject, which is why this is opt-in per case.
+   */
+  in_place?: boolean;
   driver?: { argv: string[]; env?: Record<string, string> };
   [key: string]: unknown;
 }
@@ -569,7 +582,15 @@ function basename(path: string): string {
   return parts[parts.length - 1] ?? path;
 }
 
-async function artifact(sandbox: string, relativeName: string): Promise<string> {
+async function artifact(sandbox: string, relativeName: string, outputDir?: string): Promise<string> {
+  // `outputs/...` is evaluator scratch space. Normally it lives inside the
+  // sandbox. An in-place case passes an outputDir that already points at the
+  // outputs directory itself, so the prefix is stripped before resolving there;
+  // without the override, behaviour is exactly as before.
+  if (outputDir !== undefined && (relativeName === 'outputs' || /^outputs[\\/]/.test(relativeName))) {
+    const stripped = relativeName.replace(/^outputs[\\/]?/, '');
+    return stripped === '' ? resolve(outputDir) : artifact(outputDir, stripped);
+  }
   const target = resolve(sandbox, relativeName);
   const root = resolve(sandbox);
   const inside = target === root || target.startsWith(root + sep);
@@ -932,6 +953,7 @@ async function check(
   timeoutSeconds: number,
   mcpCalls: McpCallRecord[],
   capturedStdout: Buffer,
+  outputDir?: string,
 ): Promise<CheckResult> {
   const kind = item.kind;
   const evidence: { kind: string; [key: string]: unknown } = { kind };
@@ -947,7 +969,7 @@ async function check(
     }
   } else if (kind === 'file_exists') {
     try {
-      const path = await artifact(sandbox, relativePath(item.path, 'file_exists.path'));
+      const path = await artifact(sandbox, relativePath(item.path, 'file_exists.path'), outputDir);
       const info = await stat(path).catch(() => null);
       passed = info !== null && info.isFile();
       reason = passed ? 'ok' : info === null ? 'not_found' : 'not_a_file';
@@ -958,7 +980,7 @@ async function check(
     evidence.path = item.path;
   } else if (kind === 'json_equals') {
     try {
-      const path = await artifact(sandbox, relativePath(item.path, 'json_equals.path'));
+      const path = await artifact(sandbox, relativePath(item.path, 'json_equals.path'), outputDir);
       const raw = await readBounded(path, MAX_JSON_BYTES);
       let value: unknown = JSON.parse(raw.toString('utf8'));
       for (const key of String(item.key).split('.')) {
@@ -979,7 +1001,7 @@ async function check(
     }
     evidence.path = item.path;
   } else if (kind === 'script') {
-    const scriptPath = await artifact(sandbox, relativePath(item.path, 'script.path')).catch(() => null);
+    const scriptPath = await artifact(sandbox, relativePath(item.path, 'script.path'), outputDir).catch(() => null);
     const scriptInfo = scriptPath === null ? null : await stat(scriptPath).catch(() => null);
     if (scriptPath === null || scriptInfo === null || !scriptInfo.isFile()) {
       passed = false;
@@ -1093,8 +1115,22 @@ async function oneCase(
   const taskRunId = randomUUID().replace(/-/g, '');
   const root = await mkdtemp(join(tmpdir(), 'craft-eval-case-'));
   try {
-    const sandbox = join(root, 'workspace');
-    await workspaceCopy(workspace, sandbox);
+    // In-place cases run against the checkout itself: the copy deliberately
+    // skips node_modules/dist, so a build or the subject's own suite cannot run
+    // inside it. Everything else keeps the isolation.
+    const sandbox = item.in_place === true ? workspace : join(root, 'workspace');
+    if (item.in_place !== true) {
+      await workspaceCopy(workspace, sandbox);
+    }
+    // Outputs sit inside the sandbox. An in-place case has no sandbox of its
+    // own, so it redirects outputs beside the case root; the subject checkout is
+    // never written to either way.
+    // Outputs sit inside the sandbox. An in-place case has no sandbox of its
+    // own, so it redirects outputs beside the case root; the subject checkout is
+    // never written to either way.
+    const outputOverride = item.in_place === true ? join(root, 'outputs') : undefined;
+    const outputDir = outputOverride ?? join(sandbox, 'outputs');
+    await mkdir(outputDir, { recursive: true });
     const tracePath = join(root, 'host-trace.jsonl');
     const stdoutPath = join(root, 'stdout');
     const stderrPath = join(root, 'stderr');
@@ -1114,7 +1150,9 @@ async function oneCase(
       CRAFT_EVAL_CASE_ID: item.id,
       CRAFT_EVAL_TRIAL: String(trial),
       CRAFT_EVAL_TRACE_PATH: tracePath,
-      CRAFT_EVAL_OUTPUT_DIR: join(sandbox, 'outputs'),
+      // The adapter must write where the checks will look, which for an in-place
+      // case is the redirect target rather than the sandbox.
+      CRAFT_EVAL_OUTPUT_DIR: outputOverride ?? outputDir,
     });
     Object.assign(env, subject.env ?? {});
     // Bind the skill before running: an unresolvable manifest is a broken suite,
@@ -1130,7 +1168,6 @@ async function oneCase(
     if (mcp !== null) {
       Object.assign(env, mcp.environment);
     }
-    await mkdir(join(sandbox, 'outputs'), { recursive: true });
     const started = process.hrtime.bigint();
     let exitCode: number | null = null;
     let issue: string | null = null;
@@ -1167,12 +1204,12 @@ async function oneCase(
     const mcpCalls = mcp === null ? [] : await readMcpCalls(mcp.configPath);
     const taskChecks = await Promise.all(
       (item.checks ?? []).map((entry) =>
-        check(entry, sandbox, exitCode, events, terminalTrace, timeoutSeconds, mcpCalls, capturedStdout),
+        check(entry, sandbox, exitCode, events, terminalTrace, timeoutSeconds, mcpCalls, capturedStdout, outputOverride),
       ),
     );
     const safetyChecks = await Promise.all(
       (item.safety_checks ?? []).map((entry) =>
-        check(entry, sandbox, exitCode, events, terminalTrace, timeoutSeconds, mcpCalls, capturedStdout),
+        check(entry, sandbox, exitCode, events, terminalTrace, timeoutSeconds, mcpCalls, capturedStdout, outputOverride),
       ),
     );
     const trigger =
@@ -1420,8 +1457,19 @@ export async function runSuite(
   };
   await atomicJson(join(runDir, 'plan.json'), plan);
   for (const item of suite.cases) {
+    // A case may name its own workspace, resolved under --workspace. Every
+    // resolved directory must stay inside it, so a suite cannot reach out.
+    const caseWorkspace =
+      item.workspace === undefined ? workspacePath : resolve(workspacePath, item.workspace);
+    if (caseWorkspace !== workspacePath && !caseWorkspace.startsWith(workspacePath + sep)) {
+      throw new Error(`case ${item.id} workspace leaves --workspace`);
+    }
+    const caseWorkspaceInfo = await stat(caseWorkspace).catch(() => null);
+    if (caseWorkspaceInfo === null || !caseWorkspaceInfo.isDirectory()) {
+      throw new Error(`case ${item.id} workspace must be a directory`);
+    }
     for (let trial = 1; trial <= trials; trial += 1) {
-      const result = await oneCase(item, subject, workspacePath, runId, trial);
+      const result = await oneCase(item, subject, caseWorkspace, runId, trial);
       await atomicJson(join(runDir, 'results', `${item.id}-${trial}.json`), result);
     }
   }

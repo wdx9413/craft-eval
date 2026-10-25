@@ -1,0 +1,10 @@
+[
+  {
+    "id": "move",
+    "tool": "move_file",
+    "arguments": {
+      "source": "ghost.txt",
+      "destination": "x.txt"
+    }
+  }
+]

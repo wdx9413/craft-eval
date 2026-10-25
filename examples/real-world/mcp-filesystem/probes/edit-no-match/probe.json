@@ -1,0 +1,15 @@
+[
+  {
+    "id": "edit",
+    "tool": "edit_file",
+    "arguments": {
+      "path": "nomatch.txt",
+      "edits": [
+        {
+          "oldText": "ZZZ",
+          "newText": "YYY"
+        }
+      ]
+    }
+  }
+]

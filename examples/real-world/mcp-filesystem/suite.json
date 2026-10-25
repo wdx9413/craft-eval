@@ -1,24 +1,893 @@
 {
   "schema": "craft-eval.eval.v1",
-  "suite_id": "mcp-filesystem-smoke",
+  "suite_id": "mcp-filesystem-full",
   "subject_kind": "software",
   "partition": "development",
   "sanitized": true,
   "cases": [
     {
-      "id": "filesystem-protocol-and-tools",
-      "argv": ["node", "D:\\\\documents\\\\project\\\\mytest\\\\eval-subjects\\\\mcp-servers\\\\src\\\\filesystem\\\\dist\\\\index.js", "."],
-      "timeout_s": 60,
-      "driver": { "argv": ["node", "driver.mjs"] },
-      "checks": [
-        {"id": "exit", "kind": "exit_code", "equals": 0},
-        {"id": "connected", "kind": "json_equals", "path": "outputs/mcp-result.json", "key": "connect_ok", "equals": true},
-        {"id": "initialized", "kind": "json_equals", "path": "outputs/mcp-result.json", "key": "init_ok", "equals": true},
-        {"id": "has-write-tool", "kind": "json_equals", "path": "outputs/mcp-result.json", "key": "write_ok", "equals": true},
-        {"id": "roundtrip", "kind": "json_equals", "path": "outputs/mcp-result.json", "key": "read_back_ok", "equals": true}
+      "id": "protocol-initializes",
+      "workspace": "workspaces/protocol-initializes",
+      "argv": [
+        "node",
+        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "."
       ],
-      "safety_checks": [
-        {"id": "not-crashed", "kind": "stdout_not_contains", "value": "Unhandled"}
+      "timeout_s": 45,
+      "driver": {
+        "argv": [
+          "node",
+          "probe.mjs"
+        ]
+      },
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "handshake",
+          "kind": "json_equals",
+          "path": "outputs/probe-result.json",
+          "key": "__init.ok",
+          "equals": true
+        },
+        {
+          "id": "server-name",
+          "kind": "json_equals",
+          "path": "outputs/probe-result.json",
+          "key": "__init.name",
+          "equals": "secure-filesystem-server"
+        }
+      ]
+    },
+    {
+      "id": "tools-listed",
+      "workspace": "workspaces/tools-listed",
+      "argv": [
+        "node",
+        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "."
+      ],
+      "timeout_s": 45,
+      "driver": {
+        "argv": [
+          "node",
+          "probe.mjs"
+        ]
+      },
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "has-read",
+          "kind": "script",
+          "path": "check-tools.py",
+          "interpreter": [
+            "py",
+            "-3"
+          ],
+          "pass_exit_codes": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "write-file-succeeds",
+      "workspace": "workspaces/write-then-read",
+      "argv": [
+        "node",
+        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "."
+      ],
+      "timeout_s": 45,
+      "driver": {
+        "argv": [
+          "node",
+          "probe.mjs"
+        ]
+      },
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "write-ok",
+          "kind": "json_equals",
+          "path": "outputs/probe-result.json",
+          "key": "write.is_error",
+          "equals": false
+        },
+        {
+          "id": "write-text",
+          "kind": "script",
+          "path": "contains.py",
+          "interpreter": [
+            "py",
+            "-3"
+          ],
+          "args": [
+            "outputs/probe-result.json",
+            "write",
+            "Successfully wrote"
+          ],
+          "pass_exit_codes": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "create-directory-succeeds",
+      "workspace": "workspaces/create-directory",
+      "argv": [
+        "node",
+        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "."
+      ],
+      "timeout_s": 45,
+      "driver": {
+        "argv": [
+          "node",
+          "probe.mjs"
+        ]
+      },
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "mkdir-ok",
+          "kind": "json_equals",
+          "path": "outputs/probe-result.json",
+          "key": "mkdir.is_error",
+          "equals": false
+        }
+      ]
+    },
+    {
+      "id": "list-directory-succeeds",
+      "workspace": "workspaces/list-directory",
+      "argv": [
+        "node",
+        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "."
+      ],
+      "timeout_s": 45,
+      "driver": {
+        "argv": [
+          "node",
+          "probe.mjs"
+        ]
+      },
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "list-ok",
+          "kind": "json_equals",
+          "path": "outputs/probe-result.json",
+          "key": "list.is_error",
+          "equals": false
+        },
+        {
+          "id": "list-text",
+          "kind": "script",
+          "path": "contains.py",
+          "interpreter": [
+            "py",
+            "-3"
+          ],
+          "args": [
+            "outputs/probe-result.json",
+            "list",
+            "one.txt"
+          ],
+          "pass_exit_codes": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "list-with-sizes-succeeds",
+      "workspace": "workspaces/list-with-sizes",
+      "argv": [
+        "node",
+        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "."
+      ],
+      "timeout_s": 45,
+      "driver": {
+        "argv": [
+          "node",
+          "probe.mjs"
+        ]
+      },
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "sizes-ok",
+          "kind": "json_equals",
+          "path": "outputs/probe-result.json",
+          "key": "sizes.is_error",
+          "equals": false
+        },
+        {
+          "id": "sizes-text",
+          "kind": "script",
+          "path": "contains.py",
+          "interpreter": [
+            "py",
+            "-3"
+          ],
+          "args": [
+            "outputs/probe-result.json",
+            "sizes",
+            "two.txt"
+          ],
+          "pass_exit_codes": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "directory-tree-succeeds",
+      "workspace": "workspaces/directory-tree",
+      "argv": [
+        "node",
+        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "."
+      ],
+      "timeout_s": 45,
+      "driver": {
+        "argv": [
+          "node",
+          "probe.mjs"
+        ]
+      },
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "tree-ok",
+          "kind": "json_equals",
+          "path": "outputs/probe-result.json",
+          "key": "tree.is_error",
+          "equals": false
+        },
+        {
+          "id": "tree-text",
+          "kind": "script",
+          "path": "contains.py",
+          "interpreter": [
+            "py",
+            "-3"
+          ],
+          "args": [
+            "outputs/probe-result.json",
+            "tree",
+            "inner.txt"
+          ],
+          "pass_exit_codes": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "get-file-info-succeeds",
+      "workspace": "workspaces/get-file-info",
+      "argv": [
+        "node",
+        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "."
+      ],
+      "timeout_s": 45,
+      "driver": {
+        "argv": [
+          "node",
+          "probe.mjs"
+        ]
+      },
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "info-ok",
+          "kind": "json_equals",
+          "path": "outputs/probe-result.json",
+          "key": "info.is_error",
+          "equals": false
+        },
+        {
+          "id": "info-text",
+          "kind": "script",
+          "path": "contains.py",
+          "interpreter": [
+            "py",
+            "-3"
+          ],
+          "args": [
+            "outputs/probe-result.json",
+            "info",
+            "isFile: true"
+          ],
+          "pass_exit_codes": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "allowed-directories-succeeds",
+      "workspace": "workspaces/allowed-directories",
+      "argv": [
+        "node",
+        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "."
+      ],
+      "timeout_s": 45,
+      "driver": {
+        "argv": [
+          "node",
+          "probe.mjs"
+        ]
+      },
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "roots-ok",
+          "kind": "json_equals",
+          "path": "outputs/probe-result.json",
+          "key": "roots.is_error",
+          "equals": false
+        }
+      ]
+    },
+    {
+      "id": "move-file-succeeds",
+      "workspace": "workspaces/move-file",
+      "argv": [
+        "node",
+        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "."
+      ],
+      "timeout_s": 45,
+      "driver": {
+        "argv": [
+          "node",
+          "probe.mjs"
+        ]
+      },
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "move-ok",
+          "kind": "json_equals",
+          "path": "outputs/probe-result.json",
+          "key": "move.is_error",
+          "equals": false
+        }
+      ]
+    },
+    {
+      "id": "edit-file-succeeds",
+      "workspace": "workspaces/edit-file",
+      "argv": [
+        "node",
+        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "."
+      ],
+      "timeout_s": 45,
+      "driver": {
+        "argv": [
+          "node",
+          "probe.mjs"
+        ]
+      },
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "edit-ok",
+          "kind": "json_equals",
+          "path": "outputs/probe-result.json",
+          "key": "edit.is_error",
+          "equals": false
+        },
+        {
+          "id": "edit-text",
+          "kind": "script",
+          "path": "contains.py",
+          "interpreter": [
+            "py",
+            "-3"
+          ],
+          "args": [
+            "outputs/probe-result.json",
+            "edit",
+            "BBB"
+          ],
+          "pass_exit_codes": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "search-files-succeeds",
+      "workspace": "workspaces/search-files",
+      "argv": [
+        "node",
+        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "."
+      ],
+      "timeout_s": 45,
+      "driver": {
+        "argv": [
+          "node",
+          "probe.mjs"
+        ]
+      },
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "search-ok",
+          "kind": "json_equals",
+          "path": "outputs/probe-result.json",
+          "key": "search.is_error",
+          "equals": false
+        },
+        {
+          "id": "search-text",
+          "kind": "script",
+          "path": "contains.py",
+          "interpreter": [
+            "py",
+            "-3"
+          ],
+          "args": [
+            "outputs/probe-result.json",
+            "search",
+            "hit.txt"
+          ],
+          "pass_exit_codes": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "read-multiple-succeeds",
+      "workspace": "workspaces/read-multiple",
+      "argv": [
+        "node",
+        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "."
+      ],
+      "timeout_s": 45,
+      "driver": {
+        "argv": [
+          "node",
+          "probe.mjs"
+        ]
+      },
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "multi-ok",
+          "kind": "json_equals",
+          "path": "outputs/probe-result.json",
+          "key": "multi.is_error",
+          "equals": false
+        },
+        {
+          "id": "multi-text",
+          "kind": "script",
+          "path": "contains.py",
+          "interpreter": [
+            "py",
+            "-3"
+          ],
+          "args": [
+            "outputs/probe-result.json",
+            "multi",
+            "first"
+          ],
+          "pass_exit_codes": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "read-head-truncates",
+      "workspace": "workspaces/read-file-head",
+      "argv": [
+        "node",
+        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "."
+      ],
+      "timeout_s": 45,
+      "driver": {
+        "argv": [
+          "node",
+          "probe.mjs"
+        ]
+      },
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "head-ok",
+          "kind": "json_equals",
+          "path": "outputs/probe-result.json",
+          "key": "head.is_error",
+          "equals": false
+        },
+        {
+          "id": "head-text",
+          "kind": "script",
+          "path": "contains.py",
+          "interpreter": [
+            "py",
+            "-3"
+          ],
+          "args": [
+            "outputs/probe-result.json",
+            "head",
+            "line1"
+          ],
+          "pass_exit_codes": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "read-missing-file-rejected",
+      "workspace": "workspaces/read-missing-file",
+      "argv": [
+        "node",
+        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "."
+      ],
+      "timeout_s": 45,
+      "driver": {
+        "argv": [
+          "node",
+          "probe.mjs"
+        ]
+      },
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "read-rejected",
+          "kind": "json_equals",
+          "path": "outputs/probe-result.json",
+          "key": "read.is_error",
+          "equals": true
+        }
+      ]
+    },
+    {
+      "id": "list-missing-dir-rejected",
+      "workspace": "workspaces/list-missing-dir",
+      "argv": [
+        "node",
+        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "."
+      ],
+      "timeout_s": 45,
+      "driver": {
+        "argv": [
+          "node",
+          "probe.mjs"
+        ]
+      },
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "list-rejected",
+          "kind": "json_equals",
+          "path": "outputs/probe-result.json",
+          "key": "list.is_error",
+          "equals": true
+        }
+      ]
+    },
+    {
+      "id": "move-missing-source-rejected",
+      "workspace": "workspaces/move-missing-source",
+      "argv": [
+        "node",
+        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "."
+      ],
+      "timeout_s": 45,
+      "driver": {
+        "argv": [
+          "node",
+          "probe.mjs"
+        ]
+      },
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "move-rejected",
+          "kind": "json_equals",
+          "path": "outputs/probe-result.json",
+          "key": "move.is_error",
+          "equals": true
+        }
+      ]
+    },
+    {
+      "id": "edit-no-match-rejected",
+      "workspace": "workspaces/edit-no-match",
+      "argv": [
+        "node",
+        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "."
+      ],
+      "timeout_s": 45,
+      "driver": {
+        "argv": [
+          "node",
+          "probe.mjs"
+        ]
+      },
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "edit-rejected",
+          "kind": "json_equals",
+          "path": "outputs/probe-result.json",
+          "key": "edit.is_error",
+          "equals": true
+        }
+      ]
+    },
+    {
+      "id": "search-no-match-empty",
+      "workspace": "workspaces/search-no-match",
+      "argv": [
+        "node",
+        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "."
+      ],
+      "timeout_s": 45,
+      "driver": {
+        "argv": [
+          "node",
+          "probe.mjs"
+        ]
+      },
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "search-ok",
+          "kind": "json_equals",
+          "path": "outputs/probe-result.json",
+          "key": "search.is_error",
+          "equals": false
+        }
+      ]
+    },
+    {
+      "id": "read-media-missing-rejected",
+      "workspace": "workspaces/read-media-file",
+      "argv": [
+        "node",
+        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "."
+      ],
+      "timeout_s": 45,
+      "driver": {
+        "argv": [
+          "node",
+          "probe.mjs"
+        ]
+      },
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "media-rejected",
+          "kind": "json_equals",
+          "path": "outputs/probe-result.json",
+          "key": "media.is_error",
+          "equals": true
+        }
+      ]
+    },
+    {
+      "id": "rejects-dotdot-traversal",
+      "workspace": "workspaces/path-traversal-dotdot",
+      "argv": [
+        "node",
+        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "."
+      ],
+      "timeout_s": 45,
+      "driver": {
+        "argv": [
+          "node",
+          "probe.mjs"
+        ]
+      },
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "traversal-rejected",
+          "kind": "json_equals",
+          "path": "outputs/probe-result.json",
+          "key": "traversal.is_error",
+          "equals": true
+        }
+      ]
+    },
+    {
+      "id": "rejects-absolute-outside-root",
+      "workspace": "workspaces/path-traversal-abs",
+      "argv": [
+        "node",
+        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "."
+      ],
+      "timeout_s": 45,
+      "driver": {
+        "argv": [
+          "node",
+          "probe.mjs"
+        ]
+      },
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "abs-rejected",
+          "kind": "json_equals",
+          "path": "outputs/probe-result.json",
+          "key": "abs.is_error",
+          "equals": true
+        }
+      ]
+    },
+    {
+      "id": "rejects-write-outside-root",
+      "workspace": "workspaces/write-outside-root",
+      "argv": [
+        "node",
+        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "."
+      ],
+      "timeout_s": 45,
+      "driver": {
+        "argv": [
+          "node",
+          "probe.mjs"
+        ]
+      },
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "escape-rejected",
+          "kind": "json_equals",
+          "path": "outputs/probe-result.json",
+          "key": "escape.is_error",
+          "equals": true
+        }
+      ]
+    },
+    {
+      "id": "rejects-mkdir-outside-root",
+      "workspace": "workspaces/create-dir-traversal",
+      "argv": [
+        "node",
+        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "."
+      ],
+      "timeout_s": 45,
+      "driver": {
+        "argv": [
+          "node",
+          "probe.mjs"
+        ]
+      },
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "evil-rejected",
+          "kind": "json_equals",
+          "path": "outputs/probe-result.json",
+          "key": "evil.is_error",
+          "equals": true
+        }
       ]
     }
   ]

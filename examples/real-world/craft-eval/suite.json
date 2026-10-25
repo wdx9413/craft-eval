@@ -1,18 +1,533 @@
 {
   "schema": "craft-eval.eval.v1",
-  "suite_id": "craft-eval-self-test",
+  "suite_id": "craft-eval-capabilities",
   "subject_kind": "software",
   "partition": "development",
   "sanitized": true,
   "cases": [
     {
-      "id": "build-and-tests",
-      "argv": ["py", "-3", "run-tests.py"],
-      "timeout_s": 600,
+      "id": "build-succeeds",
+      "in_place": true,
+      "argv": [
+        "cmd",
+        "/c",
+        "npm",
+        "run",
+        "build"
+      ],
+      "timeout_s": 300,
       "checks": [
-        {"id": "ran", "kind": "exit_code", "equals": 0},
-        {"id": "build-ok", "kind": "json_equals", "path": "outputs/craft-result.json", "key": "build_ok", "equals": true},
-        {"id": "all-tests-pass", "kind": "json_equals", "path": "outputs/craft-result.json", "key": "all_pass", "equals": true}
+        {
+          "id": "built",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "01-software-executes-in-copy-and-reports-observed-f",
+      "in_place": true,
+      "argv": [
+        "py",
+        "-3",
+        "run-self-test.py",
+        "software executes in copy and reports observed failures"
+      ],
+      "timeout_s": 180,
+      "checks": [
+        {
+          "id": "ran",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "matched",
+          "kind": "stdout_not_contains",
+          "value": "tests 0"
+        }
+      ]
+    },
+    {
+      "id": "02-agent-checks-environment-state-and-completed-hos",
+      "in_place": true,
+      "argv": [
+        "py",
+        "-3",
+        "run-self-test.py",
+        "agent checks environment state and completed host trace"
+      ],
+      "timeout_s": 180,
+      "checks": [
+        {
+          "id": "ran",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "matched",
+          "kind": "stdout_not_contains",
+          "value": "tests 0"
+        }
+      ]
+    },
+    {
+      "id": "03-missing-terminal-trace-is-inconclusive-even-when",
+      "in_place": true,
+      "argv": [
+        "py",
+        "-3",
+        "run-self-test.py",
+        "missing terminal trace is inconclusive even when skill not selected"
+      ],
+      "timeout_s": 180,
+      "checks": [
+        {
+          "id": "ran",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "matched",
+          "kind": "stdout_not_contains",
+          "value": "tests 0"
+        }
+      ]
+    },
+    {
+      "id": "04-agent-requires-completed-host-trace-even-for-fil",
+      "in_place": true,
+      "argv": [
+        "py",
+        "-3",
+        "run-self-test.py",
+        "agent requires completed host trace even for file checks"
+      ],
+      "timeout_s": 180,
+      "checks": [
+        {
+          "id": "ran",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "matched",
+          "kind": "stdout_not_contains",
+          "value": "tests 0"
+        }
+      ]
+    },
+    {
+      "id": "05-skill-paired-gain-requires-positive-negative-and",
+      "in_place": true,
+      "argv": [
+        "py",
+        "-3",
+        "run-self-test.py",
+        "skill paired gain requires positive negative and real distinct runs"
+      ],
+      "timeout_s": 180,
+      "checks": [
+        {
+          "id": "ran",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "matched",
+          "kind": "stdout_not_contains",
+          "value": "tests 0"
+        }
+      ]
+    },
+    {
+      "id": "06-plan-and-result-tampering-or-incomplete-work-can",
+      "in_place": true,
+      "argv": [
+        "py",
+        "-3",
+        "run-self-test.py",
+        "plan and result tampering or incomplete work cannot pass"
+      ],
+      "timeout_s": 180,
+      "checks": [
+        {
+          "id": "ran",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "matched",
+          "kind": "stdout_not_contains",
+          "value": "tests 0"
+        }
+      ]
+    },
+    {
+      "id": "07-suite-validation-rejects-unsafe-or-ambiguous-con",
+      "in_place": true,
+      "argv": [
+        "py",
+        "-3",
+        "run-self-test.py",
+        "suite validation rejects unsafe or ambiguous contracts"
+      ],
+      "timeout_s": 180,
+      "checks": [
+        {
+          "id": "ran",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "matched",
+          "kind": "stdout_not_contains",
+          "value": "tests 0"
+        }
+      ]
+    },
+    {
+      "id": "08-runtime-mismatch-and-adapter-errors-are-explicit",
+      "in_place": true,
+      "argv": [
+        "py",
+        "-3",
+        "run-self-test.py",
+        "runtime mismatch and adapter errors are explicit"
+      ],
+      "timeout_s": 180,
+      "checks": [
+        {
+          "id": "ran",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "matched",
+          "kind": "stdout_not_contains",
+          "value": "tests 0"
+        }
+      ]
+    },
+    {
+      "id": "09-timeout-and-untrusted-trace-cannot-count-as-succ",
+      "in_place": true,
+      "argv": [
+        "py",
+        "-3",
+        "run-self-test.py",
+        "timeout and untrusted trace cannot count as success"
+      ],
+      "timeout_s": 180,
+      "checks": [
+        {
+          "id": "ran",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "matched",
+          "kind": "stdout_not_contains",
+          "value": "tests 0"
+        }
+      ]
+    },
+    {
+      "id": "10-artifact-links-cannot-read-outside-workspace",
+      "in_place": true,
+      "argv": [
+        "py",
+        "-3",
+        "run-self-test.py",
+        "artifact links cannot read outside workspace"
+      ],
+      "timeout_s": 180,
+      "checks": [
+        {
+          "id": "ran",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "matched",
+          "kind": "stdout_not_contains",
+          "value": "tests 0"
+        }
+      ]
+    },
+    {
+      "id": "11-contract-rejects-all-invalid-case-and-check-shap",
+      "in_place": true,
+      "argv": [
+        "py",
+        "-3",
+        "run-self-test.py",
+        "contract rejects all invalid case and check shapes"
+      ],
+      "timeout_s": 180,
+      "checks": [
+        {
+          "id": "ran",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "matched",
+          "kind": "stdout_not_contains",
+          "value": "tests 0"
+        }
+      ]
+    },
+    {
+      "id": "12-subject-workspace-trials-and-cli-errors",
+      "in_place": true,
+      "argv": [
+        "py",
+        "-3",
+        "run-self-test.py",
+        "subject workspace trials and cli errors"
+      ],
+      "timeout_s": 180,
+      "checks": [
+        {
+          "id": "ran",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "matched",
+          "kind": "stdout_not_contains",
+          "value": "tests 0"
+        }
+      ]
+    },
+    {
+      "id": "13-artifact-and-trace-failure-modes",
+      "in_place": true,
+      "argv": [
+        "py",
+        "-3",
+        "run-self-test.py",
+        "artifact and trace failure modes"
+      ],
+      "timeout_s": 180,
+      "checks": [
+        {
+          "id": "ran",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "matched",
+          "kind": "stdout_not_contains",
+          "value": "tests 0"
+        }
+      ]
+    },
+    {
+      "id": "14-comparison-guards-and-pair-directions",
+      "in_place": true,
+      "argv": [
+        "py",
+        "-3",
+        "run-self-test.py",
+        "comparison guards and pair directions"
+      ],
+      "timeout_s": 180,
+      "checks": [
+        {
+          "id": "ran",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "matched",
+          "kind": "stdout_not_contains",
+          "value": "tests 0"
+        }
+      ]
+    },
+    {
+      "id": "15-self-reported-triggers-can-diagnose-but-never-su",
+      "in_place": true,
+      "argv": [
+        "py",
+        "-3",
+        "run-self-test.py",
+        "self-reported triggers can diagnose but never support a gain claim"
+      ],
+      "timeout_s": 180,
+      "checks": [
+        {
+          "id": "ran",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "matched",
+          "kind": "stdout_not_contains",
+          "value": "tests 0"
+        }
+      ]
+    },
+    {
+      "id": "16-script-checks-grade-by-exit-code-and-classify-fa",
+      "in_place": true,
+      "argv": [
+        "py",
+        "-3",
+        "run-self-test.py",
+        "script checks grade by exit code and classify failures"
+      ],
+      "timeout_s": 180,
+      "checks": [
+        {
+          "id": "ran",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "matched",
+          "kind": "stdout_not_contains",
+          "value": "tests 0"
+        }
+      ]
+    },
+    {
+      "id": "17-development-suite-and-command-entry-points",
+      "in_place": true,
+      "argv": [
+        "py",
+        "-3",
+        "run-self-test.py",
+        "development suite and command entry points"
+      ],
+      "timeout_s": 180,
+      "checks": [
+        {
+          "id": "ran",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "matched",
+          "kind": "stdout_not_contains",
+          "value": "tests 0"
+        }
+      ]
+    },
+    {
+      "id": "18-mocked-mcp-servers-serve-tools-and-tool-call-che",
+      "in_place": true,
+      "argv": [
+        "py",
+        "-3",
+        "run-self-test.py",
+        "mocked mcp servers serve tools and tool_call checks grade from evaluator evidence"
+      ],
+      "timeout_s": 180,
+      "checks": [
+        {
+          "id": "ran",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "matched",
+          "kind": "stdout_not_contains",
+          "value": "tests 0"
+        }
+      ]
+    },
+    {
+      "id": "19-mcp-contract-validation-rejects-malformed-declar",
+      "in_place": true,
+      "argv": [
+        "py",
+        "-3",
+        "run-self-test.py",
+        "mcp contract validation rejects malformed declarations"
+      ],
+      "timeout_s": 180,
+      "checks": [
+        {
+          "id": "ran",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "matched",
+          "kind": "stdout_not_contains",
+          "value": "tests 0"
+        }
+      ]
+    },
+    {
+      "id": "20-script-checks-accept-an-explicit-interpreter-for",
+      "in_place": true,
+      "argv": [
+        "py",
+        "-3",
+        "run-self-test.py",
+        "script checks accept an explicit interpreter for any language"
+      ],
+      "timeout_s": 180,
+      "checks": [
+        {
+          "id": "ran",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "matched",
+          "kind": "stdout_not_contains",
+          "value": "tests 0"
+        }
+      ]
+    },
+    {
+      "id": "21-server-mode-cases-start-a-service-drive-it-and-t",
+      "in_place": true,
+      "argv": [
+        "py",
+        "-3",
+        "run-self-test.py",
+        "server-mode cases start a service, drive it, and terminate it"
+      ],
+      "timeout_s": 180,
+      "checks": [
+        {
+          "id": "ran",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "matched",
+          "kind": "stdout_not_contains",
+          "value": "tests 0"
+        }
+      ]
+    },
+    {
+      "id": "22-stdout-assertions-work-for-a-bare-print-adapter",
+      "in_place": true,
+      "argv": [
+        "py",
+        "-3",
+        "run-self-test.py",
+        "stdout assertions work for a bare-print adapter"
+      ],
+      "timeout_s": 180,
+      "checks": [
+        {
+          "id": "ran",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "matched",
+          "kind": "stdout_not_contains",
+          "value": "tests 0"
+        }
       ]
     }
   ]

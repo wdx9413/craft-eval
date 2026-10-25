@@ -1,0 +1,10 @@
+[
+  {
+    "id": "search",
+    "tool": "search_files",
+    "arguments": {
+      "path": ".",
+      "pattern": "*.nomatch"
+    }
+  }
+]
