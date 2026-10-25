@@ -49,6 +49,47 @@ craft-eval        23 complete     23      0
 total: 92/94 cases passed
 ```
 
+## A/B comparison
+
+`run-all.ps1` reports per-suite verdicts. `ab-compare.ps1` exercises the
+`Comparison` layer: it grades two checkouts of the same subject against the same
+suite and runtime, then prints the paired metrics.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File examples/real-world/ab-compare.ps1
+```
+
+The candidate is a copy of PocketFlow with one line changed — `Node._exec` caps
+retries at one attempt, ignoring `max_retries`. Expected output:
+
+```
+baseline: passed=23 failed=0 status=complete
+candidate: passed=22 failed=1 status=complete
+
+comparison:
+status                : comparable
+expected_pairs        : 23
+measured_pairs        : 23
+baseline_wins         : 1
+candidate_wins        : 0
+ties                  : 22
+one_sided_p           : 1
+independent_task_runs : True
+
+duration_ms: baseline mean=272.5 (n=23)  candidate mean=271.7 (n=23)
+OK: the injected defect was detected
+```
+
+What this pins down:
+
+- the defect is attributed to **one** case, not "the suite failed"
+- direction is correct: `baseline_wins: 1`, `candidate_wins: 0`
+- `one_sided_p: 1` is the honest answer for one discordant pair. A single-case
+  regression cannot be statistically significant, and the report says so rather
+  than implying confidence
+- `duration_ms` is measured per case on both sides (n=23 each), not estimated
+- `skill_gain_supported: false` — no skill is involved, so no gain claim
+
 ## Why cases, not one blob per repo
 
 A suite with one case per repo answers "did anything break". A suite with one

@@ -5,11 +5,14 @@ They are independent of PocketFlow's own test files on purpose: the point is to
 grade the library against its documented contract, not to re-run its suite.
 """
 import asyncio
+import os
 import sys
 import traceback
 from pathlib import Path
 
-sys.path.insert(0, str(Path(r"D:\documents\project\mytest\eval-subjects\pocketflow")))
+# Overridable so the same probes can grade two checkouts for an A/B comparison.
+REPO = Path(os.environ.get("POCKETFLOW_REPO", r"D:\documents\project\mytest\eval-subjects\pocketflow"))
+sys.path.insert(0, str(REPO))
 
 from pocketflow import (  # noqa: E402
     AsyncBatchFlow,

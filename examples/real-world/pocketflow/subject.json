@@ -1,6 +1,8 @@
 {
-  "kind": "software",
-  "id": "pocketflow",
-  "version": "main",
-  "env": {}
+    "env":  {
+                "POCKETFLOW_REPO":  "D:\\documents\\project\\mytest\\eval-subjects\\pocketflow"
+            },
+    "version":  "baseline",
+    "id":  "pocketflow",
+    "kind":  "software"
 }

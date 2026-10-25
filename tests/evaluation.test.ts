@@ -1,4 +1,4 @@
-import assert from 'node:assert/strict';
+﻿import assert from 'node:assert/strict';
 import test from 'node:test';
 import { spawnSync } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, rm, symlink, unlink, writeFile } from 'node:fs/promises';
@@ -1083,6 +1083,56 @@ writeFileSync(process.env.CRAFT_EVAL_OUTPUT_DIR + '/ran.json', JSON.stringify({ 
     assert.equal(result.verdict, 'passed', JSON.stringify(result.checks));
     // The subject checkout must not gain an outputs directory.
     assert.equal(existsSync(join(fx.workspace, 'outputs')), false);
+  } finally {
+    await fx.cleanup();
+  }
+});
+
+test('comparison over many cases reports real metrics, not a restated exit code', async () => {
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    // Twenty independent cases; the candidate fixes exactly two of them. This
+    // exercises the Comparison layer at the scale a real suite has, and pins the
+    // metric shape (pair counts, direction, duration observations) rather than
+    // just "some numbers came back".
+    await fx.project(`import { writeFileSync, mkdirSync } from 'node:fs';
+const id = process.env.CRAFT_EVAL_CASE_ID;
+const fixed = process.env.FIXED === '1';
+const target = ['case-03', 'case-17'].includes(id);
+mkdirSync('outputs', { recursive: true });
+writeFileSync('outputs/result.json', JSON.stringify({ ok: target ? fixed : true }));
+process.exit(target && !fixed ? 1 : 0);
+`);
+    const cases = Array.from({ length: 20 }, (_, index) =>
+      caseDoc(`case-${String(index + 1).padStart(2, '0')}`, {
+        checks: [{ id: 'ok', kind: 'json_equals', path: 'outputs/result.json', key: 'ok', equals: true }],
+      }),
+    );
+    const baseline = await fx.runEval('software', cases, { FIXED: '0' });
+    const candidate = await fx.runEval('software', cases, { FIXED: '1' });
+    const comparison = await compareRuns(baseline, candidate);
+
+    assert.equal(comparison.status, 'comparable');
+    assert.equal(comparison.expected_pairs, 20);
+    assert.equal(comparison.measured_pairs, 20);
+    assert.equal(comparison.unmeasured_pairs, 0);
+    // The candidate is strictly better: two wins, no losses.
+    assert.deepEqual([comparison.candidate_wins, comparison.baseline_wins, comparison.ties], [2, 0, 18]);
+    // Two wins out of twenty pairs gives p = 0.25: correct, and deliberately not
+    // significant. This is why the project requires 20+ positives before a gain
+    // claim — the test pins that small samples cannot reach the threshold.
+    assert.equal(comparison.one_sided_p, 0.25);
+    assert.ok((comparison.one_sided_p ?? 1) > 0.05);
+    assert.equal(comparison.independent_task_runs, true);
+    // Duration is measured per case, not invented.
+    assert.equal(comparison.duration_ms.baseline.observed, 20);
+    assert.equal(comparison.duration_ms.candidate.observed, 20);
+    assert.ok((comparison.duration_ms.baseline.mean ?? 0) > 0);
+    // Software subjects report no cost, which must stay null rather than zero.
+    assert.equal(comparison.cost_units.baseline.mean, null);
+    // No skill is involved, so no gain claim may be made.
+    assert.equal(comparison.skill_gain_supported, false);
   } finally {
     await fx.cleanup();
   }
