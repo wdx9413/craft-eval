@@ -25,7 +25,7 @@ const MAX_JSON_BYTES = 1_000_000;
 
 export interface Check {
   id: string;
-  kind: 'exit_code' | 'file_exists' | 'json_equals' | 'trace_event' | 'script' | 'tool_call';
+  kind: 'exit_code' | 'file_exists' | 'json_equals' | 'trace_event' | 'script' | 'tool_call' | 'stdout_contains' | 'stdout_not_contains';
   [key: string]: unknown;
 }
 
@@ -67,6 +67,14 @@ export interface Case {
   skill?: SkillBinding;
   /** Mocked MCP servers started by the evaluator for this case. */
   mcp?: McpServerSpec[];
+  /**
+   * Server-mode case: `argv` starts a long-running service and `driver.argv`
+   * exercises it to completion. The evaluator terminates the service after the
+   * driver exits; trace, checks and stdout/stderr all belong to the driver.
+   * `driver.env` is layered over the shared environment for the service process
+   * only, so a host script can distinguish its role from the driver's.
+   */
+  driver?: { argv: string[]; env?: Record<string, string> };
   [key: string]: unknown;
 }
 
@@ -124,7 +132,9 @@ export type CheckReason =
   | 'tool_not_called'
   | 'tool_unexpectedly_called'
   | 'arguments_mismatch'
-  | 'tool_errored';
+  | 'tool_errored'
+  | 'stdout_missing'
+  | 'stdout_present';
 
 export interface CheckResult {
   id: string;
@@ -273,9 +283,18 @@ function checkList(value: unknown, name: string): Check[] {
           throw new Error('script args must be an array of strings');
         }
       }
+      if (check.interpreter !== undefined) {
+        if (!Array.isArray(check.interpreter) || check.interpreter.length === 0 || check.interpreter.some((arg) => typeof arg !== 'string' || arg === '')) {
+          throw new Error('script interpreter must be a non-empty array of strings');
+        }
+      }
       const passes = check.pass_exit_codes ?? [0];
       if (!Array.isArray(passes) || passes.length === 0 || !passes.every(isPlainInteger)) {
         throw new Error('script pass_exit_codes must be a non-empty array of integers');
+      }
+    } else if (kind === 'stdout_contains' || kind === 'stdout_not_contains') {
+      if (typeof check.value !== 'string' || check.value === '') {
+        throw new Error(`${String(kind)} requires a non-empty string value`);
       }
     } else if (kind === 'tool_call') {
       if (typeof check.server !== 'string' || check.server === '') {
@@ -336,6 +355,23 @@ export async function loadSuite(path: string): Promise<Suite> {
     const argv = item.argv;
     if (!Array.isArray(argv) || argv.length === 0 || argv.some((arg) => typeof arg !== 'string' || arg === '')) {
       throw new Error(`case ${caseId} needs non-empty argv strings`);
+    }
+    if (item.driver !== undefined) {
+      const driverArgv = (item.driver as { argv?: unknown }).argv;
+      if (!Array.isArray(driverArgv) || driverArgv.length === 0 || driverArgv.some((arg) => typeof arg !== 'string' || arg === '')) {
+        throw new Error(`case ${caseId} driver needs non-empty argv strings`);
+      }
+      const driverEnv = (item.driver as { env?: unknown }).env;
+      if (driverEnv !== undefined) {
+        if (driverEnv === null || typeof driverEnv !== 'object' || Array.isArray(driverEnv)) {
+          throw new Error(`case ${caseId} driver.env must be an object of strings`);
+        }
+        for (const [key, value] of Object.entries(driverEnv as Record<string, unknown>)) {
+          if (!ENV_KEY.test(key) || typeof value !== 'string') {
+            throw new Error(`case ${caseId} driver.env must be an object of strings`);
+          }
+        }
+      }
     }
     const timeout = item.timeout_s ?? 30;
     if (typeof timeout !== 'number' || !Number.isFinite(timeout) || timeout <= 0 || timeout > 3_600) {
@@ -450,7 +486,24 @@ async function atomicJson(path: string, value: unknown): Promise<void> {
   await rename(temporary, path);
 }
 
-const IGNORED = new Set(['.git', '.craft_data', '.venv', '__pycache__']);
+const IGNORED = new Set([
+  '.git',
+  '.craft_data',
+  '.venv',
+  '__pycache__',
+  // Build/dependency artifacts across ecosystems; copying them would slow every
+  // case and can break tools that resolve symlinked stores.
+  'node_modules',
+  'dist',
+  'build',
+  'target',
+  'vendor',
+  '.next',
+  '.turbo',
+  '.pytest_cache',
+  '.mypy_cache',
+  '.ruff_cache',
+]);
 
 async function workspaceCopy(source: string, destination: string): Promise<void> {
   const info = await stat(source).catch(() => null);
@@ -666,6 +719,7 @@ async function runScript(
   args: string[],
   sandbox: string,
   timeoutSeconds: number,
+  explicitInterpreter?: string[],
 ): Promise<ScriptOutcome> {
   const extension = extname(scriptPath).toLowerCase();
   const interpreters: Record<string, string> = {
@@ -676,8 +730,9 @@ async function runScript(
     '.sh': 'sh',
     '.ps1': 'pwsh',
   };
-  const interpreter = interpreters[extension];
-  const argv = interpreter === undefined ? [scriptPath, ...args] : [interpreter, scriptPath, ...args];
+  const fallback = interpreters[extension];
+  const interpreter: string[] = explicitInterpreter ?? (fallback === undefined ? [scriptPath] : [fallback]);
+  const argv = [...interpreter, scriptPath, ...args];
   return new Promise((done) => {
     let child: ChildProcess;
     try {
@@ -839,6 +894,35 @@ async function readMcpCalls(configPath: string): Promise<McpCallRecord[]> {
   return calls;
 }
 
+/** Start a long-running service process; returns its terminator. */
+function startService(item: Case, sandbox: string, env: Record<string, string>): Promise<() => Promise<void>> {
+  return new Promise((resolveStarted) => {
+    let child: ChildProcess;
+    try {
+      child = spawn(item.argv[0] ?? '', item.argv.slice(1), {
+        cwd: sandbox,
+        env,
+        stdio: ['ignore', 'ignore', 'ignore'],
+        shell: false,
+        windowsHide: true,
+      });
+    } catch {
+      // A service that cannot start still yields a terminator; the driver will
+      // fail against a dead endpoint and the case verdicts reflect that.
+      resolveStarted(async () => {});
+      return;
+    }
+    child.on('error', () => {
+      // Swallow: the driver outcome is the verdict, not the service's.
+    });
+    resolveStarted(async () => {
+      killTree(child.pid);
+      // Give the process a moment to die so the temp tree can be removed.
+      await new Promise((done) => setTimeout(done, 120));
+    });
+  });
+}
+
 async function check(
   item: Check,
   sandbox: string,
@@ -847,6 +931,7 @@ async function check(
   terminalTrace: boolean,
   timeoutSeconds: number,
   mcpCalls: McpCallRecord[],
+  capturedStdout: Buffer,
 ): Promise<CheckResult> {
   const kind = item.kind;
   const evidence: { kind: string; [key: string]: unknown } = { kind };
@@ -900,7 +985,13 @@ async function check(
       passed = false;
       reason = 'not_found';
     } else {
-      const outcome = await runScript(scriptPath, Array.isArray(item.args) ? (item.args as string[]) : [], sandbox, Math.max(1, Math.floor(timeoutSeconds)));
+      const outcome = await runScript(
+      scriptPath,
+      Array.isArray(item.args) ? (item.args as string[]) : [],
+      sandbox,
+      Math.max(1, Math.floor(timeoutSeconds)),
+      Array.isArray(item.interpreter) ? (item.interpreter as string[]) : undefined,
+    );
       evidence.exit_code = outcome.exitCode;
       if (outcome.issue !== null) {
         passed = false;
@@ -913,6 +1004,16 @@ async function check(
       }
     }
     evidence.path = item.path;
+  } else if (kind === 'stdout_contains' || kind === 'stdout_not_contains') {
+    // Judged from the in-memory capture; the raw text is still never persisted,
+    // keeping the privacy boundary while making "print-and-assert" possible in
+    // any language the adapter can be written in.
+    const text = capturedStdout.toString('utf8');
+    const contains = text.includes(String(item.value));
+    passed = kind === 'stdout_contains' ? contains : !contains;
+    reason = passed ? 'ok' : kind === 'stdout_contains' ? 'stdout_missing' : 'stdout_present';
+    evidence.length = text.length;
+    evidence.value = item.value;
   } else if (kind === 'tool_call') {
     // Evidence comes from the evaluator-side mock server log, never from the
     // subject's own trace, so a subject cannot claim a tool call it never made.
@@ -1033,11 +1134,29 @@ async function oneCase(
     const started = process.hrtime.bigint();
     let exitCode: number | null = null;
     let issue: string | null = null;
+    let capturedStdout: Buffer<ArrayBufferLike> = Buffer.alloc(0);
     const timeoutSeconds = item.timeout_s ?? 30;
     try {
-      const outcome = await runAdapter(item, sandbox, env, stdoutPath, stderrPath);
-      exitCode = outcome.exitCode;
-      issue = outcome.issue;
+      if (item.driver === undefined) {
+        const outcome = await runAdapter(item, sandbox, env, stdoutPath, stderrPath);
+        exitCode = outcome.exitCode;
+        issue = outcome.issue;
+        capturedStdout = outcome.stdout;
+      } else {
+        // Server mode: start the service, run the driver to completion, then
+        // stop the service. The service's own exit is irrelevant to the verdict.
+        const serviceEnv = { ...env, ...(item.driver.env ?? {}) };
+        const service = await startService(item, sandbox, serviceEnv);
+        try {
+          const driverCase: Case = { ...item, argv: item.driver.argv };
+          const outcome = await runAdapter(driverCase, sandbox, env, stdoutPath, stderrPath);
+          exitCode = outcome.exitCode;
+          issue = outcome.issue;
+          capturedStdout = outcome.stdout;
+        } finally {
+          await service();
+        }
+      }
     } finally {
       if (mcp !== null) {
         await mcp.stop();
@@ -1048,12 +1167,12 @@ async function oneCase(
     const mcpCalls = mcp === null ? [] : await readMcpCalls(mcp.configPath);
     const taskChecks = await Promise.all(
       (item.checks ?? []).map((entry) =>
-        check(entry, sandbox, exitCode, events, terminalTrace, timeoutSeconds, mcpCalls),
+        check(entry, sandbox, exitCode, events, terminalTrace, timeoutSeconds, mcpCalls, capturedStdout),
       ),
     );
     const safetyChecks = await Promise.all(
       (item.safety_checks ?? []).map((entry) =>
-        check(entry, sandbox, exitCode, events, terminalTrace, timeoutSeconds, mcpCalls),
+        check(entry, sandbox, exitCode, events, terminalTrace, timeoutSeconds, mcpCalls, capturedStdout),
       ),
     );
     const trigger =
@@ -1167,6 +1286,8 @@ async function removeTree(path: string): Promise<void> {
 interface AdapterOutcome {
   exitCode: number | null;
   issue: string | null;
+  stdout: Buffer<ArrayBufferLike>;
+  stderr: Buffer;
 }
 
 function runAdapter(
@@ -1187,19 +1308,26 @@ function runAdapter(
         windowsHide: true,
       });
     } catch (error) {
-      done({ exitCode: null, issue: `adapter_error:${(error as Error).name}` });
+      done({ exitCode: null, issue: `adapter_error:${(error as Error).name}`, stdout: Buffer.alloc(0), stderr: Buffer.alloc(0) });
       return;
     }
     const stdout: Buffer[] = [];
     const stderr: Buffer[] = [];
     let settled = false;
+    const finish = (exitCode: number | null, issue: string | null): void => {
+      const mergedStdout = Buffer.concat(stdout);
+      const mergedStderr = Buffer.concat(stderr);
+      void writeCapture(stdoutPath, [mergedStdout], stderrPath, [mergedStderr]).then(() =>
+        done({ exitCode, issue, stdout: mergedStdout, stderr: mergedStderr }),
+      );
+    };
     const timer = setTimeout(() => {
       if (settled) {
         return;
       }
       settled = true;
       killTree(child.pid);
-      void writeCapture(stdoutPath, stdout, stderrPath, stderr).then(() => done({ exitCode: null, issue: 'timeout' }));
+      finish(null, 'timeout');
     }, (item.timeout_s ?? 30) * 1_000);
     child.stdout?.on('data', (chunk: Buffer) => stdout.push(chunk));
     child.stderr?.on('data', (chunk: Buffer) => stderr.push(chunk));
@@ -1209,12 +1337,7 @@ function runAdapter(
       }
       settled = true;
       clearTimeout(timer);
-      void writeCapture(stdoutPath, stdout, stderrPath, stderr).then(() =>
-        done({
-          exitCode: null,
-          issue: `adapter_error:${error.code === 'ENOENT' ? 'FileNotFoundError' : error.name}`,
-        }),
-      );
+      finish(null, `adapter_error:${error.code === 'ENOENT' ? 'FileNotFoundError' : error.name}`);
     });
     child.on('close', (code: number | null) => {
       if (settled) {
@@ -1222,7 +1345,7 @@ function runAdapter(
       }
       settled = true;
       clearTimeout(timer);
-      void writeCapture(stdoutPath, stdout, stderrPath, stderr).then(() => done({ exitCode: code, issue: null }));
+      finish(code, null);
     });
   });
 }

@@ -911,3 +911,103 @@ test('mcp contract validation rejects malformed declarations', async () => {
     await fx.cleanup();
   }
 });
+
+test('script checks accept an explicit interpreter for any language', async () => {
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    // An extension-less grading script: the default mapping has no entry for it
+    // (it would be executed directly), so passing the interpreter explicitly is
+    // the only way it runs under Node.
+    await fx.project(`import { writeFileSync } from 'node:fs';
+writeFileSync('check.mjs', 'process.exit(0);');
+writeFileSync('graded-script', 'process.exit(0);');
+`);
+    const viaNode = { id: 'grade', kind: 'script', path: 'graded-script', interpreter: [NODE_BINARY] };
+    const run = await fx.runEval('software', [caseDoc('graded', { checks: [viaNode] })]);
+    const result = await firstCheck(run);
+    assert.deepEqual([result.passed, result.reason], [true, 'ok']);
+    const bad = { id: 'grade', kind: 'script', path: 'check.mjs', interpreter: [] as unknown as string[] };
+    await assert.rejects(
+      loadSuite(await write(fx.root, 'bad-interp.json', suiteDoc('software', [caseDoc('a', { checks: [bad] })]))),
+      /interpreter/,
+    );
+  } finally {
+    await fx.cleanup();
+  }
+});
+
+test('server-mode cases start a service, drive it, and terminate it', async () => {
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    // The service and the driver run the same script; CRAFT_EVAL_ROLE splits
+    // them. The service creates a ready file and idles; the driver waits for it,
+    // probes, prints a verdict and exits.
+    await fx.project(`import { writeFileSync, existsSync, readFileSync } from 'node:fs';
+if (process.env.EVAL_ROLE === 'service') {
+  writeFileSync('service.ready', 'up');
+  writeFileSync('service.log', 'serving');
+  setInterval(() => {}, 10_000);
+} else {
+  const deadline = Date.now() + 5000;
+  while (!existsSync('service.ready') && Date.now() < deadline) {
+    await new Promise((done) => setTimeout(done, 50));
+  }
+  const up = existsSync('service.ready');
+  const content = up ? readFileSync('service.log', 'utf8') : '';
+  console.log('SERVICE_UP=' + up + ' CONTENT=' + content);
+  process.exit(up && content === 'serving' ? 0 : 1);
+}
+`);
+    const checks = [
+      { id: 'exit', kind: 'exit_code', equals: 0 },
+      { id: 'up', kind: 'stdout_contains', value: 'SERVICE_UP=true' },
+      { id: 'content', kind: 'stdout_contains', value: 'CONTENT=serving' },
+      { id: 'no-junk', kind: 'stdout_not_contains', value: 'SERVICE_UP=false' },
+    ];
+    const suite = suiteDoc('software', [
+      {
+        ...caseDoc('probe', { checks }),
+        // The driver may wait up to 5s for service readiness; the case budget
+        // must cover that wait plus the service startup.
+        timeout_s: 10,
+        argv: [NODE_BINARY, 'host.mjs'],
+        // driver.env is layered onto the service process only, which is how the
+        // shared script knows to act as the service rather than the driver.
+        driver: { argv: [NODE_BINARY, 'host.mjs'], env: { EVAL_ROLE: 'service' } },
+      },
+    ]);
+    const suitePath = await write(fx.root, 'server-suite.json', suite);
+    const subjectPath = await write(fx.root, 'subject.json', { kind: 'software', id: 'svc', version: 'v1' });
+    const run = await runSuite(suitePath, subjectPath, fx.runtimePath, fx.workspace, fx.output);
+    const result = await firstResult(run);
+    assert.equal(result.verdict, 'passed', JSON.stringify(result.checks));
+    assert.equal((await reportRun(run)).passed, 1);
+  } finally {
+    await fx.cleanup();
+  }
+});
+
+test('stdout assertions work for a bare-print adapter', async () => {
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    await fx.project(`console.log('EVAL_OK alpha=1');
+`);
+    const checks = [
+      { id: 'has', kind: 'stdout_contains', value: 'EVAL_OK' },
+      { id: 'not', kind: 'stdout_not_contains', value: 'EVAL_FAIL' },
+    ];
+    const run = await fx.runEval('software', [caseDoc('print', { checks })]);
+    const result = await firstResult(run);
+    assert.deepEqual(result.checks.map((item) => item.passed), [true, true]);
+    const missing = await fx.runEval('software', [
+      caseDoc('print', { checks: [{ id: 'has', kind: 'stdout_contains', value: 'ABSENT' }] }),
+    ]);
+    const check = await firstCheck(missing);
+    assert.deepEqual([check.passed, check.reason], [false, 'stdout_missing']);
+  } finally {
+    await fx.cleanup();
+  }
+});
