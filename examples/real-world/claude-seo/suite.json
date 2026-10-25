@@ -1,0 +1,20 @@
+{
+  "schema": "craft-eval.eval.v1",
+  "suite_id": "claude-seo-test-suite",
+  "subject_kind": "software",
+  "partition": "development",
+  "sanitized": true,
+  "cases": [
+    {
+      "id": "pytest-full",
+      "argv": ["py", "-3", "run-tests.py"],
+      "timeout_s": 720,
+      "checks": [
+        {"id": "ran", "kind": "exit_code", "equals": 0},
+        {"id": "tests-collected", "kind": "script", "path": "collected.py", "interpreter": ["py", "-3"], "pass_exit_codes": [0]},
+        {"id": "pass-rate", "kind": "script", "path": "pass_rate.py", "interpreter": ["py", "-3"], "pass_exit_codes": [0]},
+        {"id": "no-internal-errors", "kind": "json_equals", "path": "outputs/pytest-result.json", "key": "errors", "equals": 0}
+      ]
+    }
+  ]
+}

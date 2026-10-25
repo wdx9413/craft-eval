@@ -1,0 +1,19 @@
+{
+  "schema": "craft-eval.eval.v1",
+  "suite_id": "craft-eval-self-test",
+  "subject_kind": "software",
+  "partition": "development",
+  "sanitized": true,
+  "cases": [
+    {
+      "id": "build-and-tests",
+      "argv": ["py", "-3", "run-tests.py"],
+      "timeout_s": 600,
+      "checks": [
+        {"id": "ran", "kind": "exit_code", "equals": 0},
+        {"id": "build-ok", "kind": "json_equals", "path": "outputs/craft-result.json", "key": "build_ok", "equals": true},
+        {"id": "all-tests-pass", "kind": "json_equals", "path": "outputs/craft-result.json", "key": "all_pass", "equals": true}
+      ]
+    }
+  ]
+}

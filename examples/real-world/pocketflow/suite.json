@@ -1,0 +1,18 @@
+{
+  "schema": "craft-eval.eval.v1",
+  "suite_id": "pocketflow-test-suite",
+  "subject_kind": "software",
+  "partition": "development",
+  "sanitized": true,
+  "cases": [
+    {
+      "id": "unittest-full",
+      "argv": ["py", "-3", "run-tests.py"],
+      "timeout_s": 360,
+      "checks": [
+        {"id": "ran", "kind": "exit_code", "equals": 0},
+        {"id": "all-pass", "kind": "script", "path": "verify.py", "interpreter": ["py", "-3"], "pass_exit_codes": [0]}
+      ]
+    }
+  ]
+}

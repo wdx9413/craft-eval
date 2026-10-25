@@ -1,0 +1,25 @@
+{
+  "schema": "craft-eval.eval.v1",
+  "suite_id": "mcp-filesystem-smoke",
+  "subject_kind": "software",
+  "partition": "development",
+  "sanitized": true,
+  "cases": [
+    {
+      "id": "filesystem-protocol-and-tools",
+      "argv": ["node", "D:\\\\documents\\\\project\\\\mytest\\\\eval-subjects\\\\mcp-servers\\\\src\\\\filesystem\\\\dist\\\\index.js", "."],
+      "timeout_s": 60,
+      "driver": { "argv": ["node", "driver.mjs"] },
+      "checks": [
+        {"id": "exit", "kind": "exit_code", "equals": 0},
+        {"id": "connected", "kind": "json_equals", "path": "outputs/mcp-result.json", "key": "connect_ok", "equals": true},
+        {"id": "initialized", "kind": "json_equals", "path": "outputs/mcp-result.json", "key": "init_ok", "equals": true},
+        {"id": "has-write-tool", "kind": "json_equals", "path": "outputs/mcp-result.json", "key": "write_ok", "equals": true},
+        {"id": "roundtrip", "kind": "json_equals", "path": "outputs/mcp-result.json", "key": "read_back_ok", "equals": true}
+      ],
+      "safety_checks": [
+        {"id": "not-crashed", "kind": "stdout_not_contains", "value": "Unhandled"}
+      ]
+    }
+  ]
+}

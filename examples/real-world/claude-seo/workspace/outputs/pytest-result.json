@@ -1,0 +1,22 @@
+{
+  "exit_code": 1,
+  "tests": 1053,
+  "failures": 13,
+  "errors": 0,
+  "skipped": 37,
+  "failed_tests": [
+    "tests.test_agentic::test_webmcp_markup_detects_legacy_entry_point",
+    "tests.test_agentic::test_js_shell_detection",
+    "tests.test_agentic::test_llms_draft_passes_lighthouse_rules",
+    "tests.test_agentic::test_webmcp_draft_binds_to_form_and_marks_consequential",
+    "tests.test_agentic::test_webmcp_draft_uses_document_order_and_escapes_script_end",
+    "tests.test_agentic::test_radio_group_becomes_one_enum_field",
+    "tests.test_agentic::test_priority_table_checks_always_emit_a_row",
+    "tests.test_domain_history::test_legitimate_referral_is_still_followed",
+    "tests.test_google_gcloud_adc::test_gcloud_is_the_fallback_when_nothing_else_is_configured",
+    "tests.test_google_gcloud_adc::test_explicit_choice_beats_a_configured_service_account",
+    "tests.test_render_page::test_render_page_never_mode_against_example_com",
+    "tests.test_technical_depth::test_lcp_subparts_reports_missing_api_key",
+    "tests.test_technical_depth::test_unlighthouse_reports_missing_node"
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "kind": "software",
+  "id": "mcp-filesystem",
+  "version": "2.0.1",
+  "env": {
+    "EVAL_SUBJECT_SERVER": "{\"command\":\"node\",\"args\":[\"D:\\\\documents\\\\project\\\\mytest\\\\eval-subjects\\\\mcp-servers\\\\src\\\\filesystem\\\\dist\\\\index.js\",\"D:\\\\documents\\\\project\\\\mytest\\\\craft-eval\\\\examples\\\\real-world\\\\mcp-filesystem\\\\workspace\"]}"
+  }
+}
