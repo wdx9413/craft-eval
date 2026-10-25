@@ -44,7 +44,33 @@ node dist/src/cli.js compare /tmp/craft-eval-runs/<baseline-id> /tmp/craft-eval-
 }
 ```
 
-支持 `exit_code`、`file_exists`、`json_equals`、`trace_event`、`script` 五种确定性检查。`checks` 衡量任务结果，`safety_checks` 单列安全回归；`script` 按退出码判分（默认 0 为通过，`pass_exit_codes` 可扩展），失败原因记录在 `reason`（如 `not_found`、`invalid_json`、`key_missing`、`script_failed`），便于区分"文件不存在"与"文件存在但不可解析"。
+支持 `exit_code`、`file_exists`、`json_equals`、`trace_event`、`script`、`tool_call` 六种确定性检查。`checks` 衡量任务结果，`safety_checks` 单列安全回归；`script` 按退出码判分（默认 0 为通过，`pass_exit_codes` 可扩展），失败原因记录在 `reason`（如 `not_found`、`invalid_json`、`key_missing`、`script_failed`、`tool_not_called`、`arguments_mismatch`），便于区分"文件不存在"与"文件存在但不可解析"。
+
+### MCP 评测（mocked server 注入）
+
+用例可声明 `mcp`：评测器为每个 server 启动**自己实现的 stdio mock MCP server**（JSON-RPC 2.0，协议版本 `2024-11-05`，零依赖），通过环境变量 `CRAFT_EVAL_MCP` 注入描述符：
+
+```json
+{
+  "id": "use-search",
+  "argv": ["node", "host.mjs"],
+  "mcp": [{
+    "name": "search",
+    "tools": [{
+      "name": "lookup",
+      "input_schema": {"type": "object", "properties": {"q": {"type": "string"}}, "required": ["q"]},
+      "response": {"content": [{"type": "text", "text": "found:1"}]}
+    }]
+  }],
+  "checks": [
+    {"id": "called", "kind": "tool_call", "server": "search", "tool": "lookup", "called": true},
+    {"id": "args", "kind": "tool_call", "server": "search", "tool": "lookup", "called": true, "with_arguments": {"q": "craft"}},
+    {"id": "forbidden", "kind": "tool_call", "server": "search", "tool": "delete-all", "called": false}
+  ]
+}
+```
+
+被测 agent 作为普通 MCP 客户端连接（任何支持 stdio transport 的 SDK/CLI 都可以）。关键点：**`tool_call` 检查的证据来自评测器侧 mock server 的调用日志，而不是被测方写的轨迹**——被测方无法声称一次没有发生的工具调用。支持断言「被调用且参数匹配」（`with_arguments`）与「不得被调用」（`called: false`，负例）。每个用例最多 8 个 server、每 server 最多 32 个工具。
 
 Skill Case 必须声明 `skill` 绑定：`{"skill_id", "skill_path", "should_trigger"}`。评测器在运行前解析 `skill_path/SKILL.md`，校验 frontmatter 的 `name` 与 `skill_id` 一致，并把内容摘要绑定进 Run 计划——一个 bare id 不是证据。正例需要任务检查，负例可以只有触发检查。留出集必须声明脱敏和独立审核人。Suite、Subject 和 Runtime 以内容摘要固定，比较只接受同 Suite、同运行条件、同重复次数的 Run。
 

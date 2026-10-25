@@ -772,3 +772,142 @@ test('development suite and command entry points', async () => {
     await fx.cleanup();
   }
 });
+
+test('mocked mcp servers serve tools and tool_call checks grade from evaluator evidence', async () => {
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    // The host acts as a real MCP client: it reads the evaluator's server
+    // descriptor, connects over stdio, initializes, lists tools and calls one.
+    await fx.project(`import { spawn } from 'node:child_process';
+import { writeFileSync, mkdirSync } from 'node:fs';
+import { createInterface } from 'node:readline';
+
+const servers = JSON.parse(process.env.CRAFT_EVAL_MCP);
+const server = servers[0];
+mkdirSync('outputs', { recursive: true });
+
+const child = spawn(server.command, server.args, { stdio: ['pipe', 'pipe', 'pipe'] });
+const pending = new Map();
+let nextId = 1;
+function request(method, params) {
+  return new Promise((resolve) => {
+    const id = nextId++;
+    pending.set(id, resolve);
+    child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, ...(params === undefined ? {} : { params }) }) + '\\n');
+  });
+}
+child.stdout.setEncoding('utf8');
+const lines = createInterface({ input: child.stdout });
+lines.on('line', (line) => {
+  if (!line.trim()) return;
+  const message = JSON.parse(line);
+  if (message.id !== undefined && pending.has(message.id)) {
+    pending.get(message.id)(message);
+    pending.delete(message.id);
+  }
+});
+
+await request('initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'eval-host', version: '0' } });
+child.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\\n');
+const listed = await request('tools/list', {});
+const called = await request('tools/call', { name: 'lookup', arguments: { q: 'craft' } });
+const wrongArgs = await request('tools/call', { name: 'lookup', arguments: { q: 'other' } });
+
+writeFileSync('outputs/mcp-result.json', JSON.stringify({
+  tools: listed.result?.tools?.map((t) => t.name) ?? [],
+  call_ok: !called.result?.isError,
+  call_text: called.result?.content?.[0]?.text ?? '',
+  wrong_call_ok: !wrongArgs.result?.isError,
+}));
+const id = process.env.CRAFT_EVAL_TASK_RUN_ID;
+const events = [
+  { source: 'host', task_run_id: id, event: 'tool.called' },
+  { source: 'host', task_run_id: id, event: 'run.finished', cost_units: 1 },
+];
+writeFileSync(process.env.CRAFT_EVAL_TRACE_PATH, events.map((e) => JSON.stringify(e)).join('\\n') + '\\n');
+child.kill();
+`);
+    const mcp = [
+      {
+        name: 'search',
+        tools: [
+          {
+            name: 'lookup',
+            description: 'Look up a term',
+            input_schema: { type: 'object', properties: { q: { type: 'string' } }, required: ['q'] },
+            response: { content: [{ type: 'text', text: 'found:1' }] },
+          },
+        ],
+      },
+    ];
+    const checks = [
+      { id: 'result', kind: 'json_equals', path: 'outputs/mcp-result.json', key: 'call_ok', equals: true },
+      { id: 'served', kind: 'json_equals', path: 'outputs/mcp-result.json', key: 'tools', equals: ['lookup'] },
+      { id: 'called', kind: 'tool_call', server: 'search', tool: 'lookup', called: true },
+      { id: 'args', kind: 'tool_call', server: 'search', tool: 'lookup', called: true, with_arguments: { q: 'craft' } },
+      { id: 'not-called', kind: 'tool_call', server: 'search', tool: 'missing-tool', called: false },
+    ];
+    const run = await fx.runEval('agent', [caseDoc('use-mcp', { checks, mcp })]);
+    const result = await firstResult(run);
+    assert.deepEqual(
+      [result.verdict, result.checks.map((item) => item.passed)],
+      ['passed', [true, true, true, true, true]],
+    );
+    const argsCheck = result.checks.find((item) => item.id === 'args');
+    assert.equal(argsCheck?.evidence.calls, 2, 'both calls are recorded even when only one matches');
+    // A wrong-arguments expectation fails with a precise reason and observed values.
+    const wrong = await fx.runEval('agent', [
+      caseDoc('wrong', {
+        mcp,
+        checks: [
+          { id: 'args', kind: 'tool_call', server: 'search', tool: 'lookup', called: true, with_arguments: { q: 'nope' } },
+          { id: 'absent', kind: 'tool_call', server: 'search', tool: 'lookup', called: false },
+        ],
+      }),
+    ]);
+    const wrongResult = await firstResult(wrong);
+    assert.deepEqual(
+      wrongResult.checks.map((item) => [item.reason, item.passed]),
+      [
+        ['arguments_mismatch', false],
+        ['tool_unexpectedly_called', false],
+      ],
+    );
+  } finally {
+    await fx.cleanup();
+  }
+});
+
+test('mcp contract validation rejects malformed declarations', async () => {
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    const withMcp = (mcp: unknown, extra: Record<string, unknown> = {}): Record<string, unknown> => {
+      const check = { id: 'c', kind: 'tool_call', server: 'a', tool: 't', called: true };
+      return suiteDoc('software', [caseDoc('x', { checks: [check], mcp: mcp as unknown[], ...extra })]);
+    };
+    const variants: [unknown, RegExp][] = [
+      [withMcp([]), /1\.\.32|mcp/],
+      [withMcp([{ name: 'a', tools: [] }]), /1\.\.32/],
+      [withMcp([{ name: 'a', tools: [{ name: 't' }] }, { name: 'a', tools: [{ name: 'u' }] }]), /unique/],
+      [withMcp([{ name: 'a', tools: [{ name: 't' }, { name: 't' }] }]), /unique/],
+      [withMcp([{ name: 'a', tools: [{ name: 'bad name' }] }]), /identifier/],
+      [
+        suiteDoc('software', [
+          caseDoc('x', { checks: [{ id: 'c', kind: 'tool_call', server: 'undeclared', tool: 't', called: true }] }),
+        ]),
+        /undeclared/,
+      ],
+      [
+        suiteDoc('software', [caseDoc('x', { checks: [{ id: 'c', kind: 'tool_call', server: 'a', called: true }] })]),
+        /tool name/,
+      ],
+    ];
+    for (const [value, message] of variants) {
+      await assert.rejects(loadSuite(await write(fx.root, 'bad-mcp.json', value)), message);
+    }
+  } finally {
+    await fx.cleanup();
+  }
+});

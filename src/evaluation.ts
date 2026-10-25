@@ -13,6 +13,7 @@ import { existsSync } from 'node:fs';
 import { copyFile, lstat, mkdir, mkdtemp, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { extname, isAbsolute, join, resolve, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 export const SCHEMA = 'craft-eval.eval.v1';
 
@@ -24,7 +25,7 @@ const MAX_JSON_BYTES = 1_000_000;
 
 export interface Check {
   id: string;
-  kind: 'exit_code' | 'file_exists' | 'json_equals' | 'trace_event' | 'script';
+  kind: 'exit_code' | 'file_exists' | 'json_equals' | 'trace_event' | 'script' | 'tool_call';
   [key: string]: unknown;
 }
 
@@ -39,6 +40,24 @@ export interface SkillBinding {
   should_trigger: boolean;
 }
 
+/**
+ * A mocked MCP tool the evaluator serves and records. `response` is returned
+ * verbatim to the client; `expect_arguments` (when set) is what `tool_call`
+ * checks compare against.
+ */
+export interface MockTool {
+  name: string;
+  description?: string;
+  input_schema?: { type: 'object'; properties?: Record<string, unknown>; required?: string[] };
+  response?: { content?: Array<{ type: 'text'; text: string }>; is_error?: boolean };
+}
+
+/** A mocked MCP server the evaluator starts per case and records all calls of. */
+export interface McpServerSpec {
+  name: string;
+  tools: MockTool[];
+}
+
 export interface Case {
   id: string;
   argv: string[];
@@ -46,6 +65,8 @@ export interface Case {
   checks?: Check[];
   safety_checks?: Check[];
   skill?: SkillBinding;
+  /** Mocked MCP servers started by the evaluator for this case. */
+  mcp?: McpServerSpec[];
   [key: string]: unknown;
 }
 
@@ -99,7 +120,11 @@ export type CheckReason =
   | 'exit_code_mismatch'
   | 'timer_expired'
   | 'script_failed'
-  | 'script_error';
+  | 'script_error'
+  | 'tool_not_called'
+  | 'tool_unexpectedly_called'
+  | 'arguments_mismatch'
+  | 'tool_errored';
 
 export interface CheckResult {
   id: string;
@@ -252,6 +277,19 @@ function checkList(value: unknown, name: string): Check[] {
       if (!Array.isArray(passes) || passes.length === 0 || !passes.every(isPlainInteger)) {
         throw new Error('script pass_exit_codes must be a non-empty array of integers');
       }
+    } else if (kind === 'tool_call') {
+      if (typeof check.server !== 'string' || check.server === '') {
+        throw new Error('tool_call requires a server name');
+      }
+      if (typeof check.tool !== 'string' || check.tool === '') {
+        throw new Error('tool_call requires a tool name');
+      }
+      if (typeof check.called !== 'boolean') {
+        throw new Error('tool_call requires boolean called');
+      }
+      if (check.with_arguments !== undefined && typeof check.with_arguments !== 'object') {
+        throw new Error('tool_call with_arguments must be an object');
+      }
     } else {
       throw new Error(`unsupported check kind: ${String(kind)}`);
     }
@@ -308,6 +346,43 @@ export async function loadSuite(path: string): Promise<Suite> {
     const taskIds = new Set(checks.map((check) => check.id));
     if (safety.some((check) => taskIds.has(check.id))) {
       throw new Error('task and safety check IDs must be distinct');
+    }
+    const mcpServers = item.mcp;
+    if (mcpServers !== undefined) {
+      if (!Array.isArray(mcpServers) || mcpServers.length > 8) {
+        throw new Error(`case ${caseId} mcp must be an array of at most 8 servers`);
+      }
+      const serverNames = new Set<string>();
+      for (const server of mcpServers) {
+        if (server === null || typeof server !== 'object' || Array.isArray(server)) {
+          throw new Error(`case ${caseId} mcp servers must be objects`);
+        }
+        const name = identifier(server.name, 'mcp.name');
+        if (serverNames.has(name)) {
+          throw new Error(`case ${caseId} mcp server names must be unique`);
+        }
+        serverNames.add(name);
+        const tools = server.tools;
+        if (!Array.isArray(tools) || tools.length === 0 || tools.length > 32) {
+          throw new Error(`case ${caseId} mcp server ${name} needs 1..32 tools`);
+        }
+        const toolNames = new Set<string>();
+        for (const tool of tools) {
+          if (tool === null || typeof tool !== 'object' || Array.isArray(tool)) {
+            throw new Error(`case ${caseId} mcp tools must be objects`);
+          }
+          const toolName = identifier(tool.name, 'mcp.tool.name');
+          if (toolNames.has(toolName)) {
+            throw new Error(`case ${caseId} mcp tool names must be unique within a server`);
+          }
+          toolNames.add(toolName);
+        }
+      }
+    }
+    for (const entry of [...checks, ...safety]) {
+      if (entry.kind === 'tool_call' && !(mcpServers ?? []).some((server) => server.name === entry.server)) {
+        throw new Error(`case ${caseId} tool_call references undeclared mcp server: ${String(entry.server)}`);
+      }
     }
     if (suite.subject_kind === 'skill') {
       // A skill case must pin the skill it claims to exercise. A bare id is not
@@ -688,6 +763,82 @@ function buildTrigger(
   };
 }
 
+interface RunningMcp {
+  configPath: string;
+  environment: Record<string, string>;
+  stop: () => Promise<void>;
+}
+
+/**
+ * Start one mock MCP server process per declared server. Each gets its own
+ * config file and log; the descriptor env var tells the subject where to connect
+ * without the evaluator touching the subject's argv.
+ */
+async function startMcpServers(specs: McpServerSpec[], root: string, taskRunId: string): Promise<RunningMcp> {
+  const mockEntry = fileURLToPath(new URL('./mcp-mock.js', import.meta.url));
+  const configPath = join(root, 'mcp-mock-config.json');
+  const servers = specs.map((spec) => ({
+    name: spec.name,
+    log_path: join(root, `mcp-calls-${spec.name}.jsonl`),
+    tools: spec.tools,
+  }));
+  await writeFile(
+    configPath,
+    JSON.stringify({ servers } satisfies { servers: Array<{ name: string; log_path: string; tools: MockTool[] }> }),
+  );
+  const environment: Record<string, string> = {
+    CRAFT_EVAL_MCP: JSON.stringify(
+      servers.map((server) => ({
+        name: server.name,
+        command: nodeBinary(),
+        args: [mockEntry, '--server', server.name, '--config', configPath],
+      })),
+    ),
+  };
+  // The mock servers are launched lazily by the subject through the descriptor,
+  // so there is nothing to spawn here; the lifetime guard lives in mcp-mock.ts.
+  const stop = async (): Promise<void> => {
+    // Nothing to terminate: servers self-terminate via the lifetime guard once
+    // the client disconnects or the guard fires.
+    await Promise.resolve();
+  };
+  void taskRunId;
+  return { configPath, environment, stop };
+}
+
+interface McpCallRecord {
+  server: string;
+  tool: string;
+  arguments: unknown;
+  delivered: boolean;
+}
+
+async function readMcpCalls(configPath: string): Promise<McpCallRecord[]> {
+  const config = (await load(configPath)) as unknown as { servers: Array<{ name: string; log_path: string }> };
+  const calls: McpCallRecord[] = [];
+  for (const server of config.servers) {
+    try {
+      const raw = await readFile(server.log_path, 'utf8');
+      for (const line of raw.split(/\r?\n/)) {
+        if (line.trim() === '') {
+          continue;
+        }
+        try {
+          const value = JSON.parse(line) as McpCallRecord;
+          if (value.server === server.name && typeof value.tool === 'string') {
+            calls.push(value);
+          }
+        } catch {
+          // A torn line means the process died mid-write; keep what parsed.
+        }
+      }
+    } catch {
+      // No log file means no calls reached this server.
+    }
+  }
+  return calls;
+}
+
 async function check(
   item: Check,
   sandbox: string,
@@ -695,6 +846,7 @@ async function check(
   events: TraceEvent[],
   terminalTrace: boolean,
   timeoutSeconds: number,
+  mcpCalls: McpCallRecord[],
 ): Promise<CheckResult> {
   const kind = item.kind;
   const evidence: { kind: string; [key: string]: unknown } = { kind };
@@ -761,6 +913,33 @@ async function check(
       }
     }
     evidence.path = item.path;
+  } else if (kind === 'tool_call') {
+    // Evidence comes from the evaluator-side mock server log, never from the
+    // subject's own trace, so a subject cannot claim a tool call it never made.
+    const relevant = mcpCalls.filter((call) => call.server === item.server && call.tool === item.tool);
+    const called = relevant.length > 0;
+    evidence.calls = relevant.length;
+    evidence.server = item.server;
+    evidence.tool = item.tool;
+    if (item.called === true) {
+      if (!called) {
+        passed = false;
+        reason = 'tool_not_called';
+      } else if (item.with_arguments !== undefined) {
+        const matchingArgs = relevant.some((call) => jsonEquals(call.arguments, item.with_arguments));
+        passed = matchingArgs;
+        reason = matchingArgs ? 'ok' : 'arguments_mismatch';
+        evidence.expected_arguments = item.with_arguments;
+        evidence.observed_arguments = relevant.map((call) => call.arguments);
+      } else {
+        passed = true;
+        reason = 'ok';
+      }
+    } else {
+      // called === false: the tool must not have been invoked.
+      passed = !called;
+      reason = called ? 'tool_unexpectedly_called' : 'ok';
+    }
   } else {
     const used = events.some((event) => event.event === item.event) === item.present;
     passed = terminalTrace ? used : null;
@@ -844,22 +1023,37 @@ async function oneCase(
       env.CRAFT_EVAL_SKILL_ID = skill.skill_id;
       env.CRAFT_EVAL_SKILL_DIGEST = skill.digest;
     }
+    // Mocked MCP servers are evaluator infrastructure: their call log is the
+    // evidence source for tool_call checks, so the subject cannot forge it.
+    const mcp = item.mcp === undefined || item.mcp.length === 0 ? null : await startMcpServers(item.mcp, root, taskRunId);
+    if (mcp !== null) {
+      Object.assign(env, mcp.environment);
+    }
     await mkdir(join(sandbox, 'outputs'), { recursive: true });
     const started = process.hrtime.bigint();
     let exitCode: number | null = null;
     let issue: string | null = null;
     const timeoutSeconds = item.timeout_s ?? 30;
-    const outcome = await runAdapter(item, sandbox, env, stdoutPath, stderrPath);
-    exitCode = outcome.exitCode;
-    issue = outcome.issue;
+    try {
+      const outcome = await runAdapter(item, sandbox, env, stdoutPath, stderrPath);
+      exitCode = outcome.exitCode;
+      issue = outcome.issue;
+    } finally {
+      if (mcp !== null) {
+        await mcp.stop();
+      }
+    }
     const durationMs = Number((process.hrtime.bigint() - started) / 1_000_000n);
     const [events, terminalTrace] = await trace(tracePath, taskRunId);
+    const mcpCalls = mcp === null ? [] : await readMcpCalls(mcp.configPath);
     const taskChecks = await Promise.all(
-      (item.checks ?? []).map((entry) => check(entry, sandbox, exitCode, events, terminalTrace, timeoutSeconds)),
+      (item.checks ?? []).map((entry) =>
+        check(entry, sandbox, exitCode, events, terminalTrace, timeoutSeconds, mcpCalls),
+      ),
     );
     const safetyChecks = await Promise.all(
       (item.safety_checks ?? []).map((entry) =>
-        check(entry, sandbox, exitCode, events, terminalTrace, timeoutSeconds),
+        check(entry, sandbox, exitCode, events, terminalTrace, timeoutSeconds, mcpCalls),
       ),
     );
     const trigger =
