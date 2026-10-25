@@ -44,15 +44,25 @@ node dist/src/cli.js compare /tmp/craft-eval-runs/<baseline-id> /tmp/craft-eval-
 }
 ```
 
-支持 `exit_code`、`file_exists`、`json_equals`、`trace_event` 四种确定性检查。`checks` 衡量任务结果，`safety_checks` 单列安全回归。Skill Case 额外声明 `skill_id` 和 `should_trigger`；正例需要任务检查，负例可以只有触发检查。留出集必须声明脱敏和独立审核人。Suite、Subject 和 Runtime 以内容摘要固定，比较只接受同 Suite、同运行条件、同重复次数的 Run。
+支持 `exit_code`、`file_exists`、`json_equals`、`trace_event`、`script` 五种确定性检查。`checks` 衡量任务结果，`safety_checks` 单列安全回归；`script` 按退出码判分（默认 0 为通过，`pass_exit_codes` 可扩展），失败原因记录在 `reason`（如 `not_found`、`invalid_json`、`key_missing`、`script_failed`），便于区分"文件不存在"与"文件存在但不可解析"。
+
+Skill Case 必须声明 `skill` 绑定：`{"skill_id", "skill_path", "should_trigger"}`。评测器在运行前解析 `skill_path/SKILL.md`，校验 frontmatter 的 `name` 与 `skill_id` 一致，并把内容摘要绑定进 Run 计划——一个 bare id 不是证据。正例需要任务检查，负例可以只有触发检查。留出集必须声明脱敏和独立审核人。Suite、Subject 和 Runtime 以内容摘要固定，比较只接受同 Suite、同运行条件、同重复次数的 Run。
 
 ## Host 轨迹合同
 
-运行命令可读取 `CRAFT_EVAL_RUN_ID`、`CRAFT_EVAL_TASK_RUN_ID`、`CRAFT_EVAL_CASE_ID`、`CRAFT_EVAL_TRIAL`、`CRAFT_EVAL_OUTPUT_DIR`、`CRAFT_EVAL_TRACE_PATH`。Agent/Skill 适配器将 JSONL 写入 `CRAFT_EVAL_TRACE_PATH`。每行至少有 `source: "host"`、本次 `task_run_id`、`event`。Skill 实际调用写 `{"event":"skill.invoked","skill_id":"..."}`；结束时写 `{"event":"run.finished"}`。缺少终态或轨迹无效，触发与轨迹检查为**未判定**；没有调用事件不能自动推断"未触发"。终态事件可包含非负的 `cost_units`；未提供时成本显示为未测量。
+运行命令可读取 `CRAFT_EVAL_RUN_ID`、`CRAFT_EVAL_TASK_RUN_ID`、`CRAFT_EVAL_CASE_ID`、`CRAFT_EVAL_TRIAL`、`CRAFT_EVAL_OUTPUT_DIR`、`CRAFT_EVAL_TRACE_PATH`，Skill 用例额外读取 `CRAFT_EVAL_SKILL_ID` 与 `CRAFT_EVAL_SKILL_DIGEST`。Agent/Skill 适配器将 JSONL 写入 `CRAFT_EVAL_TRACE_PATH`。每行至少有 `source`、本次 `task_run_id`、`event`；`source` 只接受 `"host"`（被测方写入）或 `"gateway"`（评测器安装的包装层写入）。Skill 实际调用写 `{"event":"skill.invoked","skill_id":"..."}`；结束时写 `{"event":"run.finished"}`。缺少终态或轨迹无效，触发与轨迹检查为**未判定**；没有调用事件不能自动推断"未触发"。终态事件可包含非负的 `cost_units`；未提供时成本显示为未测量。
 
 Agent 用例即使只检查输出文件，也必须有完整 Host 轨迹才能得到通过结论。
 
-Skill 增益比较要求同一留出 Suite 至少 20 个不同正例、一个负例、独立 TaskRun、候选无触发错误和安全失败、任务配对有改善且单侧符号检验 `p ≤ 0.05`。返回 `skill_gain_supported` 仅表示这组任务上的证据支持改善，不授予发布权。任务、触发、安全、时延与成本分别报告。
+### 触发证据分级
+
+触发判定带 `evidence` 字段，分三级：
+
+- **`gateway`**：由评测器安装的包装层记录，被测方无法伪造。唯一能支持增益声明的证据等级。
+- **`self_reported`**：由被测方自己写入。可以用于诊断，但**永远不能**支持增益声明——被测方报告自己的成功什么也证明不了。
+- **`unobserved`**：无终态轨迹，触发未判定。
+
+Skill 增益比较要求同一留出 Suite 至少 20 个不同正例、一个负例、独立 TaskRun、候选无触发错误和安全失败、**全部触发证据为 `gateway`**、任务配对有改善且单侧符号检验 `p ≤ 0.05`。任何 `self_reported` 或 `unobserved` 触发都会让 `skill_gain_supported` 为 `false`，并在 `gateway_observed_triggers` / `unobserved_triggers` 中给出原因。返回 `skill_gain_supported` 仅表示这组任务上的证据支持改善，不授予发布权。任务、触发、安全、时延与成本分别报告。
 
 符号检验要求用例彼此足够独立；反复调参或多候选筛选需要另留最终测试集，避免选择偏差。
 
@@ -61,7 +71,7 @@ Skill 增益比较要求同一留出 Suite 至少 20 个不同正例、一个负
 - 命令通过 argv 直接执行，没有 shell 展开。工作区逐任务复制，忽略 `.git`、`.craft_data`、`.venv`、`node_modules` 和 `__pycache__`，拒绝输入符号链接；检查器也拒绝通过输出符号链接读工作区外文件。
 - **只运行受信任的命令与 Host 适配器。** 工作区复制并非操作系统沙箱，不能阻止命令访问网络或机器上其他路径。需要执行不受信任代码时，先在外部容器/虚拟机里运行本工具。
 - 结果只保留检查结果、摘要和数值，不保存 stdout、stderr 或原始轨迹。输出目录不得位于输入工作区内。每项任务有独立目录与 TaskRun ID；计划数、已记录数、失败、未判定、无效和缺失数均在报告中列出。
-- 本地测试验证了真实子进程与示例 Host 轨迹链路；尚未与 Codex、Claude 或 Craft 的实际 Host 事件源打通。接真实 Host 时，应由 Host 自身发出轨迹，避免让被测 Agent 自行声明成功。
+- 本地测试验证了真实子进程与示例 Host 轨迹链路；尚未与 Codex、Claude 或 Craft 的实际 Host 事件源打通。接真实 Host 时，应由 Host 自身发出轨迹，避免让被测 Agent 自行声明成功。本工具是**独立 CLI**，通过 JSON 契约与上层（如 craft）协作：craft-eval 生产证据，上层保留发证与路由权。
 - 在 Windows 上，目录链接（junction）无需开发者模式或管理员权限，文件符号链接则必须提权。拒绝规则覆盖两者：检查器逐级 `lstat`，任何链接（`isSymbolicLink()`）都按"路径穿越"拒绝，因此安全用例以 junction 驱动即可，不需要提权。
 
 ## 类型与模块

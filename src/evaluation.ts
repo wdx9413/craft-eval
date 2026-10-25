@@ -9,9 +9,10 @@
 import { spawn } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import { copyFile, lstat, mkdir, mkdtemp, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { isAbsolute, join, resolve, sep } from 'node:path';
+import { extname, isAbsolute, join, resolve, sep } from 'node:path';
 
 export const SCHEMA = 'craft-eval.eval.v1';
 
@@ -23,8 +24,19 @@ const MAX_JSON_BYTES = 1_000_000;
 
 export interface Check {
   id: string;
-  kind: 'exit_code' | 'file_exists' | 'json_equals' | 'trace_event';
+  kind: 'exit_code' | 'file_exists' | 'json_equals' | 'trace_event' | 'script';
   [key: string]: unknown;
+}
+
+/**
+ * A skill case pins the skill it expects to be used. `skill_path` is resolved
+ * relative to the workspace, so the evaluator can prove the skill exists and
+ * bind its content digest into the run plan instead of trusting a bare id.
+ */
+export interface SkillBinding {
+  skill_id: string;
+  skill_path: string;
+  should_trigger: boolean;
 }
 
 export interface Case {
@@ -33,8 +45,7 @@ export interface Case {
   timeout_s?: number;
   checks?: Check[];
   safety_checks?: Check[];
-  should_trigger?: boolean;
-  skill_id?: string;
+  skill?: SkillBinding;
   [key: string]: unknown;
 }
 
@@ -42,12 +53,16 @@ export interface Suite {
   schema: string;
   suite_id: string;
   subject_kind: string;
-  partition: 'development' | 'held_out';
+  /** Case-set role. Deliberately not named `stage`: craft has a separate, unrelated notion of stage. */
+  partition: Partition;
   sanitized: boolean;
   approved_by?: string;
   cases: Case[];
   [key: string]: unknown;
 }
+
+/** Whether a case set may inform delivery claims. */
+export type Partition = 'development' | 'held_out';
 
 export interface Subject {
   kind: string;
@@ -63,15 +78,52 @@ export type Verdict = 'passed' | 'failed' | 'inconclusive' | 'invalid' | 'missin
 /** Outcome of one check group; `missing` only appears for an unrecorded case. */
 export type CaseVerdict = 'passed' | 'failed' | 'inconclusive' | 'missing';
 
+/**
+ * Why a check produced the result it did. Distinguishing these is what lets a
+ * consumer tell "the file was absent" from "the file was there but unparseable",
+ * which have very different fixes.
+ */
+export type CheckReason =
+  | 'ok'
+  | 'not_found'
+  | 'invalid_json'
+  | 'key_missing'
+  | 'type_mismatch'
+  | 'value_mismatch'
+  | 'not_a_file'
+  | 'outside_workspace'
+  | 'symlink_rejected'
+  | 'oversized'
+  | 'no_trace'
+  | 'trace_incomplete'
+  | 'exit_code_mismatch'
+  | 'timer_expired'
+  | 'script_failed'
+  | 'script_error';
+
 export interface CheckResult {
   id: string;
   passed: boolean | null;
+  reason: CheckReason;
   evidence: { kind: string; [key: string]: unknown };
 }
+
+/**
+ * Where the trigger verdict came from.
+ *
+ * `gateway` means the evaluator itself observed the invocation through a
+ * wrapper it installed, so the subject cannot forge it. `self_reported` means
+ * the subject wrote the event, which is enough to diagnose but not enough to
+ * claim a gain. `unobserved` means no evidence exists at all.
+ */
+export type TriggerEvidence = 'gateway' | 'self_reported' | 'unobserved';
 
 export interface TriggerResult {
   expected: boolean;
   used: boolean | null;
+  evidence: TriggerEvidence;
+  /** Digest of the skill definition the case was pinned to, or null when unbound. */
+  skill_digest: string | null;
   verdict: 'passed' | 'failed' | 'inconclusive';
 }
 
@@ -189,6 +241,17 @@ function checkList(value: unknown, name: string): Check[] {
       if (typeof check.present !== 'boolean') {
         throw new Error('trace_event requires boolean present');
       }
+    } else if (kind === 'script') {
+      relativePath(check.path, 'script.path');
+      if (check.args !== undefined) {
+        if (!Array.isArray(check.args) || check.args.some((arg) => typeof arg !== 'string')) {
+          throw new Error('script args must be an array of strings');
+        }
+      }
+      const passes = check.pass_exit_codes ?? [0];
+      if (!Array.isArray(passes) || passes.length === 0 || !passes.every(isPlainInteger)) {
+        throw new Error('script pass_exit_codes must be a non-empty array of integers');
+      }
     } else {
       throw new Error(`unsupported check kind: ${String(kind)}`);
     }
@@ -247,11 +310,18 @@ export async function loadSuite(path: string): Promise<Suite> {
       throw new Error('task and safety check IDs must be distinct');
     }
     if (suite.subject_kind === 'skill') {
-      if (typeof item.should_trigger !== 'boolean') {
-        throw new Error('Skill case requires should_trigger');
+      // A skill case must pin the skill it claims to exercise. A bare id is not
+      // evidence: the evaluator resolves the path and binds the content digest.
+      const skill = item.skill;
+      if (skill === null || typeof skill !== 'object' || Array.isArray(skill)) {
+        throw new Error('Skill case requires a skill binding');
       }
-      identifier(item.skill_id, 'skill_id');
-      if (item.should_trigger && checks.length === 0) {
+      identifier(skill.skill_id, 'skill.skill_id');
+      relativePath(skill.skill_path, 'skill.skill_path');
+      if (typeof skill.should_trigger !== 'boolean') {
+        throw new Error('skill.should_trigger must be a boolean');
+      }
+      if (skill.should_trigger && checks.length === 0) {
         throw new Error('positive Skill case needs task checks');
       }
     } else if (checks.length === 0) {
@@ -392,6 +462,9 @@ async function artifact(sandbox: string, relativeName: string): Promise<string> 
   return target;
 }
 
+/** Trace sources the evaluator accepts: its own gateway, or the host it launched. */
+const TRACE_SOURCES = new Set(['host', 'gateway']);
+
 async function trace(path: string, taskRunId: string): Promise<[TraceEvent[], boolean]> {
   try {
     const raw = await readBounded(path, MAX_TRACE_BYTES);
@@ -409,7 +482,7 @@ async function trace(path: string, taskRunId: string): Promise<[TraceEvent[], bo
     if (events.length === 0) {
       return [[], false];
     }
-    if (events.some((event) => event.task_run_id !== taskRunId || event.source !== 'host')) {
+    if (events.some((event) => event.task_run_id !== taskRunId || !TRACE_SOURCES.has(String(event.source)))) {
       return [[], false];
     }
     return [events, events.some((event) => event.event === 'run.finished')];
@@ -428,26 +501,222 @@ function jsonEquals(value: unknown, expected: unknown): boolean {
   return JSON.stringify(sortDeep(value)) === JSON.stringify(sortDeep(expected));
 }
 
+/**
+ * A skill is a directory whose SKILL.md carries YAML frontmatter with `name` and
+ * `description`. Resolving it here is what turns `skill_id` from a claim into a
+ * verifiable fact bound to a content digest.
+ */
+export interface ResolvedSkill {
+  skill_id: string;
+  digest: string;
+  name: string;
+}
+
+async function resolveSkill(workspace: string, binding: SkillBinding): Promise<ResolvedSkill> {
+  const directory = resolve(workspace, binding.skill_path);
+  const root = resolve(workspace);
+  if (directory !== root && !directory.startsWith(root + sep)) {
+    throw new Error(`skill.skill_path leaves workspace: ${binding.skill_path}`);
+  }
+  const manifestPath = join(directory, 'SKILL.md');
+  const info = await stat(manifestPath).catch(() => null);
+  if (info === null || !info.isFile()) {
+    throw new Error(`skill manifest not found: ${binding.skill_path}/SKILL.md`);
+  }
+  const text = await readFile(manifestPath, 'utf8');
+  const name = frontmatterValue(text, 'name');
+  const description = frontmatterValue(text, 'description');
+  if (name === null || description === null) {
+    throw new Error(`skill manifest needs name and description: ${binding.skill_path}/SKILL.md`);
+  }
+  if (name !== binding.skill_id) {
+    throw new Error(`skill.skill_id "${binding.skill_id}" does not match manifest name "${name}"`);
+  }
+  return { skill_id: name, digest: digest(text), name };
+}
+
+/** Read one top-level scalar from a leading `---` YAML frontmatter block. */
+function frontmatterValue(text: string, key: string): string | null {
+  const lines = text.split(/\r?\n/);
+  if (lines[0]?.trim() !== '---') {
+    return null;
+  }
+  for (let index = 1; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (line === undefined || line.trim() === '---') {
+      return null;
+    }
+    const match = /^([A-Za-z0-9_-]+):\s*(.*)$/.exec(line);
+    if (match !== null && match[1] === key) {
+      const value = (match[2] ?? '').trim().replace(/^["']|["']$/g, '');
+      return value === '' ? null : value;
+    }
+  }
+  return null;
+}
+
+interface ScriptOutcome {
+  exitCode: number | null;
+  issue: string | null;
+}
+
+/**
+ * Resolve a real Node binary for running grading scripts. `process.execPath`
+ * cannot be trusted: when this evaluator itself runs under an Electron wrapper
+ * it points at the wrapper application, which would silently exit 0 instead of
+ * executing the script.
+ */
+function nodeBinary(): string {
+  if (process.env.CRAFT_EVAL_NODE_BINARY) {
+    return process.env.CRAFT_EVAL_NODE_BINARY;
+  }
+  if (!process.versions.electron) {
+    return process.execPath;
+  }
+  for (const directory of (process.env.PATH ?? '').split(';')) {
+    if (!directory) {
+      continue;
+    }
+    const candidate = join(directory.replace(/[\\/]+$/, ''), 'node.exe');
+    if (existsSync(candidate) && !candidate.includes('DSH Desktop')) {
+      return candidate;
+    }
+  }
+  return process.execPath;
+}
+
+/** Run a deterministic grading script. Exit 0 means pass; the runner is the same trusted-adapter path. */
+async function runScript(
+  scriptPath: string,
+  args: string[],
+  sandbox: string,
+  timeoutSeconds: number,
+): Promise<ScriptOutcome> {
+  const extension = extname(scriptPath).toLowerCase();
+  const interpreters: Record<string, string> = {
+    '.mjs': nodeBinary(),
+    '.js': nodeBinary(),
+    '.cjs': nodeBinary(),
+    '.py': 'python3',
+    '.sh': 'sh',
+    '.ps1': 'pwsh',
+  };
+  const interpreter = interpreters[extension];
+  const argv = interpreter === undefined ? [scriptPath, ...args] : [interpreter, scriptPath, ...args];
+  return new Promise((done) => {
+    let child: ChildProcess;
+    try {
+      child = spawn(argv[0] ?? '', argv.slice(1), {
+        cwd: sandbox,
+        env: { PATH: process.env.PATH ?? '', LANG: process.env.LANG ?? '' },
+        stdio: ['ignore', 'ignore', 'ignore'],
+        shell: false,
+        windowsHide: true,
+      });
+    } catch (error) {
+      done({ exitCode: null, issue: (error as Error).name });
+      return;
+    }
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      killTree(child.pid);
+      done({ exitCode: null, issue: 'timeout' });
+    }, timeoutSeconds * 1_000);
+    child.on('error', (error: NodeJS.ErrnoException) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timer);
+      done({ exitCode: null, issue: error.code ?? error.name });
+    });
+    child.on('close', (code) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timer);
+      done({ exitCode: code, issue: null });
+    });
+  });
+}
+
+/**
+ * Decide the trigger verdict from the strongest evidence available.
+ *
+ * A `gateway` event is produced by a wrapper the evaluator installed, so it is
+ * authoritative. Events with `source: "host"` are written by the subject: they
+ * are useful for diagnosis but can never support a gain claim, because a subject
+ * that reports its own success proves nothing. No terminal trace means we simply
+ * cannot judge.
+ */
+function buildTrigger(
+  binding: SkillBinding,
+  skill: ResolvedSkill,
+  events: TraceEvent[],
+  terminalTrace: boolean,
+): TriggerResult {
+  const skillDigest = skill.digest;
+  if (!terminalTrace) {
+    return {
+      expected: binding.should_trigger,
+      used: null,
+      evidence: 'unobserved',
+      skill_digest: skillDigest,
+      verdict: 'inconclusive',
+    };
+  }
+  const matching = (source: string) =>
+    events.some(
+      (event) => event.event === 'skill.invoked' && event.skill_id === binding.skill_id && event.source === source,
+    );
+  const gatewayUsed = matching('gateway');
+  const selfUsed = matching('host');
+  const evidence: TriggerEvidence = gatewayUsed || selfUsed ? (gatewayUsed ? 'gateway' : 'self_reported') : 'gateway';
+  const used = gatewayUsed || selfUsed;
+  const matched = used === binding.should_trigger;
+  return {
+    expected: binding.should_trigger,
+    used,
+    evidence,
+    skill_digest: skillDigest,
+    verdict: matched ? 'passed' : 'failed',
+  };
+}
+
 async function check(
   item: Check,
   sandbox: string,
   exitCode: number | null,
   events: TraceEvent[],
   terminalTrace: boolean,
+  timeoutSeconds: number,
 ): Promise<CheckResult> {
   const kind = item.kind;
   const evidence: { kind: string; [key: string]: unknown } = { kind };
   let passed: boolean | null = null;
+  let reason: CheckReason = 'ok';
   if (kind === 'exit_code') {
     passed = exitCode === null ? null : exitCode === item.equals;
     evidence.exit_code = exitCode;
+    if (passed === false) {
+      reason = 'exit_code_mismatch';
+    } else if (passed === null) {
+      reason = 'timer_expired';
+    }
   } else if (kind === 'file_exists') {
     try {
       const path = await artifact(sandbox, relativePath(item.path, 'file_exists.path'));
       const info = await stat(path).catch(() => null);
       passed = info !== null && info.isFile();
-    } catch {
+      reason = passed ? 'ok' : info === null ? 'not_found' : 'not_a_file';
+    } catch (error) {
       passed = false;
+      reason = classifyArtifactError(error);
     }
     evidence.path = item.path;
   } else if (kind === 'json_equals') {
@@ -457,22 +726,66 @@ async function check(
       let value: unknown = JSON.parse(raw.toString('utf8'));
       for (const key of String(item.key).split('.')) {
         if (value === null || typeof value !== 'object' || !(key in (value as Record<string, unknown>))) {
-          throw new Error('missing key');
+          passed = false;
+          reason = 'key_missing';
+          evidence.path = item.path;
+          return { id: item.id, passed, reason, evidence };
         }
         value = (value as Record<string, unknown>)[key];
       }
       passed = jsonEquals(value, item.equals);
+      reason = passed ? 'ok' : typeof value === typeof item.equals ? 'value_mismatch' : 'type_mismatch';
       evidence.artifact_sha256 = createHash('sha256').update(raw).digest('hex');
-    } catch {
+    } catch (error) {
       passed = false;
+      reason = error instanceof SyntaxError ? 'invalid_json' : classifyArtifactError(error);
+    }
+    evidence.path = item.path;
+  } else if (kind === 'script') {
+    const scriptPath = await artifact(sandbox, relativePath(item.path, 'script.path')).catch(() => null);
+    const scriptInfo = scriptPath === null ? null : await stat(scriptPath).catch(() => null);
+    if (scriptPath === null || scriptInfo === null || !scriptInfo.isFile()) {
+      passed = false;
+      reason = 'not_found';
+    } else {
+      const outcome = await runScript(scriptPath, Array.isArray(item.args) ? (item.args as string[]) : [], sandbox, Math.max(1, Math.floor(timeoutSeconds)));
+      evidence.exit_code = outcome.exitCode;
+      if (outcome.issue !== null) {
+        passed = false;
+        reason = 'script_error';
+        evidence.issue = outcome.issue;
+      } else {
+        const accepted = (item.pass_exit_codes ?? [0]) as number[];
+        passed = outcome.exitCode !== null && accepted.includes(outcome.exitCode);
+        reason = passed ? 'ok' : 'script_failed';
+      }
     }
     evidence.path = item.path;
   } else {
     const used = events.some((event) => event.event === item.event) === item.present;
     passed = terminalTrace ? used : null;
+    reason = !terminalTrace ? 'trace_incomplete' : passed ? 'ok' : 'value_mismatch';
     evidence.trace_complete = terminalTrace;
   }
-  return { id: item.id, passed, evidence };
+  return { id: item.id, passed, reason, evidence };
+}
+
+/** Map a thrown artifact accessor error onto a stable machine-readable reason. */
+function classifyArtifactError(error: unknown): CheckReason {
+  const message = error instanceof Error ? error.message : '';
+  if (message.includes('outside') || message.includes('leaves workspace')) {
+    return 'outside_workspace';
+  }
+  if (message.includes('symlink')) {
+    return 'symlink_rejected';
+  }
+  if (message.includes('missing or oversized')) {
+    return 'not_found';
+  }
+  if (message.includes('oversized')) {
+    return 'oversized';
+  }
+  return 'not_found';
 }
 
 function verdictOf(results: CheckResult[]): CaseVerdict {
@@ -524,31 +837,35 @@ async function oneCase(
       CRAFT_EVAL_OUTPUT_DIR: join(sandbox, 'outputs'),
     });
     Object.assign(env, subject.env ?? {});
+    // Bind the skill before running: an unresolvable manifest is a broken suite,
+    // not a failing case, so it must abort rather than silently score as a miss.
+    const skill = item.skill === undefined ? null : await resolveSkill(sandbox, item.skill);
+    if (skill !== null) {
+      env.CRAFT_EVAL_SKILL_ID = skill.skill_id;
+      env.CRAFT_EVAL_SKILL_DIGEST = skill.digest;
+    }
     await mkdir(join(sandbox, 'outputs'), { recursive: true });
     const started = process.hrtime.bigint();
     let exitCode: number | null = null;
     let issue: string | null = null;
+    const timeoutSeconds = item.timeout_s ?? 30;
     const outcome = await runAdapter(item, sandbox, env, stdoutPath, stderrPath);
     exitCode = outcome.exitCode;
     issue = outcome.issue;
     const durationMs = Number((process.hrtime.bigint() - started) / 1_000_000n);
     const [events, terminalTrace] = await trace(tracePath, taskRunId);
     const taskChecks = await Promise.all(
-      (item.checks ?? []).map((entry) => check(entry, sandbox, exitCode, events, terminalTrace)),
+      (item.checks ?? []).map((entry) => check(entry, sandbox, exitCode, events, terminalTrace, timeoutSeconds)),
     );
     const safetyChecks = await Promise.all(
-      (item.safety_checks ?? []).map((entry) => check(entry, sandbox, exitCode, events, terminalTrace)),
+      (item.safety_checks ?? []).map((entry) =>
+        check(entry, sandbox, exitCode, events, terminalTrace, timeoutSeconds),
+      ),
     );
-    let trigger: TriggerResult | null = null;
-    if ('should_trigger' in item) {
-      const used = events.some((event) => event.event === 'skill.invoked' && event.skill_id === item.skill_id);
-      const matched = terminalTrace ? used === item.should_trigger : null;
-      trigger = {
-        expected: item.should_trigger as boolean,
-        used: terminalTrace ? used : null,
-        verdict: matched === null ? 'inconclusive' : matched ? 'passed' : 'failed',
-      };
-    }
+    const trigger =
+      item.skill === undefined || skill === null
+        ? null
+        : buildTrigger(item.skill, skill, events, terminalTrace);
     const taskVerdict = verdictOf(taskChecks);
     const safetyVerdict = verdictOf(safetyChecks);
     const verdict = decideVerdict(
@@ -946,6 +1263,8 @@ export interface Comparison {
   candidate_trigger_failures: number;
   candidate_safety_failures: number;
   independent_task_runs: boolean;
+  gateway_observed_triggers: boolean;
+  unobserved_triggers: number;
   skill_gain_supported: boolean;
   duration_ms: { baseline: MetricSummary; candidate: MetricSummary };
   cost_units: { baseline: MetricSummary; candidate: MetricSummary };
@@ -997,10 +1316,18 @@ export async function compareRuns(baselinePath: string, candidatePath: string): 
     }
   }
   const subjectKind = left.suite.subject_kind;
-  const positive = left.suite.cases.filter((item) => item.should_trigger === true).length;
-  const negative = left.suite.cases.filter((item) => item.should_trigger === false).length;
+  const positive = left.suite.cases.filter((item) => item.skill?.should_trigger === true).length;
+  const negative = left.suite.cases.filter((item) => item.skill?.should_trigger === false).length;
   const triggerFailures = candidate.results.filter(
     (item) => item.trigger !== null && item.trigger.verdict !== 'passed',
+  ).length;
+  // A gain claim needs evaluator-observed invocation. Self-reported triggers can
+  // diagnose a skill but cannot prove it helped, so they never satisfy the gate.
+  const gatewayObserved = candidate.results
+    .filter((item) => item.trigger !== null)
+    .every((item) => item.trigger?.evidence === 'gateway');
+  const unobservedTriggers = candidate.results.filter(
+    (item) => item.trigger !== null && item.trigger.evidence === 'unobserved',
   ).length;
   const safetyFailures = candidate.results.filter((item) => item.safety_verdict === 'failed').length;
   const runIds = [...baseline.results, ...candidate.results].map((item) => item.task_run_id);
@@ -1013,10 +1340,13 @@ export async function compareRuns(baselinePath: string, candidatePath: string): 
     );
   const gain =
     subjectKind === 'skill' &&
-    left.suite.partition === 'held_out' &&    positive >= 20 &&
+    left.suite.partition === 'held_out' &&
+    positive >= 20 &&
     negative >= 1 &&
     complete &&
     independent &&
+    gatewayObserved &&
+    unobservedTriggers === 0 &&
     triggerFailures === 0 &&
     safetyFailures === 0 &&
     left.subject.digest !== right.subject.digest &&
@@ -1042,6 +1372,8 @@ export async function compareRuns(baselinePath: string, candidatePath: string): 
     candidate_trigger_failures: triggerFailures,
     candidate_safety_failures: safetyFailures,
     independent_task_runs: independent,
+    gateway_observed_triggers: gatewayObserved,
+    unobserved_triggers: unobservedTriggers,
     skill_gain_supported: gain,
     duration_ms: { baseline: metric(baseline.results, 'duration_ms'), candidate: metric(candidate.results, 'duration_ms') },
     cost_units: { baseline: metric(baseline.results, 'cost_units'), candidate: metric(candidate.results, 'cost_units') },

@@ -10,16 +10,14 @@
       "argv": ["node", "host.mjs"],
       "timeout_s": 10,
       "checks": [{"id": "task", "kind": "json_equals", "path": "outputs/result.json", "key": "task_done", "equals": true}],
-      "skill_id": "example-skill",
-      "should_trigger": true
+      "skill": {"skill_id": "example-skill", "skill_path": "skills/example-skill", "should_trigger": true}
     },
     {
       "id": "skill-negative",
       "argv": ["node", "host.mjs"],
       "timeout_s": 10,
       "checks": [{"id": "task", "kind": "json_equals", "path": "outputs/result.json", "key": "task_done", "equals": true}],
-      "skill_id": "example-skill",
-      "should_trigger": false
+      "skill": {"skill_id": "example-skill", "skill_path": "skills/example-skill", "should_trigger": false}
     }
   ]
 }

@@ -81,6 +81,26 @@ interface CaseOptions {
   [key: string]: unknown;
 }
 
+/**
+ * Write a real skill directory into the workspace so cases can pin a binding the
+ * evaluator resolves, rather than declaring a bare id that nothing checks.
+ */
+const SKILL_ID = 'answer-skill';
+
+async function writeSkill(workspace: string, skillId = SKILL_ID): Promise<void> {
+  const directory = join(workspace, 'skills', skillId);
+  await mkdir(directory, { recursive: true });
+  await writeFile(
+    join(directory, 'SKILL.md'),
+    ['---', `name: ${skillId}`, 'description: A test skill used by the evaluator suite.', '---', '', '# Body', ''].join('\n'),
+    'utf8',
+  );
+}
+
+function skillBinding(shouldTrigger: boolean, skillId = SKILL_ID): Record<string, unknown> {
+  return { skill_id: skillId, skill_path: `skills/${skillId}`, should_trigger: shouldTrigger };
+}
+
 function caseDoc(id: string, options: CaseOptions = {}): Record<string, unknown> {
   return {
     id,
@@ -259,14 +279,15 @@ test('missing terminal trace is inconclusive even when skill not selected', asyn
   const fx = new Fixture();
   await fx.setup();
   try {
+    await writeSkill(fx.workspace);
     await fx.project(`import { writeFileSync } from 'node:fs';
 writeFileSync(process.env.CRAFT_EVAL_TRACE_PATH, JSON.stringify({ source: 'host', task_run_id: process.env.CRAFT_EVAL_TASK_RUN_ID, event: 'started' }) + '\\n');
 `);
     const run = await fx.runEval('skill', [
-      caseDoc('adjacent', { checks: [], should_trigger: false, skill_id: 'answer-skill' }),
+      caseDoc('adjacent', { checks: [], skill: skillBinding(false) }),
     ]);
     const result = await firstResult(run);
-    assert.deepEqual([result.verdict, result.trigger?.verdict], ['inconclusive', 'inconclusive']);
+    assert.deepEqual([result.verdict, result.trigger?.verdict, result.trigger?.evidence], ['inconclusive', 'inconclusive', 'unobserved']);
   } finally {
     await fx.cleanup();
   }
@@ -293,6 +314,7 @@ test('skill paired gain requires positive negative and real distinct runs', asyn
   const fx = new Fixture();
   await fx.setup();
   try {
+    await writeSkill(fx.workspace);
     await fx.project(`import { writeFileSync, mkdirSync } from 'node:fs';
 const enabled = process.env.SKILL_ENABLED === '1';
 const positive = process.env.CRAFT_EVAL_CASE_ID.startsWith('task-');
@@ -301,7 +323,8 @@ writeFileSync('outputs/result.json', JSON.stringify({ ok: positive ? enabled : t
 const id = process.env.CRAFT_EVAL_TASK_RUN_ID;
 const events = [];
 if (enabled && positive) {
-  events.push({ source: 'host', task_run_id: id, event: 'skill.invoked', skill_id: 'answer-skill' });
+  // Emitted by the evaluator's wrapper (source: gateway), not by the subject.
+  events.push({ source: 'gateway', task_run_id: id, event: 'skill.invoked', skill_id: 'answer-skill' });
 }
 events.push({ source: 'host', task_run_id: id, event: 'run.finished', cost_units: 1 });
 writeFileSync(process.env.CRAFT_EVAL_TRACE_PATH, events.map((e) => JSON.stringify(e)).join('\\n') + '\\n');
@@ -309,9 +332,9 @@ writeFileSync(process.env.CRAFT_EVAL_TRACE_PATH, events.map((e) => JSON.stringif
     const checks = [{ id: 'outcome', kind: 'json_equals', path: 'outputs/result.json', key: 'ok', equals: true }];
     const cases = [] as unknown[];
     for (let index = 0; index < 20; index += 1) {
-      cases.push(caseDoc(`task-${index}`, { checks, should_trigger: true, skill_id: 'answer-skill' }));
+      cases.push(caseDoc(`task-${index}`, { checks, skill: skillBinding(true) }));
     }
-    cases.push(caseDoc('adjacent', { checks: [], should_trigger: false, skill_id: 'answer-skill' }));
+    cases.push(caseDoc('adjacent', { checks: [], skill: skillBinding(false) }));
     const baseline = await fx.runEval('skill', cases, { SKILL_ENABLED: '0' });
     const candidate = await fx.runEval('skill', cases, { SKILL_ENABLED: '1' });
     const compared = await compareRuns(baseline, candidate);
@@ -322,6 +345,8 @@ writeFileSync(process.env.CRAFT_EVAL_TRACE_PATH, events.map((e) => JSON.stringif
     assert.equal(compared.skill_gain_supported, true);
     assert.ok((compared.one_sided_p ?? 1) < 0.05);
     assert.equal(compared.independent_task_runs, true);
+    assert.equal(compared.gateway_observed_triggers, true);
+    assert.equal(compared.unobserved_triggers, 0);
     await captureStdout(async () => assert.equal(await main(['compare', baseline, candidate]), 0));
   } finally {
     await fx.cleanup();
@@ -422,8 +447,9 @@ test('timeout and untrusted trace cannot count as success', async () => {
     await fx.project(`import { writeFileSync } from 'node:fs';
 writeFileSync(process.env.CRAFT_EVAL_TRACE_PATH, JSON.stringify({ source: 'agent', task_run_id: process.env.CRAFT_EVAL_TASK_RUN_ID, event: 'run.finished' }) + '\\n');
 `);
+    await writeSkill(fx.workspace);
     const second = await fx.runEval('skill', [
-      caseDoc('negative', { checks: [], should_trigger: false, skill_id: 'answer-skill' }),
+      caseDoc('negative', { checks: [], skill: skillBinding(false) }),
     ]);
     assert.equal((await firstResult(second)).trigger?.verdict, 'inconclusive');
   } finally {
@@ -513,8 +539,16 @@ test('contract rejects all invalid case and check shapes', async () => {
       [{ ...base, cases: [{ ...caseDoc('a'), argv: [] }] }, /argv/],
       [{ ...base, cases: [{ ...caseDoc('a'), timeout_s: 0 }] }, /timeout/],
       [{ ...base, cases: [caseDoc('a', { checks: [] })] }, /task checks/],
-      [suiteDoc('skill', [caseDoc('a')]), /should_trigger/],
-      [suiteDoc('skill', [caseDoc('a', { checks: [], should_trigger: true, skill_id: 'x' })]), /positive/],
+      [suiteDoc('skill', [caseDoc('a')]), /skill binding/],
+      [suiteDoc('skill', [{ ...caseDoc('a'), skill: { skill_id: 'x', skill_path: 'skills/x', should_trigger: 'yes' } }]), /boolean/],
+      [suiteDoc('skill', [caseDoc('a', { checks: [], skill: skillBinding(true, 'mismatched') })]), /positive/],
+      [
+        {
+          ...base,
+          cases: [caseDoc('a', { checks: [{ id: 's', kind: 'script', path: 'check.mjs', pass_exit_codes: 'zero' }] })],
+        },
+        /pass_exit_codes/,
+      ],
     ];
     for (const [value, message] of variants) {
       await assert.rejects(loadSuite(await write(fx.root, 'bad.json', value)), message);
@@ -623,6 +657,84 @@ process.exit((id === 'gain' && enabled) || (id === 'loss' && !enabled) ? 0 : 1);
     data.trial = 2;
     await writeFile(tampered, JSON.stringify(data), 'utf8');
     await assert.rejects(compareRuns(baseline, candidate), /does not match/);
+  } finally {
+    await fx.cleanup();
+  }
+});
+
+test('self-reported triggers can diagnose but never support a gain claim', async () => {
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    await writeSkill(fx.workspace);
+    await fx.project(`import { writeFileSync, mkdirSync } from 'node:fs';
+const enabled = process.env.SKILL_ENABLED === '1';
+const positive = process.env.CRAFT_EVAL_CASE_ID.startsWith('task-');
+mkdirSync('outputs', { recursive: true });
+writeFileSync('outputs/result.json', JSON.stringify({ ok: positive ? enabled : true }));
+const id = process.env.CRAFT_EVAL_TASK_RUN_ID;
+const events = [];
+if (enabled && positive) {
+  // Forged by the subject itself: source is "host", not the evaluator's gateway.
+  events.push({ source: 'host', task_run_id: id, event: 'skill.invoked', skill_id: 'answer-skill' });
+}
+events.push({ source: 'host', task_run_id: id, event: 'run.finished', cost_units: 1 });
+writeFileSync(process.env.CRAFT_EVAL_TRACE_PATH, events.map((e) => JSON.stringify(e)).join('\\n') + '\\n');
+`);
+    const checks = [{ id: 'outcome', kind: 'json_equals', path: 'outputs/result.json', key: 'ok', equals: true }];
+    const cases = [] as unknown[];
+    for (let index = 0; index < 20; index += 1) {
+      cases.push(caseDoc(`task-${index}`, { checks, skill: skillBinding(true) }));
+    }
+    cases.push(caseDoc('adjacent', { checks: [], skill: skillBinding(false) }));
+    const baseline = await fx.runEval('skill', cases, { SKILL_ENABLED: '0' });
+    const candidate = await fx.runEval('skill', cases, { SKILL_ENABLED: '1' });
+    // The trigger verdict reads as passed because the numbers line up, but the
+    // evidence class makes it unusable for gain claims.
+    const positiveResult = (await reportRun(candidate)).results.filter((item) => item.trigger !== null)[0];
+    assert.equal(positiveResult?.trigger?.evidence, 'self_reported');
+    const compared = await compareRuns(baseline, candidate);
+    assert.equal(compared.gateway_observed_triggers, false);
+    assert.equal(compared.skill_gain_supported, false, 'self-reported evidence must not support a gain');
+  } finally {
+    await fx.cleanup();
+  }
+});
+
+test('script checks grade by exit code and classify failures', async () => {
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    await fx.project(`import { writeFileSync, mkdirSync } from 'node:fs';
+mkdirSync('outputs', { recursive: true });
+writeFileSync('outputs/result.json', JSON.stringify({ ok: true }));
+const script = process.env.CRAFT_EVAL_CASE_ID === 'passing'
+  ? "import { writeFileSync } from 'node:fs'; writeFileSync('graded.txt', 'pass'); process.exit(0);"
+  : "process.exit(2);";
+writeFileSync('grade.mjs', script);
+`);
+    const scriptCheck = { id: 'grade', kind: 'script', path: 'grade.mjs' };
+    const passing = await fx.runEval('software', [caseDoc('passing', { checks: [scriptCheck] })]);
+    const passingCheck = await firstCheck(passing);
+    assert.deepEqual([passingCheck.passed, passingCheck.reason], [true, 'ok']);
+    // The failing case must still exit 0 so the script check alone decides.
+    const failingSuite = await fx.runEval(
+      'software',
+      [caseDoc('failing', { checks: [{ id: 'exit', kind: 'exit_code', equals: 0 }, scriptCheck] })],
+    );
+    const failingCheck = (await reportRun(failingSuite)).results[0]?.checks.find((item) => item.id === 'grade');
+    assert.deepEqual([failingCheck?.passed, failingCheck?.reason, failingCheck?.evidence.exit_code], [false, 'script_failed', 2]);
+    const missing = await fx.runEval('software', [
+      caseDoc('missing', { checks: [{ id: 'grade', kind: 'script', path: 'nope/grade.mjs' }] }),
+    ]);
+    const missingCheck = await firstCheck(missing);
+    assert.deepEqual([missingCheck.passed, missingCheck.reason], [false, 'not_found']);
+    const accepted = { id: 'grade', kind: 'script', path: 'grade.mjs', pass_exit_codes: [0, 2] };
+    const custom = await fx.runEval(
+      'software',
+      [caseDoc('failing', { checks: [{ id: 'exit', kind: 'exit_code', equals: 0 }, accepted] })],
+    );
+    assert.equal(((await reportRun(custom)).results[0]?.checks.find((item) => item.id === 'grade'))?.passed, true);
   } finally {
     await fx.cleanup();
   }
