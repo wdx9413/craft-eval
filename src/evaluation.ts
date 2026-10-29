@@ -405,11 +405,13 @@ function relativePath(value: unknown, name: string): string {
  * CRAFT_EVAL_SUBJECTS_ROOT when the checkouts live elsewhere.
  */
 function expandSubjects(value: string): string {
-  if (!value.includes('{{subjects}}')) {
+  if (!value.includes('{{subjects}}') && !value.includes('{{craft-eval}}')) {
     return value;
   }
   const root = process.env.CRAFT_EVAL_SUBJECTS_ROOT ?? resolve(process.cwd(), '..', 'eval-subjects');
-  return value.replaceAll('{{subjects}}', root);
+  // dist/src/evaluation.js -> ../.. is the package root (craft-eval/).
+  const craftEvalRoot = fileURLToPath(new URL('../..', import.meta.url));
+  return value.replaceAll('{{subjects}}', root).replaceAll('{{craft-eval}}', craftEvalRoot);
 }
 
 function isPlainInteger(value: unknown): value is number {

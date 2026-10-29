@@ -1,0 +1,8 @@
+{
+  "kind": "software",
+  "id": "quta",
+  "version": "1.18.0",
+  "env": {
+    "PYTHONPATH": ".testdeps"
+  }
+}

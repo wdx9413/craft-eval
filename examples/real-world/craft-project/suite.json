@@ -1,0 +1,108 @@
+{
+  "schema": "craft-eval.eval.v1",
+  "suite_id": "craft-project",
+  "subject_kind": "software",
+  "partition": "development",
+  "sanitized": true,
+  "claim": {
+    "statement": "craft 仓库的类型检查、架构/接口/文档一致性审计与 CLI smoke 在其仓库内通过",
+    "scope": "单机离线；不含真实模型评测与线上环境",
+    "limitations": ["不覆盖全部 365 个单测（耗时过长）", "文档审计只覆盖链接与必需文档"]
+  },
+  "metrics": {
+    "primary": {
+      "id": "task_pass",
+      "kind": "binary_pass_rate",
+      "direction": "higher_is_better",
+      "minimum_sample": 6
+    }
+  },
+  "business": {
+    "invariants": [
+      {
+        "id": "inv-layering",
+        "statement": "分层依赖必须单向，禁止反向/跨层引用",
+        "positive_cases": ["layering"],
+        "negative_cases": []
+      },
+      {
+        "id": "inv-docs-links",
+        "statement": "文档中的相对链接必须指向真实存在的文件",
+        "positive_cases": ["docs", "audit-docs"],
+        "negative_cases": []
+      }
+    ]
+  },
+  "cases": [
+    {
+      "id": "typecheck",
+      "category": "static",
+      "risk": "high",
+      "language": "typescript",
+      "argv": ["node", "node_modules/typescript/bin/tsc", "--noEmit"],
+      "in_place": true,
+      "timeout_s": 600,
+      "checks": [{ "id": "exit", "kind": "exit_code", "equals": 0 }]
+    },
+    {
+      "id": "layering",
+      "category": "architecture",
+      "risk": "high",
+      "language": "typescript",
+      "argv": ["node", "--experimental-strip-types", "scripts/ci/audit-layering.ts"],
+      "in_place": true,
+      "timeout_s": 300,
+      "checks": [{ "id": "exit", "kind": "exit_code", "equals": 0 }]
+    },
+    {
+      "id": "surfaces",
+      "category": "architecture",
+      "risk": "high",
+      "language": "typescript",
+      "argv": ["node", "--experimental-strip-types", "scripts/ci/audit-surfaces.ts"],
+      "in_place": true,
+      "timeout_s": 300,
+      "checks": [{ "id": "exit", "kind": "exit_code", "equals": 0 }]
+    },
+    {
+      "id": "audit-docs",
+      "category": "documentation",
+      "risk": "medium",
+      "language": "markdown",
+      "argv": ["node", "--experimental-strip-types", "scripts/ci/check-doc-links.ts"],
+      "in_place": true,
+      "timeout_s": 300,
+      "checks": [{ "id": "exit", "kind": "exit_code", "equals": 0 }]
+    },
+    {
+      "id": "consistency",
+      "category": "documentation",
+      "risk": "medium",
+      "language": "markdown",
+      "argv": ["node", "--experimental-strip-types", "scripts/ci/check-consistency-falsifiable.ts"],
+      "in_place": true,
+      "timeout_s": 300,
+      "checks": [{ "id": "exit", "kind": "exit_code", "equals": 0 }]
+    },
+    {
+      "id": "smoke",
+      "category": "runtime",
+      "risk": "medium",
+      "language": "typescript",
+      "argv": ["node", "dist/core/cli.js", "--help"],
+      "in_place": true,
+      "timeout_s": 60,
+      "checks": [{ "id": "exit", "kind": "exit_code", "equals": 0 }]
+    },
+    {
+      "id": "docs",
+      "category": "documentation",
+      "risk": "low",
+      "language": "markdown",
+      "argv": ["node", "{{craft-eval}}/examples/real-world/docs-check/check-docs.mjs", ".", "README.md,CONTEXT.md,DESIGN.md,GLOSSARY.md,UX-CONTRACT.md", "docs"],
+      "in_place": true,
+      "timeout_s": 120,
+      "checks": [{ "id": "links", "kind": "exit_code", "equals": 0 }]
+    }
+  ]
+}

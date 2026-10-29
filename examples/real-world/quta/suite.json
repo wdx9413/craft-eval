@@ -1,0 +1,63 @@
+{
+  "schema": "craft-eval.eval.v1",
+  "suite_id": "quta",
+  "subject_kind": "software",
+  "partition": "development",
+  "sanitized": true,
+  "claim": {
+    "statement": "quta 的量化测试套件与文档链接在其仓库内可复现通过",
+    "scope": "单机离线；不验证策略收益（README 已声明不可用于实盘）",
+    "limitations": ["不覆盖真实行情数据获取（akshare 需要网络）"]
+  },
+  "metrics": {
+    "primary": {
+      "id": "task_pass",
+      "kind": "binary_pass_rate",
+      "direction": "higher_is_better",
+      "minimum_sample": 2
+    }
+  },
+  "business": {
+    "invariants": [
+      {
+        "id": "inv-cash-ledger",
+        "statement": "现金与持仓账本必须在所有交易路径上守恒",
+        "positive_cases": ["tests"],
+        "negative_cases": []
+      }
+    ],
+    "rules": [
+      {
+        "id": "cost-bps",
+        "statement": "交易成本按 bps 作用于成交金额",
+        "parameter": "cost_bps",
+        "boundaries": [
+          { "value": 0, "cases": ["tests"] },
+          { "value": 15, "cases": ["tests"] }
+        ]
+      }
+    ]
+  },
+  "cases": [
+    {
+      "id": "docs",
+      "category": "documentation",
+      "risk": "low",
+      "language": "markdown",
+      "argv": ["node", "{{craft-eval}}/examples/real-world/docs-check/check-docs.mjs", ".", "README.md,CONTEXT.md", "docs"],
+      "in_place": true,
+      "timeout_s": 60,
+      "checks": [{ "id": "links", "kind": "exit_code", "equals": 0 }]
+    },
+    {
+      "id": "tests",
+      "category": "tests",
+      "risk": "high",
+      "language": "python",
+      "argv": ["py", "-3", "-m", "pytest", "-q", "--no-header", "-p", "no:cacheprovider"],
+      "in_place": true,
+      "timeout_s": 900,
+      "checks": [{ "id": "exit", "kind": "exit_code", "equals": 0 }]
+    }
+  ]
+}
