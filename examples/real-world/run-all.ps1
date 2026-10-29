@@ -22,7 +22,7 @@ $rows = foreach ($suite in $suites) {
   $suiteFile = Join-Path $dir 'suite.json'
   $cases = (Get-Content $suiteFile -Raw | ConvertFrom-Json).cases.Count
   $raw = & node $cli run $suiteFile (Join-Path $dir 'subject.json') (Join-Path $dir 'runtime.json') `
-      --workspace (Join-Path $dir $suite.workspace) --output (Join-Path $out $suite.name) 2>&1
+      --workspace (Join-Path $dir $suite.workspace) --output (Join-Path $out $suite.name) --keep-traces 2>&1
   $report = ($raw | ConvertFrom-Json).report
   [pscustomobject]@{
     Suite    = $suite.name

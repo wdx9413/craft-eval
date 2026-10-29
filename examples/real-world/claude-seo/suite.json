@@ -909,7 +909,12 @@
           "key": "ok",
           "equals": true
         }
-      ]
+      ],
+      "requires": {
+        "python_modules": [
+          "google.auth"
+        ]
+      }
     },
     {
       "id": "report-dependencies",

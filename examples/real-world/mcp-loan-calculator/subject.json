@@ -1,0 +1,8 @@
+{
+  "kind": "software",
+  "id": "mcp-loan-calculator",
+  "version": "main",
+  "env": {
+    "EVAL_SUBJECT_DIR": "D:\\documents\\project\\mytest\\eval-subjects\\mcp-loan-calculator"
+  }
+}

@@ -1,7 +1,8 @@
 # Real-world evaluation suites
 
-Four suites that exercise `craft-eval` against third-party code instead of its
-own examples. **94 independent cases** in total, each graded on its own checks.
+Five suites that exercise `craft-eval` against third-party code instead of its
+own examples: **94 deterministic cases** plus a **3-case business-skill suite**
+driven by a real Codex host. Each case is graded on its own checks.
 
 ## Subjects
 
@@ -14,6 +15,7 @@ The checkouts live outside this repo at `../eval-subjects/` (sibling of
 | `claude-seo` | [AgriciDaniel/claude-seo](https://github.com/AgriciDaniel/claude-seo) | Python | 24 | One capability area's pytest group (agentic output, auth hardening, cost tracking, …) |
 | `pocketflow` | [The-Pocket/PocketFlow](https://github.com/The-Pocket/PocketFlow) | Python | 23 | One graph semantic (walk, conditional, retry, batch, async fan-out) + its own unit files |
 | `craft-eval` | this repo | TypeScript | 23 | One evaluator capability (trace handling, artifact guards, MCP mocking, …) |
+| `ecommerce-skill` | [feichanggege/ecommerce-visual-copywriting-skill](https://github.com/feichanggege/ecommerce-visual-copywriting-skill) | Markdown skill | 3 | Business-skill compliance: storyboard gate, Amazon cross-border localization, ordinary-food claim boundary — graded by the skill's own `must_include`/`must_not_include` rules |
 
 ## Running
 
@@ -36,6 +38,20 @@ powershell -NoProfile -ExecutionPolicy Bypass -File examples/real-world/run-all.
 `run-all.ps1` prints one row per suite plus a total, and exits non-zero if any
 suite is not `complete` or has failures.
 
+`ecommerce-skill` is run separately because it needs a real Codex host and
+network access, and takes tens of seconds to minutes per case:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File examples/real-world/ecommerce-skill/run.ps1
+```
+
+It works by having Codex read the skill's `SKILL.md`, produce the requested plan
+into `outputs/answer.md`, and then grading that file with `grade.mjs` against the
+skill's own `test-prompts.json`. `must_include` is checked across the whole
+answer; `must_not_include` is checked only in non-negated sentences, because a
+compliant plan legitimately quotes forbidden claims in a risk ledger or lists
+them in a Negative Prompt. The suite pins 3 of the skill's 14 cases.
+
 Expected result on a machine without `gcloud` and without outbound whois:
 
 ```
@@ -48,6 +64,9 @@ craft-eval        23 complete     23      0
 
 total: 92/94 cases passed
 ```
+
+`ecommerce-skill` is not part of that total. Its last real Codex run was
+3/3 passed (2026-10-28); rerun it with the command above.
 
 ## A/B comparison
 

@@ -1,0 +1,31 @@
+{
+  "schema": "craft-eval.eval.v1",
+  "suite_id": "finance-agent",
+  "subject_kind": "agent",
+  "partition": "development",
+  "sanitized": true,
+  "claim": {
+    "statement": "Codex 能按等额本息公式正确计算贷款月供并写出结构化结果",
+    "scope": "单个可确定性判分的金融计算任务；不代表完整金融业务能力",
+    "limitations": ["仅 1 个用例", "依赖真实 Codex 与网络"]
+  },
+  "metrics": {
+    "primary": {
+      "id": "task_pass",
+      "kind": "binary_pass_rate",
+      "direction": "higher_is_better",
+      "minimum_sample": 1
+    }
+  },
+  "cases": [
+    {
+      "id": "loan-payment",
+      "prompt": "你是金融计算助手。请计算等额本息贷款的月供，并把结果写入 outputs/answer.json（JSON 格式：{\"monthly_payment\": <number>}，数值保留 2 位小数）。直接写文件，不要只在终端打印。贷款参数：本金 1,000,000 元，年利率 4.2%，期限 30 年（360 期）。",
+      "timeout_s": 300,
+      "checks": [
+        {"id": "file", "kind": "file_exists", "path": "outputs/answer.json"},
+        {"id": "value", "kind": "json_equals", "path": "outputs/answer.json", "key": "monthly_payment", "equals": 4890.17}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "kind": "agent",
+  "id": "codex-free",
+  "version": "v1",
+  "env": {},
+  "host": {
+    "kind": "codex",
+    "binary": "D:\\application\\codex\\resources\\codex.exe",
+    "model": "group/free",
+    "sandbox": "workspace-write"
+  }
+}

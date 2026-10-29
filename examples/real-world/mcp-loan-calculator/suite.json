@@ -1,0 +1,101 @@
+{
+  "schema": "craft-eval.eval.v1",
+  "suite_id": "finance-mcp",
+  "subject_kind": "software",
+  "partition": "development",
+  "sanitized": true,
+  "business": {
+    "invariants": [
+      {
+        "id": "inv-monthly-payment",
+        "statement": "月供必须等于等额本息公式 P*r*(1+r)^n/((1+r)^n-1)，1,000,000 @ 4.2% / 30y = 4890.17",
+        "positive_cases": ["loan-tools", "zero-rate"],
+        "negative_cases": ["negative-rate"]
+      },
+      {
+        "id": "inv-amort-terminal-balance",
+        "statement": "摊销每年本金+利息必须等于 12 期月供，且末期余额归零",
+        "positive_cases": ["amort-terminal"],
+        "negative_cases": ["negative-rate"]
+      }
+    ],
+    "incidents": [
+      {
+        "id": "inc-amort-principal-sum",
+        "source": "observed amortization sums monthly payment as principal (2026-10-29)",
+        "case_ids": ["loan-tools"]
+      }
+    ],
+    "rules": [
+      {
+        "id": "rate-boundary",
+        "statement": "利率为 0 时月供应等于本金/期数，不得除零",
+        "parameter": "annual_rate",
+        "boundaries": [
+          { "value": 0, "cases": ["zero-rate"] },
+          { "value": -5, "cases": ["negative-rate"] },
+          { "value": 4.2, "cases": ["loan-tools"] }
+        ]
+      }
+    ]
+  },
+  "claim": {
+    "statement": "loan-calculator MCP server 能通过 stdio 协议返回正确的月供与摊销结果",
+    "scope": "真实第三方 MCP server 的 2 个工具；单机离线",
+    "limitations": ["仅 2 个工具", "不覆盖外部网络数据"]
+  },
+  "metrics": {
+    "primary": {
+      "id": "task_pass",
+      "kind": "binary_pass_rate",
+      "direction": "higher_is_better",
+      "minimum_sample": 1
+    }
+  },
+  "cases": [
+    {
+      "id": "loan-tools",
+      "category": "pricing",
+      "risk": "high",
+      "argv": ["node", "driver.mjs", "--rate", "4.2"],
+      "timeout_s": 60,
+      "checks": [
+        {"id": "file", "kind": "file_exists", "path": "outputs/result.json"},
+        {"id": "grade", "kind": "script", "path": "grade.mjs"}
+      ]
+    },
+    {
+      "id": "zero-rate",
+      "category": "pricing",
+      "risk": "high",
+      "argv": ["node", "driver.mjs", "--rate", "0"],
+      "timeout_s": 60,
+      "checks": [
+        {"id": "file", "kind": "file_exists", "path": "outputs/result.json"},
+        {"id": "grade", "kind": "script", "path": "grade.mjs"}
+      ]
+    },
+    {
+      "id": "negative-rate",
+      "category": "pricing",
+      "risk": "high",
+      "argv": ["node", "driver.mjs", "--rate", "-5"],
+      "timeout_s": 60,
+      "checks": [
+        {"id": "file", "kind": "file_exists", "path": "outputs/result.json"},
+        {"id": "grade", "kind": "script", "path": "grade.mjs"}
+      ]
+    },
+    {
+      "id": "amort-terminal",
+      "category": "pricing",
+      "risk": "high",
+      "argv": ["node", "driver.mjs", "--rate", "4.2", "--mode", "amort"],
+      "timeout_s": 60,
+      "checks": [
+        {"id": "file", "kind": "file_exists", "path": "outputs/result.json"},
+        {"id": "grade", "kind": "script", "path": "grade.mjs"}
+      ]
+    }
+  ]
+}

@@ -7,9 +7,15 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { compareRuns, loadSuite, reportRun, runSuite, signProbability } from '../src/evaluation.js';
+import { compareRuns, loadSuite, reportRun, rescoreScripts, runSuite, signProbability } from '../src/evaluation.js';
 import type { CaseResult, CheckResult } from '../src/evaluation.js';
 import { main } from '../src/cli.js';
+import { auditSuiteFiles } from '../src/audit.js';
+import { coverageSuiteFiles } from '../src/audit.js';
+import { attributeRun } from '../src/attribution.js';
+import { writeHtmlReport } from '../src/report-html.js';
+import { runMutations } from '../src/mutation.js';
+import { calibrateJudge } from '../src/calibration.js';
 
 const RUNTIME_KEYS = ['environment_digest', 'budget_digest', 'host_digest', 'model_digest', 'tools_digest'];
 
@@ -97,19 +103,59 @@ async function writeSkill(workspace: string, skillId = SKILL_ID): Promise<void> 
   );
 }
 
+/**
+ * A local fake Host emits the same JSONL shapes as a real Codex/Claude CLI.
+ * This exercises evaluator-owned parsing without making the test suite depend
+ * on network access, credentials, or a particular model.
+ */
+async function writeFakeHost(workspace: string, kind: 'codex' | 'claude'): Promise<void> {
+  const event =
+    kind === 'codex'
+      ? `{"type":"item.completed","item":{"type":"command_execution","command":"node host.mjs","aggregated_output":"","exit_code":0,"status":"completed"}}\n{"type":"turn.completed","usage":{"input_tokens":12,"cached_input_tokens":3,"output_tokens":4,"reasoning_output_tokens":2}}`
+      : `{"type":"system","subtype":"init","model":"group/free","cwd":${JSON.stringify(workspace)}}\n{"type":"assistant","message":{"model":"observed-model","usage":{"input_tokens":12,"cache_read_input_tokens":3,"output_tokens":4},"content":[{"type":"tool_use","name":"Skill","input":{"skill":"answer-skill"}},{"type":"tool_use","name":"Read","input":{"file_path":"SKILL.md"}}]}}\n{"type":"result","total_cost_usd":0.25,"usage":{"input_tokens":12,"cache_read_input_tokens":3,"output_tokens":4},"modelUsage":{"observed-model":{"inputTokens":12}}}`;
+  const withoutSkill =
+    kind === 'claude'
+      ? `{"type":"system","subtype":"init","model":"group/free","cwd":${JSON.stringify(workspace)}}\n{"type":"assistant","message":{"model":"observed-model","usage":{"input_tokens":12,"cache_read_input_tokens":3,"output_tokens":4},"content":[{"type":"tool_use","name":"Read","input":{"file_path":"SKILL.md"}}]}}\n{"type":"result","total_cost_usd":0.25,"usage":{"input_tokens":12,"cache_read_input_tokens":3,"output_tokens":4},"modelUsage":{"observed-model":{"inputTokens":12}}}`
+      : event;
+  await writeFile(
+    join(workspace, 'fake-host.mjs'),
+    `import { execFileSync } from 'node:child_process';
+let input = '';
+process.stdin.setEncoding('utf8');
+process.stdin.on('data', (chunk) => { input += chunk; });
+process.stdin.on('end', () => {
+  execFileSync(process.execPath, ['host.mjs'], { stdio: 'ignore' });
+  const positive = process.env.CRAFT_EVAL_CASE_ID.startsWith('task-');
+  const body = positive ? ${JSON.stringify(event)} : ${JSON.stringify(withoutSkill)};
+  process.stdout.write(body + '\\n');
+});
+`,
+    'utf8',
+  );
+}
+
 function skillBinding(shouldTrigger: boolean, skillId = SKILL_ID): Record<string, unknown> {
   return { skill_id: skillId, skill_path: `skills/${skillId}`, should_trigger: shouldTrigger };
 }
 
 function caseDoc(id: string, options: CaseOptions = {}): Record<string, unknown> {
-  return {
+  const base: Record<string, unknown> = {
     id,
     argv: [NODE_BINARY, 'host.mjs'],
     timeout_s: 3,
     checks: options.checks ?? [{ id: 'exit', kind: 'exit_code', equals: 0 }],
     safety_checks: options.safety ?? [],
-    ...Object.fromEntries(Object.entries(options).filter(([key]) => key !== 'checks' && key !== 'safety')),
   };
+  for (const [key, value] of Object.entries(options)) {
+    if (key !== 'checks' && key !== 'safety') {
+      if (value === undefined) {
+        delete base[key];
+      } else {
+        base[key] = value;
+      }
+    }
+  }
+  return base;
 }
 
 class Fixture {
@@ -146,6 +192,34 @@ class Fixture {
     });
     return runSuite(suitePath, subjectPath, this.runtimePath, this.workspace, this.output, { trials });
   }
+}
+
+async function runHostSuite(
+  fx: Fixture,
+  cases: unknown[],
+  baselineEnv: Record<string, string>,
+  candidateEnv: Record<string, string>,
+): Promise<{ baseline: string; candidate: string }> {
+  const suitePath = await write(fx.root, 'host-suite.json', suiteDoc('skill', cases));
+  const host = { kind: 'claude', binary: NODE_BINARY, args_prefix: ['fake-host.mjs'], model: 'group/free' };
+  const baselineSubject = await write(fx.root, 'host-baseline.json', {
+    kind: 'skill',
+    id: 'fake-claude',
+    version: 'v1',
+    env: baselineEnv,
+    host,
+  });
+  const candidateSubject = await write(fx.root, 'host-candidate.json', {
+    kind: 'skill',
+    id: 'fake-claude',
+    version: 'v2',
+    env: candidateEnv,
+    host,
+  });
+  return {
+    baseline: await runSuite(suitePath, baselineSubject, fx.runtimePath, fx.workspace, fx.output),
+    candidate: await runSuite(suitePath, candidateSubject, fx.runtimePath, fx.workspace, fx.output),
+  };
 }
 
 async function write(root: string, name: string, value: unknown): Promise<string> {
@@ -293,7 +367,7 @@ writeFileSync(process.env.CRAFT_EVAL_TRACE_PATH, JSON.stringify({ source: 'host'
   }
 });
 
-test('agent requires completed host trace even for file checks', async () => {
+test('agent local argv checks do not require a host trace', async () => {
   const fx = new Fixture();
   await fx.setup();
   try {
@@ -304,39 +378,38 @@ writeFileSync('outputs/result.json', JSON.stringify({ done: true }));
     const checks = [{ id: 'result', kind: 'json_equals', path: 'outputs/result.json', key: 'done', equals: true }];
     const run = await fx.runEval('agent', [caseDoc('agent', { checks })]);
     const result = await firstResult(run);
-    assert.deepEqual([result.task_verdict, result.verdict, result.trace_complete], ['passed', 'inconclusive', false]);
+    assert.deepEqual([result.task_verdict, result.verdict, result.trace_complete], ['passed', 'passed', false]);
   } finally {
     await fx.cleanup();
   }
 });
 
-test('skill paired gain requires positive negative and real distinct runs', async () => {
+test('skill paired gain requires evaluator-observed host events', async () => {
   const fx = new Fixture();
   await fx.setup();
   try {
     await writeSkill(fx.workspace);
+    await writeFakeHost(fx.workspace, 'claude');
     await fx.project(`import { writeFileSync, mkdirSync } from 'node:fs';
 const enabled = process.env.SKILL_ENABLED === '1';
 const positive = process.env.CRAFT_EVAL_CASE_ID.startsWith('task-');
 mkdirSync('outputs', { recursive: true });
 writeFileSync('outputs/result.json', JSON.stringify({ ok: positive ? enabled : true }));
-const id = process.env.CRAFT_EVAL_TASK_RUN_ID;
-const events = [];
-if (enabled && positive) {
-  // Emitted by the evaluator's wrapper (source: gateway), not by the subject.
-  events.push({ source: 'gateway', task_run_id: id, event: 'skill.invoked', skill_id: 'answer-skill' });
-}
-events.push({ source: 'host', task_run_id: id, event: 'run.finished', cost_units: 1 });
-writeFileSync(process.env.CRAFT_EVAL_TRACE_PATH, events.map((e) => JSON.stringify(e)).join('\\n') + '\\n');
 `);
     const checks = [{ id: 'outcome', kind: 'json_equals', path: 'outputs/result.json', key: 'ok', equals: true }];
     const cases = [] as unknown[];
     for (let index = 0; index < 20; index += 1) {
-      cases.push(caseDoc(`task-${index}`, { checks, skill: skillBinding(true) }));
+      cases.push(
+        caseDoc(`task-${index}`, {
+          checks,
+          skill: skillBinding(true),
+          prompt: 'Do the task',
+          argv: undefined,
+        }),
+      );
     }
-    cases.push(caseDoc('adjacent', { checks: [], skill: skillBinding(false) }));
-    const baseline = await fx.runEval('skill', cases, { SKILL_ENABLED: '0' });
-    const candidate = await fx.runEval('skill', cases, { SKILL_ENABLED: '1' });
+    cases.push(caseDoc('adjacent', { checks: [], skill: skillBinding(false), prompt: 'Do not use the skill', argv: undefined }));
+    const { baseline, candidate } = await runHostSuite(fx, cases, { SKILL_ENABLED: '0' }, { SKILL_ENABLED: '1' });
     const compared = await compareRuns(baseline, candidate);
     assert.deepEqual(
       [compared.measured_pairs, compared.candidate_wins, compared.candidate_trigger_failures],
@@ -347,7 +420,11 @@ writeFileSync(process.env.CRAFT_EVAL_TRACE_PATH, events.map((e) => JSON.stringif
     assert.equal(compared.independent_task_runs, true);
     assert.equal(compared.gateway_observed_triggers, true);
     assert.equal(compared.unobserved_triggers, 0);
-    await captureStdout(async () => assert.equal(await main(['compare', baseline, candidate]), 0));
+    const candidateResult = (await reportRun(candidate)).results.find((item) => item.case_id === 'task-0');
+    assert.deepEqual(candidateResult?.host?.observed_models, ['observed-model']);
+    assert.equal(candidateResult?.host?.requested_model, 'group/free');
+    assert.equal(candidateResult?.host?.cost_usd, 0.25);
+    await captureStdout(async () => assert.equal(await main(['compare', baseline, candidate, '--require-gain']), 0));
   } finally {
     await fx.cleanup();
   }
@@ -379,6 +456,8 @@ test('suite validation rejects unsafe or ambiguous contracts', async () => {
   await fx.setup();
   try {
     const base = suiteDoc('software', [caseDoc('a')]);
+    const noCommand = caseDoc('a');
+    delete noCommand.argv;
     const variants: [unknown, RegExp][] = [
       [{ ...base, schema: 'wrong' }, /schema/],
       [{ ...base, sanitized: false }, /sanitized/],
@@ -389,6 +468,8 @@ test('suite validation rejects unsafe or ambiguous contracts', async () => {
       [{ ...base, cases: [caseDoc('../bad')] }, /identifier/],
       [{ ...base, cases: [caseDoc('a', { checks: [{ id: 'x', kind: 'file_exists', path: '../secret' }] })] }, /relative/],
       [{ ...base, cases: [caseDoc('a', { checks: [{ id: 'x', kind: 'unknown' }] })] }, /unsupported/],
+      [{ ...base, cases: [noCommand] }, /argv or prompt/],
+      [{ ...base, cases: [{ ...caseDoc('a'), prompt: 'task' }] }, /both argv and prompt/],
     ];
     for (const [value, message] of variants) {
       await assert.rejects(loadSuite(await write(fx.root, 'invalid.json', value)), message);
@@ -577,6 +658,32 @@ test('subject workspace trials and cli errors', async () => {
         message,
       );
     }
+    const hostVariants: [unknown, RegExp][] = [
+      [null, /object/],
+      [{ kind: 'other', binary: 'host' }, /codex or claude/],
+      [{ kind: 'codex', binary: '' }, /binary/],
+      [{ kind: 'codex', binary: 'host', args_prefix: 'bad' }, /args_prefix/],
+      [{ kind: 'codex', binary: 'host', args_prefix: [''] }, /args_prefix/],
+      [{ kind: 'codex', binary: 'host', model: '' }, /model/],
+      [{ kind: 'codex', binary: 'host', sandbox: 'unsafe' }, /sandbox/],
+      [{ kind: 'codex', binary: 'host', env: [] }, /host\.env/],
+      [{ kind: 'codex', binary: 'host', env: { 'BAD-NAME': 'x' } }, /host\.env/],
+      [{ kind: 'codex', binary: 'host', env: { CRAFT_EVAL_RUN_ID: 'fake' } }, /override/],
+      [{ kind: 'codex', binary: 'host', env: { LD_PRELOAD: 'fake' } }, /override/],
+      [{ kind: 'codex', binary: 'host', typo: true }, /unsupported/],
+    ];
+    for (const [host, message] of hostVariants) {
+      await assert.rejects(
+        runSuite(
+          suitePath,
+          await write(fx.root, 'host-subject.json', { ...valid, host }),
+          fx.runtimePath,
+          fx.workspace,
+          fx.output,
+        ),
+        message,
+      );
+    }
     const subjectPath = await write(fx.root, 'subject.json', valid);
     for (const trials of [0, true, 21]) {
       await assert.rejects(runSuite(suitePath, subjectPath, fx.runtimePath, fx.workspace, fx.output, { trials: trials as number }), /trials/);
@@ -592,6 +699,648 @@ test('subject workspace trials and cli errors', async () => {
     }
     const failed = await captureStderr(async () => main(['validate', join(fx.root, 'missing.json')]));
     assert.equal(failed.value, 2);
+    for (const argv of [['run', '--unknown'], ['run', '--parallelism']]) {
+      const parsed = await captureStderr(async () => main(argv));
+      assert.equal(parsed.value, 2);
+      assert.match(parsed.text, /unrecognized argument|--parallelism requires a value/);
+    }
+    for (const argv of [['validate'], ['report'], ['compare', 'only-one'], ['run']]) {
+      const parsed = await captureStderr(async () => main(argv));
+      assert.equal(parsed.value, 2);
+      assert.match(parsed.text, /missing arguments/);
+    }
+  } finally {
+    await fx.cleanup();
+  }
+});
+
+test('parallel runs keep independent case results and reject unsafe bounds', async () => {
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    await fx.project(`import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
+const path = 'active.txt';
+const current = Number(readFileSync(path, 'utf8').trim());
+writeFileSync(path, String(current + 1));
+await new Promise((done) => setTimeout(done, 200));
+appendFileSync('finished.txt', process.env.CRAFT_EVAL_CASE_ID + '\\n');
+writeFileSync(path, String(Number(readFileSync(path, 'utf8').trim()) - 1));
+`);
+    await writeFile(join(fx.workspace, 'active.txt'), '0', 'utf8');
+    const cases = Array.from({ length: 4 }, (_, index) => caseDoc(`parallel-${index}`));
+    const suitePath = await write(fx.root, 'parallel-suite.json', suiteDoc('software', cases));
+    const subjectPath = await write(fx.root, 'parallel-subject.json', {
+      kind: 'software',
+      id: 'parallel',
+      version: 'v1',
+    });
+    const run = await runSuite(suitePath, subjectPath, fx.runtimePath, fx.workspace, fx.output, {
+      parallelism: 2,
+    });
+    assert.equal((await reportRun(run)).passed, 4);
+    await assert.rejects(
+      runSuite(suitePath, subjectPath, fx.runtimePath, fx.workspace, fx.output, { parallelism: 9 }),
+      /parallelism/,
+    );
+    const numeric = await runSuite(suitePath, subjectPath, fx.runtimePath, fx.workspace, fx.output, 2);
+    assert.equal((await reportRun(numeric)).expected, 8);
+    const broken = await write(fx.root, 'broken-suite.json', suiteDoc('software', [caseDoc('bad', { checks: [] })]));
+    await assert.rejects(
+      runSuite(broken, subjectPath, fx.runtimePath, fx.workspace, fx.output),
+      /needs task checks/,
+    );
+  } finally {
+    await fx.cleanup();
+  }
+});
+
+test('cli failure gates return one without hiding the report', async () => {
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    await fx.project('process.exit(1);\n');
+    const failed = await fx.runEval('software', [caseDoc('failed')]);
+    const gated = await captureStdout(async () => main(['run', join(fx.root, 'software-suite.json'), join(fx.root, 'software-1.json'), fx.runtimePath, '--workspace', fx.workspace, '--output', fx.output, '--fail-on-failed']));
+    assert.equal(gated.value, 1);
+    assert.match(gated.text, /"status":"complete"/);
+    const baseline = await fx.runEval('software', [caseDoc('failed')]);
+    const comparison = await captureStdout(async () => main(['compare', failed, baseline, '--require-gain']));
+    assert.equal(comparison.value, 1);
+    assert.match(comparison.text, /"skill_gain_supported":false/);
+  } finally {
+    await fx.cleanup();
+  }
+});
+
+test('--keep-traces exports raw capture files under the run directory', async () => {
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    await fx.project('process.stdout.write("hello-stdout");\nprocess.exit(0);\n');
+    // Seed the suite and subject files via the standard helper, then drive the
+    // CLI so the end-to-end flag handling is exercised.
+    const seeded = await fx.runEval('software', [caseDoc('writes-stdout')]);
+    const captured = await captureStdout(async () =>
+      main(['run', join(fx.root, 'software-suite.json'), join(fx.root, 'software-1.json'), fx.runtimePath,
+        '--workspace', fx.workspace, '--output', fx.output, '--keep-traces']));
+    assert.equal(captured.value, 0);
+    const runDir = JSON.parse(captured.text).run_dir as string;
+    const captureDir = join(runDir, 'captures', 'writes-stdout-1');
+    const stdout = await readFile(join(captureDir, 'stdout'), 'utf8');
+    assert.match(stdout, /hello-stdout/);
+    // The seeded run (no flag) must not retain any captures.
+    assert.ok(!existsSync(join(seeded, 'captures')));
+  } finally {
+    await fx.cleanup();
+  }
+});
+
+test('script check surfaces stderr tail for diagnosis', async () => {
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    await fx.project('process.exit(0);\n');
+    await writeFile(
+      join(fx.workspace, 'grade.mjs'),
+      'console.log("grading-output"); console.error("missing marker: MAGIC"); process.exit(1);\n',
+      'utf8',
+    );
+    const run = await fx.runEval('software', [
+      caseDoc('scripted', { checks: [{ id: 'grade', kind: 'script', path: 'grade.mjs' }] }),
+    ]);
+    const result = await firstResult(run);
+    const check = only(result.checks, 'script check');
+    assert.equal(check.passed, false);
+    assert.match(String(check.evidence.stderr_tail), /missing marker: MAGIC/);
+    assert.match(String(check.evidence.stdout_tail), /grading-output/);
+  } finally {
+    await fx.cleanup();
+  }
+});
+
+test('script checks receive the case id in their environment', async () => {
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    await fx.project('process.exit(0);\n');
+    await writeFile(
+      join(fx.workspace, 'grade.mjs'),
+      'if (process.env.CRAFT_EVAL_CASE_ID !== "env-case") {\n' +
+        '  console.error("wrong case id: " + process.env.CRAFT_EVAL_CASE_ID);\n' +
+        '  process.exit(1);\n' +
+        '}\n',
+      'utf8',
+    );
+    const run = await fx.runEval('software', [
+      caseDoc('env-case', { checks: [{ id: 'g', kind: 'script', path: 'grade.mjs' }] }),
+    ]);
+    const check = only((await firstResult(run)).checks, 'script check');
+    assert.equal(check.passed, true);
+  } finally {
+    await fx.cleanup();
+  }
+});
+
+test('--keep-traces also exports inspected sandbox outputs', async () => {
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    await fx.project(
+      'import { mkdirSync, writeFileSync } from "node:fs";\n' +
+        'mkdirSync("outputs", { recursive: true });\n' +
+        'writeFileSync("outputs/answer.md", "artifact-body");\n',
+    );
+    const suitePath = await write(
+      fx.root,
+      'artifacts-suite.json',
+      suiteDoc('software', [
+        caseDoc('artifact', { checks: [{ id: 'file', kind: 'file_exists', path: 'outputs/answer.md' }] }),
+      ]),
+    );
+    const subjectPath = await write(fx.root, 'artifacts-subject.json', {
+      kind: 'software',
+      id: 'artifact-subject',
+      version: 'v1',
+    });
+    const run = await runSuite(suitePath, subjectPath, fx.runtimePath, fx.workspace, fx.output, {
+      keep_traces: true,
+    });
+    const exported = await readFile(join(run, 'captures', 'artifact-1', 'outputs', 'answer.md'), 'utf8');
+    assert.equal(exported, 'artifact-body');
+  } finally {
+    await fx.cleanup();
+  }
+});
+
+test('rescore re-runs script checks from captured outputs without the host', async () => {
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    await fx.project(
+      'import { mkdirSync, writeFileSync } from "node:fs";\n' +
+        'mkdirSync("outputs", { recursive: true });\n' +
+        'writeFileSync("outputs/answer.md", "body");\n',
+    );
+    await writeFile(join(fx.workspace, 'grade.mjs'), 'process.exit(1);\n', 'utf8');
+    const suitePath = await write(
+      fx.root,
+      'rescore-suite.json',
+      suiteDoc('software', [
+        caseDoc('case-a', { checks: [{ id: 'g', kind: 'script', path: 'grade.mjs' }] }),
+      ]),
+    );
+    const subjectPath = await write(fx.root, 'rescore-subject.json', {
+      kind: 'software',
+      id: 'rescore-subject',
+      version: 'v1',
+    });
+    const run = await runSuite(suitePath, subjectPath, fx.runtimePath, fx.workspace, fx.output, {
+      keep_traces: true,
+    });
+    assert.equal((await reportRun(run)).failed, 1);
+    // The captured outputs are unchanged; only the grader is fixed. Rescore must
+    // reach a passing verdict without executing the subject again.
+    await writeFile(join(fx.workspace, 'grade.mjs'), 'process.exit(0);\n', 'utf8');
+    const rescored = await rescoreScripts(run, fx.workspace, join(fx.root, 'rescored'));
+    const report = await reportRun(rescored);
+    assert.equal(report.passed, 1);
+    assert.equal(report.failed, 0);
+  } finally {
+    await fx.cleanup();
+  }
+});
+
+test('rescore leaves not_applicable cases untouched', async () => {
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    await fx.project('process.exit(0);\n');
+    const suitePath = await write(
+      fx.root,
+      'rescore-skip-suite.json',
+      suiteDoc('software', [
+        caseDoc('skip', {
+          language: 'python',
+          requires: { python_modules: ['definitely_missing_module_xyz'] },
+        }),
+      ]),
+    );
+    const subjectPath = await write(fx.root, 'rescore-skip-subject.json', {
+      kind: 'software',
+      id: 'rescore-skip-subject',
+      version: 'v1',
+    });
+    const run = await runSuite(suitePath, subjectPath, fx.runtimePath, fx.workspace, fx.output);
+    assert.equal((await reportRun(run)).not_applicable, 1);
+    const rescored = await rescoreScripts(run, fx.workspace, join(fx.root, 'rescored-skip'));
+    const report = await reportRun(rescored);
+    assert.equal(report.not_applicable, 1);
+    assert.equal(report.failed, 0);
+  } finally {
+    await fx.cleanup();
+  }
+});
+
+test('http_mock injects a local fixture API into the subject', async () => {
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    await fx.project(
+      'import { mkdirSync, writeFileSync } from "node:fs";\n' +
+        'const response = await fetch(process.env.FIXTURE_API + "/price");\n' +
+        'const data = await response.json();\n' +
+        'mkdirSync("outputs", { recursive: true });\n' +
+        'writeFileSync("outputs/result.json", JSON.stringify({ price: data.price }));\n',
+    );
+    const suitePath = await write(
+      fx.root,
+      'http-suite.json',
+      suiteDoc('software', [
+        caseDoc('http', {
+          http_mock: [{ env: 'FIXTURE_API', routes: [{ path: '/price', body: { price: 42 } }] }],
+          checks: [{ id: 'price', kind: 'json_equals', path: 'outputs/result.json', key: 'price', equals: 42 }],
+        }),
+      ]),
+    );
+    const subjectPath = await write(fx.root, 'http-subject.json', {
+      kind: 'software',
+      id: 'http-subject',
+      version: 'v1',
+    });
+    const run = await runSuite(suitePath, subjectPath, fx.runtimePath, fx.workspace, fx.output);
+    assert.equal((await reportRun(run)).passed, 1);
+  } finally {
+    await fx.cleanup();
+  }
+});
+
+test('json_equals failure keeps expected and observed values', async () => {
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    await fx.project(
+      'import { mkdirSync, writeFileSync } from "node:fs";\n' +
+        'mkdirSync("outputs", { recursive: true });\n' +
+        'writeFileSync("outputs/r.json", JSON.stringify({ ok: false }));\n',
+    );
+    const run = await fx.runEval('software', [
+      caseDoc('c', { checks: [{ id: 'j', kind: 'json_equals', path: 'outputs/r.json', key: 'ok', equals: true }] }),
+    ]);
+    const check = only((await firstResult(run)).checks, 'check');
+    assert.equal(check.passed, false);
+    assert.equal(check.evidence.expected, true);
+    assert.equal(check.evidence.actual, false);
+  } finally {
+    await fx.cleanup();
+  }
+});
+
+test('unmet requires records not_applicable and attributes an external dependency gap', async () => {
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    await fx.project('process.exit(0);\n');
+    const suitePath = await write(
+      fx.root,
+      'requires-suite.json',
+      suiteDoc('software', [
+        caseDoc('needs-python', {
+          language: 'python',
+          requires: { python_modules: ['definitely_missing_module_xyz'] },
+        }),
+      ]),
+    );
+    const subjectPath = await write(fx.root, 'requires-subject.json', {
+      kind: 'software',
+      id: 'requires-subject',
+      version: 'v1',
+    });
+    const run = await runSuite(suitePath, subjectPath, fx.runtimePath, fx.workspace, fx.output);
+    const report = await reportRun(run);
+    assert.equal(report.not_applicable, 1);
+    assert.equal(report.failed, 0);
+    assert.equal(report.by_language?.['python']?.not_applicable, 1);
+    const attribution = attributeRun(report);
+    assert.equal(attribution.failures[0]?.category, 'external_dependency_missing');
+  } finally {
+    await fx.cleanup();
+  }
+});
+
+test('assert-set threshold passes on weighted partial success', async () => {
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    await fx.project('process.exit(0);\n');
+    const run = await fx.runEval('software', [
+      caseDoc('partial', {
+        threshold: 0.5,
+        checks: [
+          { id: 'a', kind: 'exit_code', equals: 0, weight: 3 },
+          { id: 'b', kind: 'stdout_contains', value: 'impossible-marker', weight: 1 },
+        ],
+      }),
+    ]);
+    const result = await firstResult(run);
+    assert.equal(result.verdict, 'passed');
+    assert.equal(result.checks[1]?.weight, 1);
+  } finally {
+    await fx.cleanup();
+  }
+});
+
+test('model_graded runs a pluggable judge command', async () => {
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    await fx.project(
+      'import { mkdirSync, writeFileSync } from "node:fs";\n' +
+        'mkdirSync("outputs", { recursive: true });\n' +
+        'writeFileSync("outputs/answer.md", "candidate answer");\n',
+    );
+    await writeFile(
+      join(fx.workspace, 'judge.mjs'),
+      'import { readFileSync } from "node:fs";\n' +
+        'const answer = readFileSync(process.env.CRAFT_EVAL_JUDGE_ANSWER, "utf8");\n' +
+        'const score = answer.includes("candidate") ? 0.9 : 0.1;\n' +
+        'console.log(JSON.stringify({ score, reason: "contains marker" }));\n',
+      'utf8',
+    );
+    const run = await fx.runEval('software', [
+      caseDoc('judged', {
+        checks: [
+          { id: 'quality', kind: 'model_graded', command: [NODE_BINARY, 'judge.mjs'], answer: 'outputs/answer.md', threshold: 0.8, judge: 'marker-judge' },
+        ],
+      }),
+    ]);
+    const check = only((await firstResult(run)).checks, 'judge check');
+    assert.equal(check.passed, true);
+    assert.equal(check.judge, 'marker-judge');
+    assert.equal(check.evidence.score, 0.9);
+  } finally {
+    await fx.cleanup();
+  }
+});
+
+test('coverage reports dimension gaps and report-html renders cases', async () => {
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    await fx.project('process.exit(0);\n');
+    const suitePath = await write(fx.root, 'cov-suite.json', suiteDoc('software', [
+      caseDoc('tagged', { category: 'core', risk: 'high', checks: [{ id: 'e', kind: 'exit_code', equals: 0 }] }),
+      caseDoc('untagged'),
+    ]));
+    const coverage = await coverageSuiteFiles([suitePath]);
+    const entry = only(coverage.suites, 'coverage suite');
+    assert.equal(entry.cases, 2);
+    assert.equal(entry.by_category.core, 1);
+    // caseDoc adds a default exit_code check, so both cases contribute one.
+    assert.equal(entry.by_check_kind.exit_code, 2);
+    assert.ok(coverage.gaps.some((gap) => gap.includes('no category/risk/difficulty')));
+    const run = await fx.runEval('software', [caseDoc('tagged')]);
+    const htmlPath = join(fx.root, 'report.html');
+    await writeHtmlReport(run, htmlPath);
+    const html = await readFile(htmlPath, 'utf8');
+    assert.match(html, /craft-eval run/);
+    assert.match(html, /tagged/);
+  } finally {
+    await fx.cleanup();
+  }
+});
+
+test('business model derives audit findings for invariants, transitions and incidents', async () => {
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    await fx.project('process.exit(0);\n');
+    const suitePath = await write(fx.root, 'biz-suite.json', {
+      ...suiteDoc('software', [
+        caseDoc('positive', { category: 'core' }),
+      ], 'development'),
+      business: {
+        invariants: [
+          { id: 'inv-covered', statement: 'exit code is zero', positive_cases: ['positive'], negative_cases: [] },
+          { id: 'inv-unknown', statement: 'refs a ghost case', positive_cases: ['ghost'], negative_cases: ['ghost'] },
+        ],
+        transitions: [
+          { id: 't-idle', entity: 'order', from: 'created', to: 'paid', allowed: true, cases: ['positive'] },
+          { id: 't-gap', entity: 'order', from: 'paid', to: 'refunded', allowed: true, cases: [] },
+        ],
+        incidents: [
+          { id: 'inc-1', source: 'issue-42', case_ids: ['positive'] },
+          { id: 'inc-2', source: 'issue-43', case_ids: [] },
+        ],
+      },
+    });
+    const audit = await auditSuiteFiles([suitePath]);
+    const codes = audit.findings.map((item) => item.code);
+    assert.ok(codes.includes('business_invariant_no_negative'));
+    assert.ok(codes.includes('business_invariant_unknown_case'));
+    assert.ok(codes.includes('business_transition_unexercised'));
+    assert.ok(codes.includes('business_incident_unregressed'));
+  } finally {
+    await fx.cleanup();
+  }
+});
+
+test('business rules flag uncovered boundaries and unknown case refs', async () => {
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    await fx.project('process.exit(0);\n');
+    const suitePath = await write(fx.root, 'rules-suite.json', {
+      ...suiteDoc('software', [caseDoc('c199'), caseDoc('c201')], 'development'),
+      business: {
+        rules: [
+          {
+            id: 'coupon-threshold',
+            statement: '满 200 减 30 仅在商品金额 >= 200 时可用',
+            parameter: 'cart_amount',
+            boundaries: [
+              { value: 199, cases: ['c199'] },
+              { value: 200, cases: [] },
+              { value: 201, cases: ['c201', 'ghost'] },
+            ],
+          },
+        ],
+      },
+    });
+    const audit = await auditSuiteFiles([suitePath]);
+    const codes = audit.findings.map((item) => item.code);
+    assert.ok(codes.includes('business_rule_boundary_uncovered'));
+    assert.ok(codes.includes('business_rule_unknown_case'));
+  } finally {
+    await fx.cleanup();
+  }
+});
+
+test('mutation counts killed and surviving injected defects', async () => {
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    // Baseline doubles as the --workspace: mutation edits host.mjs in a copy of
+    // this directory, and the suite runs that copy's host.mjs via subject env.
+    const baseline = join(fx.root, 'baseline');
+    await mkdir(baseline, { recursive: true });
+    await writeFile(
+      join(baseline, 'host.mjs'),
+      'const ok = true;\nif (ok) { process.exit(0); } else { process.exit(1); }\n',
+      'utf8',
+    );
+    await writeFile(
+      join(baseline, 'subject.json'),
+      JSON.stringify({ kind: 'software', id: 'mutant-subject', version: 'v1' }),
+      'utf8',
+    );
+    const suitePath = await write(fx.root, 'mut-suite.json', suiteDoc('software', [
+      caseDoc('must-pass', { argv: [NODE_BINARY, 'host.mjs'], in_place: false, checks: [{ id: 'e', kind: 'exit_code', equals: 0 }] }),
+    ], 'development'));
+    // Case argv points at the workspace copy; the mutation flips a flag in the
+    // subject copy, so drive via workspace host.mjs importing nothing from it.
+    // Simpler: make the case run the mutated file directly through driver env.
+    const manifestPath = await write(fx.root, 'mut-manifest.json', {
+      baseline_dir: baseline,
+      mutations: [
+        { id: 'flip-ok', file: 'host.mjs', find: 'const ok = true;', replace: 'const ok = false;', should_fail: true },
+        { id: 'comment-only', file: 'host.mjs', find: 'const ok = true;', replace: 'const ok = true; // noop', should_fail: false },
+      ],
+    });
+    // runMutations passes the mutated copy dir as the subject path; our fixture
+    // suite cases run `[NODE_BINARY, host.mjs]` from the workspace. To make the
+    // mutated host.mjs the one that runs, the subject copy also contains the
+    // workspace files, and we point --workspace at the mutated copy.
+    const report = await runMutations(manifestPath, suitePath, fx.runtimePath, baseline, join(fx.root, 'mut-out'));
+    assert.equal(report.total, 2);
+    assert.equal(report.killed, 1);
+    assert.equal(report.survived, 1);
+    assert.equal(report.mutation_score, 0.5);
+  } finally {
+    await fx.cleanup();
+  }
+});
+
+test('cli rejects unsupported workspace-mode values', async () => {
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    await fx.project('process.exit(0);\n');
+    const errored = await captureStderr(async () =>
+      main(['run', join(fx.root, 'software-suite.json'), join(fx.root, 'software-1.json'), fx.runtimePath,
+        '--workspace', fx.workspace, '--output', fx.output, '--workspace-mode', 'bogus']));
+    assert.notEqual(errored.value, 0);
+    assert.match(errored.text, /workspace-mode must be isolated or shared/);
+  } finally {
+    await fx.cleanup();
+  }
+});
+
+test('calibrate measures gold-set accuracy and self-consistency', async () => {
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    // Gold samples resolve relative to the manifest directory.
+    await writeFile(join(fx.root, 'good.md'), 'the answer mentions the marker', 'utf8');
+    await writeFile(join(fx.root, 'bad.md'), 'nothing relevant here', 'utf8');
+    await writeFile(
+      join(fx.workspace, 'judge.mjs'),
+      'import { readFileSync } from "node:fs";\n' +
+        'const answer = readFileSync(process.env.CRAFT_EVAL_JUDGE_ANSWER, "utf8");\n' +
+        'console.log(JSON.stringify({ score: answer.includes("marker") ? 0.9 : 0.2 }));\n',
+      'utf8',
+    );
+    const manifest = await write(fx.root, 'calib.json', {
+      command: [NODE_BINARY, join(fx.workspace, 'judge.mjs')],
+      repeats: 3,
+      samples: [
+        { id: 'gold-pass', answer: 'good.md', expected: 'passed', threshold: 0.5 },
+        { id: 'gold-fail', answer: 'bad.md', expected: 'failed', threshold: 0.5 },
+      ],
+    });
+    const report = await calibrateJudge(manifest);
+    assert.equal(report.samples, 2);
+    assert.equal(report.accuracy, 1);
+    assert.equal(report.consistency, 1);
+  } finally {
+    await fx.cleanup();
+  }
+});
+
+test('calibrate reports inconsistency for a flaky judge', async () => {
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    await writeFile(join(fx.root, 'answer.md'), 'content', 'utf8');
+    await writeFile(
+      join(fx.workspace, 'flaky.mjs'),
+      'console.log(JSON.stringify({ score: Math.random() > 0.5 ? 0.9 : 0.1 }));\n',
+      'utf8',
+    );
+    const manifest = await write(fx.root, 'calib-flaky.json', {
+      command: [NODE_BINARY, join(fx.workspace, 'flaky.mjs')],
+      repeats: 8,
+      samples: [{ id: 's', answer: 'answer.md', expected: 'passed', threshold: 0.5 }],
+    });
+    const report = await calibrateJudge(manifest);
+    assert.equal(report.samples, 1);
+    assert.ok(report.consistency !== null && report.consistency < 1, 'flaky judge must not be perfectly consistent');
+  } finally {
+    await fx.cleanup();
+  }
+});
+
+test('audit warns on insufficient skill gain sample size', async () => {
+  // skill_gain_supported needs >=20 positives and >=1 negative; a tiny suite
+  // must be flagged so authors size their held-out set before a meaningless run.
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    const suitePath = await write(fx.root, 'skill-suite.json', suiteDoc('skill', [
+      caseDoc('positive', { skill: skillBinding(true) }),
+    ], 'held_out'));
+    const result = await auditSuiteFiles([suitePath]);
+    const codes = result.findings.map((item) => item.code);
+    assert.ok(codes.includes('skill_gain_sample_insufficient'));
+    assert.ok(codes.includes('skill_gain_no_negative'));
+    // A well-sized suite avoids the sample warnings but may still surface
+    // held-out review/independence warnings, which are a different gate.
+    const cases = [];
+    for (let index = 0; index < 20; index += 1) {
+      cases.push(caseDoc(`positive-${index}`, { skill: skillBinding(true) }));
+    }
+    cases.push(caseDoc('negative', { skill: skillBinding(false) }));
+    const sizedPath = await write(fx.root, 'skill-sized.json', suiteDoc('skill', cases, 'held_out'));
+    const sized = await auditSuiteFiles([sizedPath]);
+    const sizedCodes = sized.findings.map((item) => item.code);
+    assert.ok(!sizedCodes.includes('skill_gain_sample_insufficient'));
+    assert.ok(!sizedCodes.includes('skill_gain_no_negative'));
+  } finally {
+    await fx.cleanup();
+  }
+});
+
+test('audit warns when declarative boundaries are not enforced by a sandbox', async () => {
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    const suitePath = await write(fx.root, 'bounded.json', {
+      ...suiteDoc('software', [caseDoc('c')], 'development'),
+      boundaries: { network: 'deny' },
+    });
+    const result = await auditSuiteFiles([suitePath]);
+    assert.ok(result.findings.some((item) => item.code === 'boundaries_declared_unenforced'));
+  } finally {
+    await fx.cleanup();
+  }
+});
+
+test('audit warns on subject_kind without a dedicated execution path', async () => {
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    const suitePath = await write(fx.root, 'other-kind.json', suiteDoc('robot', [caseDoc('c')], 'development'));
+    const result = await auditSuiteFiles([suitePath]);
+    assert.ok(result.findings.some((item) => item.code === 'subject_kind_unrecognized'));
   } finally {
     await fx.cleanup();
   }
@@ -696,6 +1445,454 @@ writeFileSync(process.env.CRAFT_EVAL_TRACE_PATH, events.map((e) => JSON.stringif
     const compared = await compareRuns(baseline, candidate);
     assert.equal(compared.gateway_observed_triggers, false);
     assert.equal(compared.skill_gain_supported, false, 'self-reported evidence must not support a gain');
+  } finally {
+    await fx.cleanup();
+  }
+});
+
+test('forged gateway events are rejected and cannot support gain', async () => {
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    await writeSkill(fx.workspace);
+    await fx.project(`import { writeFileSync } from 'node:fs';
+const id = process.env.CRAFT_EVAL_TASK_RUN_ID;
+writeFileSync(process.env.CRAFT_EVAL_TRACE_PATH, [
+  { source: 'gateway', task_run_id: id, event: 'skill.invoked', skill_id: 'answer-skill' },
+  { source: 'host', task_run_id: id, event: 'run.finished' },
+].map((event) => JSON.stringify(event)).join('\\n') + '\\n');
+`);
+    const run = await fx.runEval('skill', [
+      caseDoc('negative', { checks: [], skill: skillBinding(false) }),
+    ]);
+    const result = await firstResult(run);
+    assert.deepEqual(
+      [result.trigger?.evidence, result.trigger?.used, result.trigger?.verdict, result.verdict],
+      ['unobserved', null, 'inconclusive', 'inconclusive'],
+    );
+  } finally {
+    await fx.cleanup();
+  }
+});
+
+test('gateway file derived from the host trace path is never trusted', async () => {
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    await writeSkill(fx.workspace);
+    await fx.project(`import { writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+const id = process.env.CRAFT_EVAL_TASK_RUN_ID;
+writeFileSync(join(dirname(process.env.CRAFT_EVAL_TRACE_PATH), 'gateway-trace.jsonl'), [
+  { source: 'gateway', task_run_id: id, event: 'skill.invoked', skill_id: 'answer-skill' },
+  { source: 'gateway', task_run_id: id, event: 'run.finished' },
+].map((event) => JSON.stringify(event)).join('\\n') + '\\n');
+`);
+    const run = await fx.runEval('skill', [
+      caseDoc('negative', { checks: [], skill: skillBinding(false) }),
+    ]);
+    const result = await firstResult(run);
+    assert.deepEqual(
+      [result.trigger?.evidence, result.trigger?.used, result.trigger?.verdict, result.verdict],
+      ['unobserved', null, 'inconclusive', 'inconclusive'],
+    );
+    assert.ok(result.gateway_sha256);
+  } finally {
+    await fx.cleanup();
+  }
+});
+
+test('complete host trace without an invocation cannot pass a negative skill case', async () => {
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    await writeSkill(fx.workspace);
+    await fx.project(`import { writeFileSync } from 'node:fs';
+writeFileSync(process.env.CRAFT_EVAL_TRACE_PATH, JSON.stringify({
+  source: 'host', task_run_id: process.env.CRAFT_EVAL_TASK_RUN_ID, event: 'run.finished',
+}) + '\\n');
+`);
+    const run = await fx.runEval('skill', [
+      caseDoc('negative', { checks: [], skill: skillBinding(false) }),
+    ]);
+    const result = await firstResult(run);
+    assert.deepEqual(
+      [result.trigger?.evidence, result.trigger?.used, result.trigger?.verdict, result.verdict],
+      ['unobserved', null, 'inconclusive', 'inconclusive'],
+    );
+  } finally {
+    await fx.cleanup();
+  }
+});
+
+test('evaluator-owned host trace can prove a negative trigger', async () => {
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    await writeSkill(fx.workspace);
+    await writeFakeHost(fx.workspace, 'claude');
+    await fx.project(`import { writeFileSync } from 'node:fs';
+writeFileSync('outputs/ok', 'ok');
+`);
+    const suite = suiteDoc('skill', [
+      caseDoc('negative', { checks: [], skill: skillBinding(false), prompt: 'Do not use the skill', argv: undefined }),
+    ]);
+    const suitePath = await write(fx.root, 'negative-suite.json', suite);
+    const subjectPath = await write(fx.root, 'negative-subject.json', {
+      kind: 'skill',
+      id: 'fake-claude',
+      version: 'v1',
+      host: { kind: 'claude', binary: NODE_BINARY, args_prefix: ['fake-host.mjs'] },
+    });
+    const run = await runSuite(suitePath, subjectPath, fx.runtimePath, fx.workspace, fx.output);
+    const result = await firstResult(run);
+    assert.deepEqual(
+      [result.trigger?.evidence, result.trigger?.used, result.trigger?.verdict, result.verdict],
+      ['gateway', false, 'passed', 'passed'],
+    );
+  } finally {
+    await fx.cleanup();
+  }
+});
+
+test('host JSONL failures are inconclusive rather than successful', async () => {
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    await writeSkill(fx.workspace);
+    const suite = suiteDoc('skill', [
+      caseDoc('negative', {
+        checks: [],
+        skill: skillBinding(false),
+        prompt: 'Do not use the skill',
+        argv: undefined,
+      }),
+    ]);
+    const suitePath = await write(fx.root, 'host-jsonl-suite.json', suite);
+    const subjectPath = await write(fx.root, 'host-jsonl-subject.json', {
+      kind: 'skill',
+      id: 'fake-claude',
+      version: 'v1',
+      host: { kind: 'claude', binary: NODE_BINARY, args_prefix: ['invalid-host.mjs'] },
+    });
+    await writeFile(join(fx.workspace, 'invalid-host.mjs'), "process.stdout.write('not json\\n');\n", 'utf8');
+    const invalid = await runSuite(suitePath, subjectPath, fx.runtimePath, fx.workspace, fx.output);
+    const invalidResult = await firstResult(invalid);
+    assert.deepEqual(
+      [invalidResult.trigger?.evidence, invalidResult.trigger?.verdict, invalidResult.verdict, invalidResult.host],
+      ['unobserved', 'inconclusive', 'inconclusive', null],
+    );
+
+    await writeFile(
+      join(fx.workspace, 'invalid-host.mjs'),
+      `process.stdout.write(JSON.stringify({ type: 'assistant', message: { model: 'observed-model', content: [] } }) + '\\n');\n`,
+      'utf8',
+    );
+    const incomplete = await runSuite(suitePath, subjectPath, fx.runtimePath, fx.workspace, fx.output);
+    const incompleteResult = await firstResult(incomplete);
+    assert.deepEqual(
+      [incompleteResult.trigger?.evidence, incompleteResult.trigger?.verdict, incompleteResult.verdict],
+      ['unobserved', 'inconclusive', 'inconclusive'],
+    );
+    assert.equal(incompleteResult.host?.adapter, 'claude');
+  } finally {
+    await fx.cleanup();
+  }
+});
+
+test('host launch and prompt contract failures are explicit', async () => {
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    await writeSkill(fx.workspace);
+    const hostCase = caseDoc('host-task', {
+      checks: [],
+      skill: skillBinding(false),
+      prompt: 'Do not use the skill',
+      argv: undefined,
+    });
+    const suitePath = await write(fx.root, 'launch-suite.json', suiteDoc('skill', [hostCase]));
+    const missingHost = await write(fx.root, 'missing-host.json', {
+      kind: 'skill',
+      id: 'fake-claude',
+      version: 'v1',
+      host: { kind: 'claude', binary: '/definitely/missing/craft-eval-host' },
+    });
+    const launched = await firstResult(
+      await runSuite(suitePath, missingHost, fx.runtimePath, fx.workspace, fx.output),
+    );
+    assert.equal(launched.verdict, 'invalid');
+    assert.match(launched.issue ?? '', /adapter_error/);
+
+    const plainSubject = await write(fx.root, 'plain-subject.json', {
+      kind: 'skill',
+      id: 'plain',
+      version: 'v1',
+    });
+    await assert.rejects(
+      runSuite(suitePath, plainSubject, fx.runtimePath, fx.workspace, fx.output),
+      /prompt requires subject\.host/,
+    );
+
+    const plainCase = caseDoc('plain-case', {
+      argv: [NODE_BINARY, 'plain.mjs'],
+      checks: [{ id: 'exit', kind: 'exit_code', equals: 0 }],
+      skill: skillBinding(true),
+    });
+    await writeFile(
+      join(fx.workspace, 'plain.mjs'),
+      `import { appendFileSync } from 'node:fs';
+const task = process.env.CRAFT_EVAL_TASK_RUN_ID;
+appendFileSync(process.env.CRAFT_EVAL_TRACE_PATH, JSON.stringify({ source: 'host', task_run_id: task, event: 'skill.invoked', skill_id: '${SKILL_ID}' }) + '\\n');
+appendFileSync(process.env.CRAFT_EVAL_TRACE_PATH, JSON.stringify({ source: 'host', task_run_id: task, event: 'run.finished' }) + '\\n');
+`,
+      'utf8',
+    );
+    const plainSuite = await write(fx.root, 'plain-suite.json', suiteDoc('skill', [plainCase]));
+    const localStep = await firstResult(
+      await runSuite(plainSuite, missingHost, fx.runtimePath, fx.workspace, fx.output),
+    );
+    assert.equal(localStep.verdict, 'passed');
+  } finally {
+    await fx.cleanup();
+  }
+});
+
+test('oversized host output is rejected instead of partially parsed', async () => {
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    await writeSkill(fx.workspace);
+    await writeFile(
+      join(fx.workspace, 'oversized-host.mjs'),
+      `process.stdin.resume();
+process.stdin.on('end', () => {
+  process.stdout.write('x'.repeat(8 * 1024 * 1024 + 1));
+});
+`,
+      'utf8',
+    );
+    const suitePath = await write(
+      fx.root,
+      'oversized-suite.json',
+      suiteDoc('skill', [
+        caseDoc('negative', {
+          checks: [],
+          skill: skillBinding(false),
+          prompt: 'Do not use the skill',
+          argv: undefined,
+        }),
+      ]),
+    );
+    const subjectPath = await write(fx.root, 'oversized-subject.json', {
+      kind: 'skill',
+      id: 'fake-claude',
+      version: 'v1',
+      host: { kind: 'claude', binary: NODE_BINARY, args_prefix: ['oversized-host.mjs'] },
+    });
+    const result = await firstResult(
+      await runSuite(suitePath, subjectPath, fx.runtimePath, fx.workspace, fx.output),
+    );
+    assert.deepEqual(
+      [result.trigger?.evidence, result.trigger?.verdict, result.verdict, result.host],
+      ['unobserved', 'inconclusive', 'inconclusive', null],
+    );
+  } finally {
+    await fx.cleanup();
+  }
+});
+
+test('claude result usage falls back to assistant usage', async () => {
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    await writeSkill(fx.workspace);
+    await writeFile(
+      join(fx.workspace, 'fallback-host.mjs'),
+      `process.stdin.resume();
+process.stdin.on('end', () => {
+  process.stdout.write([
+    ${JSON.stringify(
+      JSON.stringify({
+        type: 'assistant',
+        message: {
+          model: 'observed-model',
+          usage: { input_tokens: 7, cache_read_input_tokens: 2, output_tokens: 3 },
+          content: [],
+        },
+      }),
+    )},
+    ${JSON.stringify(JSON.stringify({ type: 'result', total_cost_usd: 0.01, modelUsage: { 'observed-model': {} } }))},
+  ].join('\\n') + '\\n');
+});
+`,
+      'utf8',
+    );
+    const suitePath = await write(
+      fx.root,
+      'fallback-suite.json',
+      suiteDoc('skill', [
+        caseDoc('negative', {
+          checks: [],
+          skill: skillBinding(false),
+          prompt: 'Do not use the skill',
+          argv: undefined,
+        }),
+      ]),
+    );
+    const subjectPath = await write(fx.root, 'fallback-subject.json', {
+      kind: 'skill',
+      id: 'fake-claude',
+      version: 'v1',
+      host: { kind: 'claude', binary: NODE_BINARY, args_prefix: ['fallback-host.mjs'] },
+    });
+    const result = await firstResult(
+      await runSuite(suitePath, subjectPath, fx.runtimePath, fx.workspace, fx.output),
+    );
+    assert.deepEqual(
+      [
+        result.host?.input_tokens,
+        result.host?.cached_input_tokens,
+        result.host?.output_tokens,
+        result.host?.cost_usd,
+      ],
+      [7, 2, 3, 0.01],
+    );
+  } finally {
+    await fx.cleanup();
+  }
+});
+
+test('codex host events are parsed but skill invocation stays unobserved', async () => {
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    await writeSkill(fx.workspace);
+    await writeFakeHost(fx.workspace, 'codex');
+    await fx.project(`import { writeFileSync, mkdirSync } from 'node:fs';
+mkdirSync('outputs', { recursive: true });
+writeFileSync('outputs/result.json', JSON.stringify({ ok: true }));
+`);
+    const suite = suiteDoc('agent', [
+      caseDoc('codex-task', {
+        prompt: 'Do the task',
+        argv: undefined,
+        checks: [{ id: 'result', kind: 'json_equals', path: 'outputs/result.json', key: 'ok', equals: true }],
+      }),
+    ]);
+    const suitePath = await write(fx.root, 'codex-suite.json', suite);
+    const subjectPath = await write(fx.root, 'codex-subject.json', {
+      kind: 'agent',
+      id: 'fake-codex',
+      version: 'v1',
+      host: { kind: 'codex', binary: NODE_BINARY, args_prefix: ['fake-host.mjs'], model: 'group/free' },
+    });
+    const run = await runSuite(suitePath, subjectPath, fx.runtimePath, fx.workspace, fx.output);
+    const result = await firstResult(run);
+    assert.equal(result.verdict, 'passed');
+    assert.equal(result.host?.adapter, 'codex');
+    assert.equal(result.host?.input_tokens, 12);
+    assert.equal(result.host?.cost_usd, null);
+    assert.equal(result.host?.requested_model, 'group/free');
+    assert.deepEqual(result.host?.observed_models, []);
+  } finally {
+    await fx.cleanup();
+  }
+});
+
+test('codex mcp tool calls are counted from evaluator-owned events', async () => {
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    await writeFile(
+      join(fx.workspace, 'mcp-host.mjs'),
+      `import { mkdirSync, writeFileSync } from 'node:fs';
+process.stdin.resume();
+process.stdin.on('end', () => {
+  mkdirSync('outputs', { recursive: true });
+  writeFileSync('outputs/result.json', JSON.stringify({ ok: true }));
+  process.stdout.write([
+    ${JSON.stringify(
+      JSON.stringify({
+        type: 'item.completed',
+        item: { type: 'mcp_tool_call', tool: 'lookup', status: 'completed' },
+      }),
+    )},
+    ${JSON.stringify(
+      JSON.stringify({
+        type: 'turn.completed',
+        usage: { input_tokens: 5, cached_input_tokens: 1, output_tokens: 2, reasoning_output_tokens: 0 },
+      }),
+    )},
+  ].join('\\n') + '\\n');
+});
+`,
+      'utf8',
+    );
+    const suitePath = await write(
+      fx.root,
+      'mcp-host-suite.json',
+      suiteDoc('agent', [
+        caseDoc('mcp-task', {
+          prompt: 'Use the tool',
+          argv: undefined,
+          checks: [
+            { id: 'result', kind: 'json_equals', path: 'outputs/result.json', key: 'ok', equals: true },
+            { id: 'tool', kind: 'trace_event', event: 'tool.called', present: true },
+          ],
+        }),
+      ]),
+    );
+    const subjectPath = await write(fx.root, 'mcp-host-subject.json', {
+      kind: 'agent',
+      id: 'fake-codex',
+      version: 'v1',
+      host: { kind: 'codex', binary: NODE_BINARY, args_prefix: ['mcp-host.mjs'] },
+    });
+    const result = await firstResult(
+      await runSuite(suitePath, subjectPath, fx.runtimePath, fx.workspace, fx.output),
+    );
+    assert.deepEqual([result.verdict, result.host?.tool_calls], ['passed', 1]);
+  } finally {
+    await fx.cleanup();
+  }
+});
+
+test('codex cannot prove skill triggers without an explicit invocation event', async () => {
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    await writeSkill(fx.workspace);
+    await writeFakeHost(fx.workspace, 'codex');
+    await fx.project(`import { writeFileSync, mkdirSync } from 'node:fs';
+mkdirSync('outputs', { recursive: true });
+writeFileSync('outputs/result.json', JSON.stringify({ ok: true }));
+`);
+    const suitePath = await write(
+      fx.root,
+      'codex-skill-suite.json',
+      suiteDoc('skill', [
+        caseDoc('task-codex', {
+          prompt: 'Use the skill',
+          argv: undefined,
+          skill: skillBinding(true),
+          checks: [{ id: 'result', kind: 'json_equals', path: 'outputs/result.json', key: 'ok', equals: true }],
+        }),
+      ]),
+    );
+    const subjectPath = await write(fx.root, 'codex-skill-subject.json', {
+      kind: 'skill',
+      id: 'fake-codex',
+      version: 'v1',
+      host: { kind: 'codex', binary: NODE_BINARY, args_prefix: ['fake-host.mjs'] },
+    });
+    const result = await firstResult(
+      await runSuite(suitePath, subjectPath, fx.runtimePath, fx.workspace, fx.output),
+    );
+    assert.deepEqual(
+      [result.trigger?.evidence, result.trigger?.used, result.trigger?.verdict, result.verdict],
+      ['unobserved', null, 'inconclusive', 'inconclusive'],
+    );
   } finally {
     await fx.cleanup();
   }

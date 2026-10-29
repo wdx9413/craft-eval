@@ -1,0 +1,10 @@
+{
+  "schema": "craft-eval.calibration.v1",
+  "command": ["node", "judge-score.mjs"],
+  "dir": "D:\\documents\\project\\mytest\\craft-eval\\examples\\real-world\\mcp-loan-calculator\\workspace",
+  "repeats": 3,
+  "samples": [
+    { "id": "correct-payment", "answer": "../calibration/good.json", "expected": "passed", "threshold": 0.5 },
+    { "id": "wrong-payment", "answer": "../calibration/bad.json", "expected": "failed", "threshold": 0.5 }
+  ]
+}

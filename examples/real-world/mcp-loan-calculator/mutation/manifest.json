@@ -1,0 +1,30 @@
+{
+  "baseline_dir": "D:\\documents\\project\\mytest\\eval-subjects\\mcp-loan-calculator",
+  "subject_path": "D:\\documents\\project\\mytest\\craft-eval\\examples\\real-world\\mcp-loan-calculator\\subject.json",
+  "subject_env": {
+    "EVAL_SUBJECT_DIR": "{{copy}}"
+  },
+  "mutations": [
+    {
+      "id": "payment-off-by-scale",
+      "file": "src/index.js",
+      "find": "const r = annualRate / 100 / 12, n = years * 12;",
+      "replace": "const r = annualRate / 1000 / 12, n = years * 12;",
+      "should_fail": true
+    },
+    {
+      "id": "money-rounding",
+      "file": "src/_shared.js",
+      "find": "export function money(n) { return Math.round(n * 100) / 100; }",
+      "replace": "export function money(n) { return Math.round(n * 100) / 100 + 0.01; }",
+      "should_fail": true
+    },
+    {
+      "id": "whitespace-noop",
+      "file": "src/index.js",
+      "find": "function monthlyPayment(P, annualRate, years) {",
+      "replace": "function monthlyPayment(P, annualRate, years) {\n  // mutation: comment only",
+      "should_fail": false
+    }
+  ]
+}
