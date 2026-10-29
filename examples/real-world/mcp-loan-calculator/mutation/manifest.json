@@ -1,6 +1,6 @@
 {
-  "baseline_dir": "D:\\documents\\project\\mytest\\eval-subjects\\mcp-loan-calculator",
-  "subject_path": "D:\\documents\\project\\mytest\\craft-eval\\examples\\real-world\\mcp-loan-calculator\\subject.json",
+  "baseline_dir": "../../../../../eval-subjects/mcp-loan-calculator",
+  "subject_path": "../subject.json",
   "subject_env": {
     "EVAL_SUBJECT_DIR": "{{copy}}"
   },

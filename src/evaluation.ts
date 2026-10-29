@@ -399,6 +399,19 @@ function relativePath(value: unknown, name: string): string {
   return value;
 }
 
+/**
+ * Expand the `{{subjects}}` placeholder at run time, not at load time, so the
+ * suite digest stays machine-independent. Override with
+ * CRAFT_EVAL_SUBJECTS_ROOT when the checkouts live elsewhere.
+ */
+function expandSubjects(value: string): string {
+  if (!value.includes('{{subjects}}')) {
+    return value;
+  }
+  const root = process.env.CRAFT_EVAL_SUBJECTS_ROOT ?? resolve(process.cwd(), '..', 'eval-subjects');
+  return value.replaceAll('{{subjects}}', root);
+}
+
 function isPlainInteger(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value);
 }
@@ -1829,7 +1842,10 @@ async function oneCase(
       // case is the redirect target rather than the sandbox.
       CRAFT_EVAL_OUTPUT_DIR: outputOverride ?? outputDir,
     });
-    Object.assign(env, subject.env ?? {});
+    Object.assign(
+      env,
+      Object.fromEntries(Object.entries(subject.env ?? {}).map(([key, value]) => [key, expandSubjects(value)])),
+    );
     if (subject.host !== undefined) {
       Object.assign(env, subject.host.env ?? {});
     }
@@ -1866,7 +1882,7 @@ async function oneCase(
             ? undefined
             : hostArgv(host, sandbox, item.prompt);
         const outcome = await runAdapter(
-          item,
+          { ...item, argv: item.argv === undefined ? undefined : item.argv.map(expandSubjects) },
           sandbox,
           env,
           stdoutPath,
@@ -1880,9 +1896,13 @@ async function oneCase(
         // Server mode: start the service, run the driver to completion, then
         // stop the service. The service's own exit is irrelevant to the verdict.
         const serviceEnv = { ...env, ...(item.driver.env ?? {}) };
-        const service = await startService(item, sandbox, serviceEnv);
+        const service = await startService(
+          { ...item, argv: item.argv === undefined ? undefined : item.argv.map(expandSubjects) },
+          sandbox,
+          serviceEnv,
+        );
         try {
-          const driverCase: Case = { ...item, argv: item.driver.argv };
+          const driverCase: Case = { ...item, argv: item.driver.argv.map(expandSubjects) };
           const outcome = await runAdapter(driverCase, sandbox, env, stdoutPath, stderrPath);
           exitCode = outcome.exitCode;
           issue = outcome.issue;

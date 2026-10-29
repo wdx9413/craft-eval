@@ -1,4 +1,4 @@
-﻿// Generate the 22-case filesystem suite.
+// Generate the 22-case filesystem suite.
 //
 // Each case runs the same probe driver in its own workspace, so the driver's
 // outputs/probe-result.json holds exactly one record (plus __init/__tools).
@@ -6,7 +6,7 @@
 // positive one asserts success and the observable effect.
 import { writeFileSync } from 'node:fs';
 
-const SERVER = 'D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js';
+const SERVER = '{{subjects}}\\mcp-servers\\src\\filesystem\\dist\\index.js';
 // process.execPath is the embedding host (e.g. a desktop app) when this script
 // runs under one, which would make argv[0] an application rather than node.
 const NODE = process.env.CRAFT_EVAL_NODE_BINARY ?? 'node';

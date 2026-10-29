@@ -99,6 +99,11 @@ export async function calibrateJudge(manifestPath: string): Promise<CalibrationR
   }
   const repeats = manifest.repeats ?? 3;
   const base = resolve(manifestPath, '..');
+  // Resolve `dir` relative to the manifest so configs stay machine-independent.
+  const resolved: CalibrationManifest = {
+    ...manifest,
+    ...(manifest.dir === undefined ? {} : { dir: resolve(base, manifest.dir) }),
+  };
   const perSample: SampleResult[] = [];
   for (const sample of manifest.samples) {
     const answerPath = resolve(base, sample.answer);
@@ -107,7 +112,7 @@ export async function calibrateJudge(manifestPath: string): Promise<CalibrationR
     const verdicts: SampleResult['verdicts'] = [];
     let error: string | null = null;
     for (let attempt = 0; attempt < repeats; attempt += 1) {
-      const outcome = scoreOnce(manifest, answerPath);
+      const outcome = scoreOnce(resolved, answerPath);
       if (outcome.score === null) {
         error = outcome.error ?? 'unknown error';
         verdicts.push('error');

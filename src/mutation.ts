@@ -71,7 +71,8 @@ export async function runMutations(
   outputRoot: string,
 ): Promise<MutationReport> {
   const manifest = await loadManifest(manifestPath);
-  const baseline = resolve(manifest.baseline_dir);
+  const manifestDir = resolve(manifestPath, '..');
+  const baseline = resolve(manifestDir, manifest.baseline_dir);
   const output = resolve(outputRoot);
   await mkdir(output, { recursive: true });
   const mutants: MutationReport['mutants'] = [];
@@ -99,7 +100,7 @@ export async function runMutations(
       const effectiveWorkspace = existsSync(join(copy, 'host.mjs')) ? copy : workspace;
       const subjectPath = manifest.subject_path === undefined
         ? join(copy, 'subject.json')
-        : resolve(manifest.subject_path);
+        : resolve(manifestDir, manifest.subject_path);
       const baseSubject = JSON.parse(await readFile(subjectPath, 'utf8')) as Record<string, unknown>;
       if (manifest.subject_env !== undefined) {
         const env = { ...((baseSubject.env as Record<string, string>) ?? {}) };

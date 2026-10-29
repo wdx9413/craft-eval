@@ -1,6 +1,6 @@
 {
     "env":  {
-                "POCKETFLOW_REPO":  "D:\\documents\\project\\mytest\\eval-subjects\\pocketflow"
+                "POCKETFLOW_REPO":  "{{subjects}}\\pocketflow"
             },
     "version":  "baseline",
     "id":  "pocketflow",

@@ -10,7 +10,7 @@
       "workspace": "workspaces/protocol-initializes",
       "argv": [
         "node",
-        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "{{subjects}}\\mcp-servers\\src\\filesystem\\dist\\index.js",
         "."
       ],
       "timeout_s": 45,
@@ -47,7 +47,7 @@
       "workspace": "workspaces/tools-listed",
       "argv": [
         "node",
-        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "{{subjects}}\\mcp-servers\\src\\filesystem\\dist\\index.js",
         "."
       ],
       "timeout_s": 45,
@@ -82,7 +82,7 @@
       "workspace": "workspaces/write-then-read",
       "argv": [
         "node",
-        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "{{subjects}}\\mcp-servers\\src\\filesystem\\dist\\index.js",
         "."
       ],
       "timeout_s": 45,
@@ -129,7 +129,7 @@
       "workspace": "workspaces/create-directory",
       "argv": [
         "node",
-        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "{{subjects}}\\mcp-servers\\src\\filesystem\\dist\\index.js",
         "."
       ],
       "timeout_s": 45,
@@ -159,7 +159,7 @@
       "workspace": "workspaces/list-directory",
       "argv": [
         "node",
-        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "{{subjects}}\\mcp-servers\\src\\filesystem\\dist\\index.js",
         "."
       ],
       "timeout_s": 45,
@@ -206,7 +206,7 @@
       "workspace": "workspaces/list-with-sizes",
       "argv": [
         "node",
-        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "{{subjects}}\\mcp-servers\\src\\filesystem\\dist\\index.js",
         "."
       ],
       "timeout_s": 45,
@@ -253,7 +253,7 @@
       "workspace": "workspaces/directory-tree",
       "argv": [
         "node",
-        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "{{subjects}}\\mcp-servers\\src\\filesystem\\dist\\index.js",
         "."
       ],
       "timeout_s": 45,
@@ -300,7 +300,7 @@
       "workspace": "workspaces/get-file-info",
       "argv": [
         "node",
-        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "{{subjects}}\\mcp-servers\\src\\filesystem\\dist\\index.js",
         "."
       ],
       "timeout_s": 45,
@@ -347,7 +347,7 @@
       "workspace": "workspaces/allowed-directories",
       "argv": [
         "node",
-        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "{{subjects}}\\mcp-servers\\src\\filesystem\\dist\\index.js",
         "."
       ],
       "timeout_s": 45,
@@ -377,7 +377,7 @@
       "workspace": "workspaces/move-file",
       "argv": [
         "node",
-        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "{{subjects}}\\mcp-servers\\src\\filesystem\\dist\\index.js",
         "."
       ],
       "timeout_s": 45,
@@ -407,7 +407,7 @@
       "workspace": "workspaces/edit-file",
       "argv": [
         "node",
-        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "{{subjects}}\\mcp-servers\\src\\filesystem\\dist\\index.js",
         "."
       ],
       "timeout_s": 45,
@@ -454,7 +454,7 @@
       "workspace": "workspaces/search-files",
       "argv": [
         "node",
-        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "{{subjects}}\\mcp-servers\\src\\filesystem\\dist\\index.js",
         "."
       ],
       "timeout_s": 45,
@@ -501,7 +501,7 @@
       "workspace": "workspaces/read-multiple",
       "argv": [
         "node",
-        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "{{subjects}}\\mcp-servers\\src\\filesystem\\dist\\index.js",
         "."
       ],
       "timeout_s": 45,
@@ -548,7 +548,7 @@
       "workspace": "workspaces/read-file-head",
       "argv": [
         "node",
-        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "{{subjects}}\\mcp-servers\\src\\filesystem\\dist\\index.js",
         "."
       ],
       "timeout_s": 45,
@@ -595,7 +595,7 @@
       "workspace": "workspaces/read-missing-file",
       "argv": [
         "node",
-        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "{{subjects}}\\mcp-servers\\src\\filesystem\\dist\\index.js",
         "."
       ],
       "timeout_s": 45,
@@ -625,7 +625,7 @@
       "workspace": "workspaces/list-missing-dir",
       "argv": [
         "node",
-        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "{{subjects}}\\mcp-servers\\src\\filesystem\\dist\\index.js",
         "."
       ],
       "timeout_s": 45,
@@ -655,7 +655,7 @@
       "workspace": "workspaces/move-missing-source",
       "argv": [
         "node",
-        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "{{subjects}}\\mcp-servers\\src\\filesystem\\dist\\index.js",
         "."
       ],
       "timeout_s": 45,
@@ -685,7 +685,7 @@
       "workspace": "workspaces/edit-no-match",
       "argv": [
         "node",
-        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "{{subjects}}\\mcp-servers\\src\\filesystem\\dist\\index.js",
         "."
       ],
       "timeout_s": 45,
@@ -715,7 +715,7 @@
       "workspace": "workspaces/search-no-match",
       "argv": [
         "node",
-        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "{{subjects}}\\mcp-servers\\src\\filesystem\\dist\\index.js",
         "."
       ],
       "timeout_s": 45,
@@ -745,7 +745,7 @@
       "workspace": "workspaces/read-media-file",
       "argv": [
         "node",
-        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "{{subjects}}\\mcp-servers\\src\\filesystem\\dist\\index.js",
         "."
       ],
       "timeout_s": 45,
@@ -775,7 +775,7 @@
       "workspace": "workspaces/path-traversal-dotdot",
       "argv": [
         "node",
-        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "{{subjects}}\\mcp-servers\\src\\filesystem\\dist\\index.js",
         "."
       ],
       "timeout_s": 45,
@@ -805,7 +805,7 @@
       "workspace": "workspaces/path-traversal-abs",
       "argv": [
         "node",
-        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "{{subjects}}\\mcp-servers\\src\\filesystem\\dist\\index.js",
         "."
       ],
       "timeout_s": 45,
@@ -835,7 +835,7 @@
       "workspace": "workspaces/write-outside-root",
       "argv": [
         "node",
-        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "{{subjects}}\\mcp-servers\\src\\filesystem\\dist\\index.js",
         "."
       ],
       "timeout_s": 45,
@@ -865,7 +865,7 @@
       "workspace": "workspaces/create-dir-traversal",
       "argv": [
         "node",
-        "D:\\documents\\project\\mytest\\eval-subjects\\mcp-servers\\src\\filesystem\\dist\\index.js",
+        "{{subjects}}\\mcp-servers\\src\\filesystem\\dist\\index.js",
         "."
       ],
       "timeout_s": 45,
