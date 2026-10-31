@@ -44,10 +44,14 @@
       "category": "documentation",
       "risk": "low",
       "language": "markdown",
-      "argv": ["node", "{{craft-eval}}/examples/real-world/docs-check/check-docs.mjs", ".", "README.md,CONTEXT.md", "docs"],
       "in_place": true,
       "timeout_s": 60,
-      "checks": [{ "id": "links", "kind": "exit_code", "equals": 0 }]
+      "checks": [{
+        "id": "links",
+        "kind": "docs_links",
+        "required": ["README.md", "CONTEXT.md"],
+        "dirs": ["docs"]
+      }]
     },
     {
       "id": "tests",

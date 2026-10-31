@@ -125,7 +125,21 @@ Suite 新增字段均为可选，旧 Suite 仍可运行。建议为每个主张�
 
 Case 可声明 `tags`、`category`、`difficulty`、`risk`、`owner`、`expected_behavior`、`claim` 和 `provenance`。留出用例建议写明 `provenance.reviewed_by` 与 `provenance.independent_of_training`。`sanitized: true` 只表示已脱敏，**不是污染或独立性的证明**。
 
-Case 还可声明 `requires` 与 `language`。`requires` 是**环境门控**：`commands`（PATH 上必须有）、`env`（变量必须非空）、`python_modules`（`py -3 -c "import <name>"` 必须成功）。任一不满足时该 case 记为 **`not_applicable`**（`issue: requirement_unmet:<tag>`），**不计为 failed**，`analyze` 归因为 `external_dependency_missing`。`language` 用于 `report.by_language` 的按语言聚合（`expected/passed/failed/not_applicable`），便于发现「Python 检索 MRR=0」这类单语言退化。
+Case 还可声明 `requires` 与 `language`。`requires` 是**环境门控**：`commands`（PATH 上必须有）、`env`（变量必须非空）、`python_modules`（`py -3 -c "import <name>"` 必须成功）、`paths`（workspace 内必须存在的文件/目录，例如 `node_modules/craft-eval`）、`symlink`（需能创建文件符号链接，Windows 需开发者模式）。任一不满足时该 case 记为 **`not_applicable`**（`issue: requirement_unmet:<tag>`），**不计为 failed**，`analyze` 归因为 `external_dependency_missing`。`language` 用于 `report.by_language` 的按语言聚合（`expected/passed/failed/not_applicable`），便于发现「Python 检索 MRR=0」这类单语言退化。
+
+### 静态检查（无需执行命令）
+
+`docs_links` 直接读取 sandbox 的 Markdown，检查必需文档存在与相对链接可解析，因此这类 case 不需要 `argv`：
+
+```json
+{"id": "docs", "in_place": true, "checks": [{"id": "links", "kind": "docs_links", "required": ["README.md"], "dirs": ["docs"]}]}
+```
+
+失败时 `evidence.broken` 给出断链清单，`evidence.missing` 给出缺失的必需文档。
+
+### Windows 命令解析
+
+`pnpm` / `npm` / `yarn` 在 Windows 上是 `.cmd` shim，无法被 `CreateProcess` 直接启动。评测器会把它们解析到真实路径并经 `cmd.exe /d /s /c` 执行，参数仍按独立 token 传递（不经 shell 展开）。
 
 `audit <suite...>` 输出 `craft-eval.audit.v1`，检查重复 Case ID、规范化 prompt 重复、验收条件重复、开发集/留出集复用、留出集审核与独立性声明、过期、缺失主张/指标/来源/期望行为，以及无信息量检查。Error 会让命令返回 1。
 

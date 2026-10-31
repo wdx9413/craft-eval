@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { compareRuns, loadSuite, reportRun, rescoreScripts, runSuite, signProbability } from '../src/evaluation.js';
+import { commandInvocation } from '../src/evaluation.js';
 import type { CaseResult, CheckResult } from '../src/evaluation.js';
 import { main } from '../src/cli.js';
 import { auditSuiteFiles } from '../src/audit.js';
@@ -277,6 +278,22 @@ async function canCreateDirectoryLink(root: string): Promise<boolean> {
   } finally {
     await rm(link, { recursive: true, force: true });
     await rm(target, { recursive: true, force: true });
+  }
+}
+
+/** File symlinks need Developer Mode or elevation on Windows. */
+async function canCreateFileLink(root: string): Promise<boolean> {
+  const target = join(root, '.probe-file');
+  const link = join(root, '.probe-file-link');
+  try {
+    await writeFile(target, 'probe', 'utf8');
+    await symlink(target, link, 'file');
+    return true;
+  } catch {
+    return false;
+  } finally {
+    await rm(link, { force: true });
+    await rm(target, { force: true });
   }
 }
 
@@ -1027,6 +1044,33 @@ test('unmet requires records not_applicable and attributes an external dependenc
   }
 });
 
+test('unmet requires.paths marks the case not_applicable', async () => {
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    await fx.project('process.exit(0);\n');
+    const suitePath = await write(
+      fx.root,
+      'requires-path-suite.json',
+      suiteDoc('software', [
+        caseDoc('needs-dep', { requires: { paths: ['node_modules/missing-package'] } }),
+      ]),
+    );
+    const subjectPath = await write(fx.root, 'requires-path-subject.json', {
+      kind: 'software',
+      id: 'requires-path-subject',
+      version: 'v1',
+    });
+    const run = await runSuite(suitePath, subjectPath, fx.runtimePath, fx.workspace, fx.output);
+    const report = await reportRun(run);
+    assert.equal(report.not_applicable, 1);
+    assert.equal(report.failed, 0);
+    assert.match(String(report.results[0]?.issue), /requirement_unmet:path:node_modules\/missing-package/);
+  } finally {
+    await fx.cleanup();
+  }
+});
+
 test('assert-set threshold passes on weighted partial success', async () => {
   const fx = new Fixture();
   await fx.setup();
@@ -1047,6 +1091,59 @@ test('assert-set threshold passes on weighted partial success', async () => {
   } finally {
     await fx.cleanup();
   }
+});
+
+test('docs_links check is static and reports broken links', async () => {
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    await mkdir(join(fx.workspace, 'docs'), { recursive: true });
+    await writeFile(join(fx.workspace, 'README.md'), '# ok\n', 'utf8');
+    await writeFile(
+      join(fx.workspace, 'docs', 'guide.md'),
+      '[missing](./gone.md) [ok](../README.md) [web](https://example.com)\n',
+      'utf8',
+    );
+    const suitePath = await write(fx.root, 'docs-suite.json', suiteDoc('software', [
+      {
+        id: 'docs',
+        timeout_s: 5,
+        checks: [{ id: 'links', kind: 'docs_links', required: ['README.md'], dirs: ['docs'] }],
+      },
+    ]));
+    const subjectPath = await write(fx.root, 'docs-subject.json', {
+      kind: 'software',
+      id: 'docs-subject',
+      version: 'v1',
+    });
+    const run = await runSuite(suitePath, subjectPath, fx.runtimePath, fx.workspace, fx.output);
+    const check = only((await firstResult(run)).checks, 'docs check');
+    assert.equal(check.passed, false);
+    assert.deepEqual(check.evidence.missing, []);
+    const broken = check.evidence.broken as string[];
+    assert.ok(broken.some((item) => item.includes('gone.md')));
+    // A healthy tree passes with nothing executed.
+    await writeFile(join(fx.workspace, 'docs', 'guide.md'), '[ok](../README.md)\n', 'utf8');
+    const healthy = await runSuite(suitePath, subjectPath, fx.runtimePath, fx.workspace, fx.output);
+    assert.equal((await firstResult(healthy)).verdict, 'passed');
+  } finally {
+    await fx.cleanup();
+  }
+});
+
+test('commandInvocation keeps argv tokens intact and stays identity on posix', () => {
+  // Windows routing adds cmd.exe wrappers; other platforms never rewrite.
+  if (process.platform !== 'win32') {
+    const out = commandInvocation('pnpm', ['run', 'test']);
+    assert.deepEqual(out, { command: 'pnpm', args: ['run', 'test'] });
+    return;
+  }
+  const batch = commandInvocation('tool.cmd', ['a', 'b']);
+  assert.equal(batch.command.toLowerCase().endsWith('cmd.exe'), true);
+  assert.deepEqual(batch.args.slice(0, 3), ['/d', '/s', '/c']);
+  assert.deepEqual(batch.args.slice(3), ['tool.cmd', 'a', 'b']);
+  const absolute = commandInvocation(process.execPath, ['--version']);
+  assert.deepEqual(absolute, { command: process.execPath, args: ['--version'] });
 });
 
 test('model_graded runs a pluggable judge command', async () => {
@@ -2363,9 +2460,13 @@ test('runtime controls bound output, cancel adapters and publish progress', asyn
 });
 
 
-test('CLI executes through an installed bin symlink', async () => {
+test('CLI executes through an installed bin symlink', async (t) => {
   const root = await mkdtemp(join(tmpdir(), 'eval-bin-'));
   try {
+    if (!(await canCreateFileLink(root))) {
+      t.skip('file symlinks need Developer Mode or elevation on this platform');
+      return;
+    }
     const cli = fileURLToPath(new URL('../src/cli.js', import.meta.url));
     const bin = join(root, 'craft-eval');
     await symlink(cli, bin);

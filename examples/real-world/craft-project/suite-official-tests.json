@@ -1,0 +1,32 @@
+{
+  "schema": "craft-eval.eval.v1",
+  "suite_id": "craft-project-official-tests",
+  "subject_kind": "software",
+  "partition": "development",
+  "sanitized": true,
+  "claim": {
+    "statement": "craft 以官方单进程入口运行全部 TypeScript 测试可通过",
+    "scope": "scripts/ci/test.ts 一次性运行 tests/ 下全部文件",
+    "limitations": ["依赖已初始化的 node_modules（含 vendored craft-eval）", "无 symlink 权限时相关测试会失败"]
+  },
+  "metrics": {
+    "primary": {
+      "id": "task_pass",
+      "kind": "binary_pass_rate",
+      "direction": "higher_is_better",
+      "minimum_sample": 1
+    }
+  },
+  "cases": [
+    {
+      "id": "all-tests",
+      "category": "tests",
+      "risk": "high",
+      "language": "typescript",
+      "argv": ["node", "--experimental-strip-types", "scripts/ci/test.ts"],
+      "in_place": true,
+      "timeout_s": 3600,
+      "checks": [{ "id": "exit", "kind": "exit_code", "equals": 0 }]
+    }
+  ]
+}

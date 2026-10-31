@@ -10,11 +10,13 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { spawnManagedCommand, stopManagedCommand as killTree, evaluationNodeBinary as nodeBinary } from './command-process.js';
 import { runBoundedCommand } from './bounded-command.js';
 import type { ChildProcess } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, createReadStream } from 'node:fs';
 import { copyFile, cp, lstat, mkdir, mkdtemp, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { extname, isAbsolute, join, resolve, sep } from 'node:path';
+import { dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { startHttpMocks, type HttpMockServer } from './http-mock.js';
@@ -55,7 +57,8 @@ export interface Check {
     | 'tool_call'
     | 'stdout_contains'
     | 'stdout_not_contains'
-    | 'model_graded';
+    | 'model_graded'
+    | 'docs_links';
   /** Relative weight for assert-set scoring (default 1). */
   weight?: number;
   /** Optional judge name, used for per-judge reporting. */
@@ -218,6 +221,10 @@ export interface CaseRequirement {
   env?: string[];
   /** Python modules that must be importable via `py -3 -c "import <name>"`. */
   python_modules?: string[];
+  /** When true, require the ability to create a file symlink (Windows dev mode). */
+  symlink?: boolean;
+  /** Relative paths (files or directories) that must exist in the workspace. */
+  paths?: string[];
 }
 
 /** A business invariant derived from domain rules; cases cite it via case_id lists. */
@@ -513,6 +520,23 @@ function checkList(value: unknown, name: string): Check[] {
       ) {
         throw new Error('model_graded.threshold must be within 0..1');
       }
+    } else if (kind === 'docs_links') {
+      if (check.required !== undefined) {
+        if (!Array.isArray(check.required) || check.required.some((value) => typeof value !== 'string' || value === '')) {
+          throw new Error('docs_links.required must be an array of relative paths');
+        }
+        for (const required of check.required as string[]) {
+          relativePath(required, 'docs_links.required');
+        }
+      }
+      if (check.dirs !== undefined) {
+        if (!Array.isArray(check.dirs) || check.dirs.some((value) => typeof value !== 'string' || value === '')) {
+          throw new Error('docs_links.dirs must be an array of relative directories');
+        }
+        for (const dir of check.dirs as string[]) {
+          relativePath(dir, 'docs_links.dirs');
+        }
+      }
     } else {
       throw new Error(`unsupported check kind: ${String(kind)}`);
     }
@@ -578,7 +602,17 @@ export async function loadSuite(path: string): Promise<Suite> {
       throw new Error(`case ${caseId} cannot set both argv and prompt`);
     }
     if (item.prompt === undefined && item.argv === undefined) {
-      throw new Error(`case ${caseId} needs argv or prompt`);
+      // Static-only cases (doc link checks, artifact assertions) have nothing
+      // to execute; they read the sandbox directly.
+      const staticOnly =
+        Array.isArray(item.checks) &&
+        item.checks.length > 0 &&
+        (item.checks as Check[]).every((check) =>
+          ['docs_links', 'file_exists', 'json_equals'].includes(String(check.kind)),
+        );
+      if (!staticOnly) {
+        throw new Error(`case ${caseId} needs argv or prompt (or static-only checks)`);
+      }
     }
     if (item.argv !== undefined) {
       const argv = item.argv;
@@ -689,10 +723,13 @@ export async function loadSuite(path: string): Promise<Suite> {
         throw new Error(`case ${caseId} requires must be an object`);
       }
       for (const [key, values] of Object.entries(requirement as Record<string, unknown>)) {
-        if (key !== 'commands' && key !== 'env' && key !== 'python_modules') {
+        if (key !== 'commands' && key !== 'env' && key !== 'python_modules' && key !== 'symlink' && key !== 'paths') {
           throw new Error(`case ${caseId} requires contains unsupported field: ${key}`);
         }
-        if (!Array.isArray(values) || values.some((value) => typeof value !== 'string' || value === '')) {
+        if (key === 'symlink' && typeof values !== 'boolean') {
+          throw new Error(`case ${caseId} requires.symlink must be a boolean`);
+        }
+        if (key !== 'symlink' && (!Array.isArray(values) || values.some((value) => typeof value !== 'string' || value === ''))) {
           throw new Error(`case ${caseId} requires.${key} must be non-empty strings`);
         }
       }
@@ -1175,6 +1212,38 @@ interface ScriptOutcome {
   stdout: string;
 }
 
+/**
+ * Windows cannot CreateProcess a `.cmd`/`.bat` shim (pnpm, npm, yarn are all
+ * `.cmd`), and a bare name does not resolve without shell expansion. Resolve
+ * the real path and route batch files through cmd.exe, without a shell for the
+ * argument vector (each arg stays a separate token).
+ */
+export function commandInvocation(command: string, args: string[]): { command: string; args: string[] } {
+  if (process.platform !== 'win32') {
+    return { command, args };
+  }
+  const batch = (value: string): boolean => {
+    const ext = extname(value).toLowerCase();
+    return ext === '.cmd' || ext === '.bat';
+  };
+  const comspec = process.env.ComSpec ?? 'cmd.exe';
+  if (batch(command)) {
+    return { command: comspec, args: ['/d', '/s', '/c', command, ...args] };
+  }
+  if (extname(command) === '') {
+    const probe = spawnSync('where.exe', [command], { encoding: 'utf8', windowsHide: true });
+    const resolved = String(probe.stdout ?? '')
+      .split(/\r?\n/)
+      .find((line) => line.trim() !== '')
+      ?.trim();
+    if (probe.status === 0 && resolved !== undefined) {
+      return batch(resolved)
+        ? { command: comspec, args: ['/d', '/s', '/c', resolved, ...args] }
+        : { command: resolved, args };
+    }
+  }
+  return { command, args };
+}
 /** Run a deterministic grading script. Exit 0 means pass; the runner is the same trusted-adapter path. */
 async function runScript(
   scriptPath: string,
@@ -1206,7 +1275,8 @@ async function runScript(
     const stderrTail = (): string => Buffer.concat(stderrChunks).toString('utf8').slice(-2_000);
     const stdoutTail = (): string => Buffer.concat(stdoutChunks).toString('utf8').slice(-2_000);
     try {
-      child = spawnManagedCommand(argv[0] ?? '', argv.slice(1), {
+      const invocation = commandInvocation(argv[0] ?? '', argv.slice(1));
+      child = spawnManagedCommand(invocation.command, invocation.args, {
         cwd: sandbox,
         env: { PATH: process.env.PATH ?? '', LANG: process.env.LANG ?? '', ...(extraEnv ?? {}) },
         stdio: ['ignore', 'pipe', 'pipe'],
@@ -1409,7 +1479,8 @@ function startService(item: Case, sandbox: string, env: Record<string, string>):
     let child: ChildProcess;
     try {
       const argv = item.argv ?? [];
-      child = spawnManagedCommand(argv[0] ?? '', argv.slice(1), {
+      const invocation = commandInvocation(argv[0] ?? '', argv.slice(1));
+      child = spawnManagedCommand(invocation.command, invocation.args, {
         cwd: sandbox,
         env,
         stdio: ['ignore', 'ignore', 'ignore'],
@@ -1455,7 +1526,8 @@ async function runJudge(
   return new Promise((done) => {
     let child: ChildProcess;
     try {
-      child = spawnManagedCommand(command[0] ?? '', command.slice(1), {
+      const invocation = commandInvocation(command[0] ?? '', command.slice(1));
+      child = spawnManagedCommand(invocation.command, invocation.args, {
         cwd: sandbox,
         env: { PATH: process.env.PATH ?? '', LANG: process.env.LANG ?? '', ...env },
         stdio: ['ignore', 'pipe', 'pipe'],
@@ -1693,6 +1765,52 @@ async function check(
       passed = !called;
       reason = called ? 'tool_unexpectedly_called' : 'ok';
     }
+  } else if (kind === 'docs_links') {
+    const required = Array.isArray(item.required) ? (item.required as string[]) : [];
+    const dirs = Array.isArray(item.dirs) ? (item.dirs as string[]) : [];
+    const missing = required.filter((value) => !existsSync(join(sandbox, value)));
+    const files: string[] = [];
+    try {
+      for (const entry of await readdir(sandbox, { withFileTypes: true })) {
+        if (entry.isFile() && entry.name.endsWith('.md')) files.push(join(sandbox, entry.name));
+      }
+    } catch {
+      // A missing sandbox is reported through the missing/broken evidence below.
+    }
+    const walk = async (dir: string): Promise<void> => {
+      let entries;
+      try {
+        entries = await readdir(dir, { withFileTypes: true });
+      } catch {
+        return;
+      }
+      for (const entry of entries) {
+        if (entry.name.startsWith('.') || entry.name === 'node_modules' || entry.name === '__pycache__') continue;
+        const full = join(dir, entry.name);
+        if (entry.isDirectory()) await walk(full);
+        else if (entry.name.endsWith('.md')) files.push(full);
+      }
+    };
+    for (const dir of dirs) await walk(join(sandbox, dir));
+    const broken: string[] = [];
+    for (const file of files) {
+      const text = await readFile(file, 'utf8').catch(() => '');
+      for (const match of text.matchAll(/\[[^\]]*\]\(([^)]+)\)/g)) {
+        const target = (match[1] ?? '').trim().replace(/^<|>$/g, '');
+        if (/^(https?:|mailto:|#|\/)/.test(target)) continue;
+        const clean = target.split('#')[0];
+        if (!clean) continue;
+        const resolved = resolve(dirname(file), decodeURIComponent(clean));
+        if (!resolved.startsWith(sandbox)) continue;
+        if (!existsSync(resolved)) broken.push(`${relative(sandbox, file)}: ${target}`);
+      }
+    }
+    passed = missing.length === 0 && broken.length === 0;
+    reason = passed ? 'ok' : 'value_mismatch';
+    evidence.files = files.length;
+    evidence.missing = missing;
+    evidence.broken = broken.slice(0, 50);
+    evidence.broken_total = broken.length;
   } else {
     const used = events.some((event) => event.event === item.event) === item.present;
     passed = terminalTrace ? used : null;
@@ -1751,7 +1869,7 @@ function verdictOf(results: CheckResult[], threshold = 1): CaseVerdict {
 const ENV_KEEP = ['PATH', 'LANG', 'LC_ALL'];
 
 /** Return a short unmet-requirement tag, or null when the case can run. */
-async function unmetRequirement(requires?: CaseRequirement): Promise<string | null> {
+async function unmetRequirement(requires?: CaseRequirement, workspace?: string): Promise<string | null> {
   if (requires === undefined) {
     return null;
   }
@@ -1784,7 +1902,36 @@ async function unmetRequirement(requires?: CaseRequirement): Promise<string | nu
       return `python_module:${module}`;
     }
   }
+  if (requires.symlink === true && !canCreateSymlink()) {
+    return 'capability:symlink';
+  }
+  if (workspace !== undefined) {
+    for (const relative of requires.paths ?? []) {
+      if (!existsSync(join(workspace, relative))) {
+        return `path:${relative}`;
+      }
+    }
+  }
   return null;
+}
+
+/** Probe once per process: symlink creation needs Windows developer mode. */
+let symlinkProbe: boolean | null = null;
+function canCreateSymlink(): boolean {
+  if (symlinkProbe !== null) return symlinkProbe;
+  try {
+    const probeRoot = mkdtempSync(join(tmpdir(), 'craft-eval-symlink-'));
+    const target = join(probeRoot, 'target');
+    const link = join(probeRoot, 'link');
+    writeFileSync(target, '');
+    symlinkSync(target, link, 'file');
+    rmSync(link, { force: true });
+    rmSync(probeRoot, { recursive: true, force: true });
+    symlinkProbe = true;
+  } catch {
+    symlinkProbe = false;
+  }
+  return symlinkProbe;
 }
 
 async function oneCase(
@@ -1797,7 +1944,7 @@ async function oneCase(
   keepTraces = false,
   runDir?: string,
 ): Promise<CaseResult> {
-  const unmet = await unmetRequirement(item.requires);
+  const unmet = await unmetRequirement(item.requires, workspace);
   if (unmet !== null) {
     return {
       case_id: item.id,
@@ -1911,7 +2058,11 @@ async function oneCase(
     const timeoutSeconds = item.timeout_s ?? 30;
     const taskInput = subject.host !== undefined && item.prompt !== undefined ? prepareTaskInput(item.prompt, subject.context) : null;
     try {
-      if (item.driver === undefined) {
+      if (item.argv === undefined && item.prompt === undefined) {
+        // Static-only case (e.g. docs_links): nothing to execute.
+        exitCode = 0;
+        issue = null;
+      } else if (item.driver === undefined) {
         const host = subject.host;
         const hostInput =
           host === undefined || item.prompt === undefined
@@ -2384,7 +2535,8 @@ function runAdapter(
     const argv = input?.argv ?? item.argv ?? [];
     let child: ChildProcess;
     try {
-      child = spawnManagedCommand(argv[0] ?? '', argv.slice(1), {
+      const invocation = commandInvocation(argv[0] ?? '', argv.slice(1));
+      child = spawnManagedCommand(invocation.command, invocation.args, {
         cwd: sandbox,
         env,
         stdio: [input?.stdin === null || input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
