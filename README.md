@@ -2,6 +2,26 @@
 
 独立的评测执行器，面向软件、Agent、Skill 三类 `subject_kind`（合同保留 `subject_kind` 为自由字符串，但当前执行器只实现 software/agent/skill 三分支；其他取值会被 `audit` 标为 `subject_kind_unrecognized` 警告，且 `run` 不会为其提供专用执行路径）。一份版本化 Suite 定义任务与判据，一份 Subject 定义被测版本，一份 Runtime 固定环境、预算、Host、模型和工具。每个任务在复制的工作区中调用**受信任的本地命令**，从退出码、文件状态和 Host 轨迹判分；结果按 Run 分目录保存，不依赖共享数据库。
 
+## 进程与输出边界
+
+`runSuite` 的 `signal` 取消正在执行的工作，`max_output_bytes` 限制每个适配命令或模型裁判的 stdout/stderr 合计，默认 8 MiB。裁判超限记为 `judge_error` / `output_limit`，属于不确定结果，不按低分或通过处理；评分脚本只保留已有的有限诊断输出。
+
+在 macOS/Linux 上，适配命令、评分脚本、模型裁判和用例服务由独立监护进程启动，实际命令使用独立进程组。命令正常退出时清理同组后代；执行器退出或被 SIGKILL 时，监护者通过 IPC 断开清理正在运行的命令。stdin/stdout/stderr 使用系统管道，监护者不通过 IPC 缓存输出。取消、超时、输出超限也通过该监护者终止命令。
+
+环境依赖探测与裁判校准也走异步监护链：探测保留每次 5 秒时限并丢弃输出，取消时中止整次运行，不把取消伪装成“依赖缺失”。校准保留每次 60 秒默认时限，stdout/stderr 合计默认限 1 MiB；可通过 `calibrateJudge(path, { signal, timeout_ms, max_output_bytes })` 或 CLI `calibrate <manifest> --timeout-ms N --max-output-bytes N` 调整。取消校准会抛出取消原因，不继续评分或输出一份看似有效的部分准确率。超时和超限记为评分错误；统计规则不变。
+
+`run --max-output-bytes N` 配置适配命令和模型裁判的合计输出上限。`--timeout-ms` 只用于 calibrate；其他命令错误使用这些选项会明确报错。单次执行、整个 Run 和重复校准都会捕获控制参数快照，中途修改调用者的原对象不会改变执行条件。新 Run 计划保存实际输出上限、有效并发度、工作区模式、失败即停与轨迹保留设置；比较前必须存在合法且一致的绑定。0.1.4 旧报告读回已由固定旧包生成的样本验证，但缺少绑定时不能推定条件一致；其他旧版本仍需单独兼容验证。
+
+每条命令多一次 Node 启动，会增加短命令成本；可在源码仓库构建后用 `node scripts/benchmark-command-supervision.mjs 30` 本机实测。主动创建新会话逃离进程组的守护进程、监护者自身被 SIGKILL、Windows 整棵进程树仍是待完善或待验收的边界，不构成安全沙箱。详见 [监护设计](docs/command-supervision.md)。
+
+## 显式上下文对照
+
+Agent Subject 可以声明 `context: { "id": "claim-revision", "text": "待评估的精确知识正文" }`。执行器只对有 `host` 和 `prompt` 的任务注入它，文本最多 64 KiB；包含普通 `argv` 用例时拒绝运行，避免静默忽略。无 context 时保持原始 prompt 不变，便于与既有任务比较。
+
+每个结果的 `input_receipt` 记录原任务、实际提交内容和上下文的 SHA-256；计划中的 `subject.context` 只保存 id/sha256。上下文改变会改变 Subject 摘要，不改变原任务摘要。可用 `prepareTaskInput` 构造并核对预期输入。原始 Subject 配置仍包含正文，Craft 受控运行会冻结该配置；摘要回执不代表原文已从评测目录删除。
+
+回执只证明提交了哪些字节，不证明模型理解或采用了知识，更不签发知识晋级或发布许可。效果结论仍需要独立留出任务、相同环境与引擎配置、真实执行结果和统计护栏。测试中的模拟 Host 只验证输入与回执的实现。
+
 ## 安装与运行
 
 需要 Node.js 22+。运行时零第三方依赖，仅用 devDependencies 里的 `typescript` 与 `@types/node` 做构建：

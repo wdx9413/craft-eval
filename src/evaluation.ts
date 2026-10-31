@@ -6,16 +6,19 @@
  * the same contract without depending on Craft's storage or runtime.
  */
 
-import { spawn, spawnSync } from 'node:child_process';
+import { AsyncLocalStorage } from 'node:async_hooks';
+import { spawnManagedCommand, stopManagedCommand as killTree, evaluationNodeBinary as nodeBinary } from './command-process.js';
+import { runBoundedCommand } from './bounded-command.js';
 import type { ChildProcess } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
-import { existsSync } from 'node:fs';
+import { existsSync, createReadStream } from 'node:fs';
 import { copyFile, cp, lstat, mkdir, mkdtemp, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { extname, isAbsolute, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { startHttpMocks, type HttpMockServer } from './http-mock.js';
+import { prepareTaskInput, validateTaskContext } from './task-context.js';
 
 import {
   validateCaseMetadata,
@@ -39,6 +42,7 @@ const ENV_KEY = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const RUNTIME_KEYS = ['environment_digest', 'budget_digest', 'host_digest', 'model_digest', 'tools_digest'] as const;
 const MAX_TRACE_BYTES = 1_000_000;
 const MAX_JSON_BYTES = 1_000_000;
+const DEFAULT_OUTPUT_BYTES = 8 * 1024 * 1024;
 
 export interface Check {
   id: string;
@@ -166,6 +170,8 @@ export interface Subject {
   env?: Record<string, string>;
   /** Optional evaluator-launched agent host. A plain argv subject leaves this unset. */
   host?: HostConfig;
+  /** Explicit context intervention for managed host prompts; never applied to arbitrary argv cases. */
+  context?: import('./task-context.js').TaskContext;
   [key: string]: unknown;
 }
 
@@ -337,6 +343,10 @@ export interface CaseResult {
   gateway_sha256: string | null;
   trace_complete: boolean;
   host: HostObservation | null;
+  /** Actual copied bytes before execution; absent in legacy reports and null for in-place cases. */
+  workspace_snapshot?: { digest: string; files: number; bytes: number } | null;
+  /** Bytes submitted by this evaluator; not a claim of model comprehension or effectiveness. */
+  input_receipt?: import('./task-context.js').TaskInputReceipt | null;
 }
 
 interface TraceEvent {
@@ -881,6 +891,10 @@ async function loadSubject(path: string, kind: string): Promise<Subject> {
     }
     validateHostEnv(config.env);
   }
+  if (subject.context !== undefined) {
+    if (subject.kind !== 'agent' || subject.host === undefined) throw new Error('subject.context requires an agent host');
+    subject.context = validateTaskContext(subject.context);
+  }
   return subject as unknown as Subject;
 }
 
@@ -964,6 +978,34 @@ async function assertNoSymlinks(root: string, current: string): Promise<void> {
       await assertNoSymlinks(root, full);
     }
   }
+}
+
+/** Fingerprint the actual execution copy, never a caller-supplied version label. */
+async function workspaceFingerprint(root: string): Promise<{ digest: string; files: number; bytes: number }> {
+  const entries: Array<{ path: string; digest: string }> = [];
+  let bytes = 0, visited = 0;
+  async function walk(directory: string, relative = ''): Promise<void> {
+    const children = (await readdir(directory, { withFileTypes: true })).sort((a, b) => a.name.localeCompare(b.name, 'en'));
+    for (const child of children) {
+      if (IGNORED.has(child.name)) continue;
+      if (++visited > 20_000) throw new Error('workspace fingerprint entry budget exceeded');
+      executionControl.getStore()?.signal?.throwIfAborted();
+      const path = join(directory, child.name), name = relative ? `${relative}/${child.name}` : child.name;
+      const info = await lstat(path);
+      if (info.isSymbolicLink()) throw new Error('workspace fingerprint rejects symlinks');
+      if (info.isDirectory()) { await walk(path, name); continue; }
+      if (!info.isFile()) throw new Error('workspace fingerprint requires regular files');
+      const hash = createHash('sha256');
+      for await (const chunk of createReadStream(path)) {
+        bytes += chunk.length;
+        if (bytes > 256 * 1024 * 1024) throw new Error('workspace fingerprint byte budget exceeded');
+        hash.update(chunk);
+      }
+      entries.push({ path: name, digest: hash.digest('hex') });
+    }
+  }
+  await walk(root);
+  return { digest: digest(entries), files: entries.length, bytes };
 }
 
 async function copyTree(source: string, destination: string): Promise<void> {
@@ -1133,31 +1175,6 @@ interface ScriptOutcome {
   stdout: string;
 }
 
-/**
- * Resolve a real Node binary for running grading scripts. `process.execPath`
- * cannot be trusted: when this evaluator itself runs under an Electron wrapper
- * it points at the wrapper application, which would silently exit 0 instead of
- * executing the script.
- */
-function nodeBinary(): string {
-  if (process.env.CRAFT_EVAL_NODE_BINARY) {
-    return process.env.CRAFT_EVAL_NODE_BINARY;
-  }
-  if (!process.versions.electron) {
-    return process.execPath;
-  }
-  for (const directory of (process.env.PATH ?? '').split(';')) {
-    if (!directory) {
-      continue;
-    }
-    const candidate = join(directory.replace(/[\\/]+$/, ''), 'node.exe');
-    if (existsSync(candidate) && !candidate.includes('DSH Desktop')) {
-      return candidate;
-    }
-  }
-  return process.execPath;
-}
-
 /** Run a deterministic grading script. Exit 0 means pass; the runner is the same trusted-adapter path. */
 async function runScript(
   scriptPath: string,
@@ -1189,13 +1206,12 @@ async function runScript(
     const stderrTail = (): string => Buffer.concat(stderrChunks).toString('utf8').slice(-2_000);
     const stdoutTail = (): string => Buffer.concat(stdoutChunks).toString('utf8').slice(-2_000);
     try {
-      child = spawn(argv[0] ?? '', argv.slice(1), {
+      child = spawnManagedCommand(argv[0] ?? '', argv.slice(1), {
         cwd: sandbox,
         env: { PATH: process.env.PATH ?? '', LANG: process.env.LANG ?? '', ...(extraEnv ?? {}) },
         stdio: ['ignore', 'pipe', 'pipe'],
-        shell: false,
-        windowsHide: true,
-      });
+        signal: executionControl.getStore()?.signal,
+      }, nodeBinary());
     } catch (error) {
       done({ exitCode: null, issue: (error as Error).name, stderr: '', stdout: '' });
       return;
@@ -1228,6 +1244,7 @@ async function runScript(
       done({ exitCode: null, issue: 'timeout', stderr: stderrTail(), stdout: stdoutTail() });
     }, timeoutSeconds * 1_000);
     child.on('error', (error: NodeJS.ErrnoException) => {
+      killTree(child.pid);
       if (settled) {
         return;
       }
@@ -1392,13 +1409,12 @@ function startService(item: Case, sandbox: string, env: Record<string, string>):
     let child: ChildProcess;
     try {
       const argv = item.argv ?? [];
-      child = spawn(argv[0] ?? '', argv.slice(1), {
+      child = spawnManagedCommand(argv[0] ?? '', argv.slice(1), {
         cwd: sandbox,
         env,
         stdio: ['ignore', 'ignore', 'ignore'],
-        shell: false,
-        windowsHide: true,
-      });
+        signal: executionControl.getStore()?.signal,
+      }, nodeBinary());
     } catch {
       // A service that cannot start still yields a terminator; the driver will
       // fail against a dead endpoint and the case verdicts reflect that.
@@ -1415,6 +1431,7 @@ function startService(item: Case, sandbox: string, env: Record<string, string>):
       });
     });
     child.once('error', () => {
+      killTree(child.pid);
       // A missing service binary is a driver-visible infrastructure failure.
       if (!started) {
         resolveStarted(async () => {});
@@ -1438,13 +1455,12 @@ async function runJudge(
   return new Promise((done) => {
     let child: ChildProcess;
     try {
-      child = spawn(command[0] ?? '', command.slice(1), {
+      child = spawnManagedCommand(command[0] ?? '', command.slice(1), {
         cwd: sandbox,
         env: { PATH: process.env.PATH ?? '', LANG: process.env.LANG ?? '', ...env },
         stdio: ['ignore', 'pipe', 'pipe'],
-        shell: false,
-        windowsHide: true,
-      });
+        signal: executionControl.getStore()?.signal,
+      }, nodeBinary());
     } catch (error) {
       done({ exitCode: null, issue: (error as Error).name, stdout: '', stderr: '' });
       return;
@@ -1460,8 +1476,23 @@ async function runJudge(
         stderr: Buffer.concat(stderr).toString('utf8').slice(-2_000),
       });
     };
-    child.stdout?.on('data', (chunk: Buffer) => stdout.push(chunk));
-    child.stderr?.on('data', (chunk: Buffer) => stderr.push(chunk));
+    // Judges have the same combined output budget as adapters. A bounded tail
+    // after Buffer.concat would still retain the entire flood in memory.
+    const limit = executionControl.getStore()?.max_output_bytes ?? DEFAULT_OUTPUT_BYTES;
+    let bytes = 0;
+    const capture = (target: Buffer[], chunk: Buffer): void => {
+      if (settled) return;
+      target.push(chunk.subarray(0, Math.max(0, limit - bytes)));
+      bytes += chunk.length;
+      if (bytes > limit) {
+        settled = true;
+        clearTimeout(timer);
+        killTree(child.pid);
+        finish(null, 'output_limit');
+      }
+    };
+    child.stdout?.on('data', (chunk: Buffer) => capture(stdout, chunk));
+    child.stderr?.on('data', (chunk: Buffer) => capture(stderr, chunk));
     const timer = setTimeout(() => {
       if (settled) return;
       settled = true;
@@ -1469,6 +1500,7 @@ async function runJudge(
       finish(null, 'timeout');
     }, timeoutSeconds * 1_000);
     child.on('error', (error: NodeJS.ErrnoException) => {
+      killTree(child.pid);
       if (settled) return;
       settled = true;
       clearTimeout(timer);
@@ -1719,7 +1751,7 @@ function verdictOf(results: CheckResult[], threshold = 1): CaseVerdict {
 const ENV_KEEP = ['PATH', 'LANG', 'LC_ALL'];
 
 /** Return a short unmet-requirement tag, or null when the case can run. */
-function unmetRequirement(requires?: CaseRequirement): string | null {
+async function unmetRequirement(requires?: CaseRequirement): Promise<string | null> {
   if (requires === undefined) {
     return null;
   }
@@ -1729,8 +1761,9 @@ function unmetRequirement(requires?: CaseRequirement): string | null {
     }
   }
   for (const command of requires.commands ?? []) {
-    const probe = spawnSync(command, ['--version'], { stdio: 'ignore', windowsHide: true, timeout: 5_000 });
-    if (probe.error !== undefined) {
+    const probe = await runBoundedCommand(command, ['--version'], { cwd: process.cwd(), env: process.env, timeout_ms: 5_000, max_output_bytes: 1, capture: false, signal: executionControl.getStore()?.signal });
+    executionControl.getStore()?.signal?.throwIfAborted();
+    if (probe.issue !== null) {
       return `command:${command}`;
     }
   }
@@ -1738,12 +1771,11 @@ function unmetRequirement(requires?: CaseRequirement): string | null {
     // The interpreter name differs across hosts (py -3 / python3 / python).
     let importable = false;
     for (const [command, prefix] of [['py', ['-3']], ['python3', []], ['python', []]] as const) {
-      const probe = spawnSync(command, [...prefix, '-c', `import ${module}`], {
-        stdio: 'ignore',
-        windowsHide: true,
-        timeout: 5_000,
+      const probe = await runBoundedCommand(command, [...prefix, '-c', `import ${module}`], {
+        cwd: process.cwd(), env: process.env, timeout_ms: 5_000, max_output_bytes: 1, capture: false, signal: executionControl.getStore()?.signal,
       });
-      if (probe.error === undefined) {
+      executionControl.getStore()?.signal?.throwIfAborted();
+      if (probe.issue === null) {
         importable = probe.status === 0;
         break;
       }
@@ -1765,7 +1797,7 @@ async function oneCase(
   keepTraces = false,
   runDir?: string,
 ): Promise<CaseResult> {
-  const unmet = unmetRequirement(item.requires);
+  const unmet = await unmetRequirement(item.requires);
   if (unmet !== null) {
     return {
       case_id: item.id,
@@ -1812,6 +1844,7 @@ async function oneCase(
     if (sharedSandbox === undefined && item.in_place !== true) {
       await workspaceCopy(workspace, sandbox);
     }
+    const workspaceSnapshot = item.in_place === true ? null : await workspaceFingerprint(sandbox);
     // Outputs sit inside the sandbox. An in-place case has no sandbox of its
     // own, so it redirects outputs beside the case root; the subject checkout is
     // never written to either way.
@@ -1876,13 +1909,14 @@ async function oneCase(
     let issue: string | null = null;
     let capturedStdout: Buffer<ArrayBufferLike> = Buffer.alloc(0);
     const timeoutSeconds = item.timeout_s ?? 30;
+    const taskInput = subject.host !== undefined && item.prompt !== undefined ? prepareTaskInput(item.prompt, subject.context) : null;
     try {
       if (item.driver === undefined) {
         const host = subject.host;
         const hostInput =
           host === undefined || item.prompt === undefined
             ? undefined
-            : hostArgv(host, sandbox, item.prompt);
+            : hostArgv(host, sandbox, taskInput!.prompt);
         const outcome = await runAdapter(
           { ...item, argv: item.argv === undefined ? undefined : item.argv.map(expandSubjects) },
           sandbox,
@@ -1975,7 +2009,7 @@ async function oneCase(
       safetyVerdict,
       safetyChecks,
       trigger,
-      issue,
+      executionControl.getStore()?.signal?.aborted ? 'cancelled' : issue,
       subject.kind === 'agent' && item.prompt !== undefined,
       terminalTrace,
     );
@@ -1988,7 +2022,7 @@ async function oneCase(
       task_verdict: taskVerdict,
       safety_verdict: safetyChecks.length > 0 ? safetyVerdict : null,
       trigger,
-      issue,
+      issue: executionControl.getStore()?.signal?.aborted ? 'cancelled' : issue,
       exit_code: exitCode,
       duration_ms: durationMs,
       cost_units: cost,
@@ -2000,6 +2034,8 @@ async function oneCase(
       gateway_sha256: await sha256File(gatewayPath),
       trace_complete: terminalTrace,
       host: parsedHost?.observation ?? null,
+      workspace_snapshot: workspaceSnapshot,
+      input_receipt: taskInput?.receipt ?? null,
     };
   } finally {
     // With --keep-traces, copy the raw capture files into the run directory before
@@ -2048,6 +2084,7 @@ function decideVerdict(
   requiresTrace: boolean,
   terminalTrace: boolean,
 ): Verdict {
+  if (issue === 'cancelled' || issue === 'output_limit') return 'inconclusive';
   if (taskVerdict === 'failed' || safetyVerdict === 'failed' || trigger?.verdict === 'failed') {
     return 'failed';
   }
@@ -2340,17 +2377,18 @@ function runAdapter(
   stderrPath: string,
   input?: AdapterInput,
 ): Promise<AdapterOutcome> {
-  return new Promise((done) => {
+  return new Promise((done, reject) => {
+    const control = executionControl.getStore();
+    const limit = control?.max_output_bytes ?? DEFAULT_OUTPUT_BYTES;
+    let bytes = 0;
     const argv = input?.argv ?? item.argv ?? [];
     let child: ChildProcess;
     try {
-      child = spawn(argv[0] ?? '', argv.slice(1), {
+      child = spawnManagedCommand(argv[0] ?? '', argv.slice(1), {
         cwd: sandbox,
         env,
         stdio: [input?.stdin === null || input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
-        shell: false,
-        windowsHide: true,
-      });
+      }, nodeBinary());
     } catch (error) {
       done({
         exitCode: null,
@@ -2364,6 +2402,7 @@ function runAdapter(
     const stderr: Buffer[] = [];
     let settled = false;
     const finish = (exitCode: number | null, issue: string | null): void => {
+      control?.signal?.removeEventListener('abort', abort);
       const mergedStdout = Buffer.concat(stdout);
       const mergedStderr = Buffer.concat(stderr);
       void writeCapture(stdoutPath, [mergedStdout], stderrPath, [mergedStderr]).then(() =>
@@ -2372,8 +2411,15 @@ function runAdapter(
           issue,
           stdout: mergedStdout,
           stderr: mergedStderr,
-        }),
+        }), reject,
       );
+    };
+    const abort = (): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      killTree(child.pid);
+      finish(null, 'cancelled');
     };
     if (input?.stdin !== null && input !== undefined) {
       child.stdin?.end(input.stdin);
@@ -2386,8 +2432,22 @@ function runAdapter(
       killTree(child.pid);
       finish(null, 'timeout');
     }, (item.timeout_s ?? 30) * 1_000);
-    child.stdout?.on('data', (chunk: Buffer) => stdout.push(chunk));
-    child.stderr?.on('data', (chunk: Buffer) => stderr.push(chunk));
+    const capture = (target: Buffer[], chunk: Buffer): void => {
+      if (settled) return;
+      const room = Math.max(0, limit - bytes);
+      target.push(chunk.subarray(0, room));
+      bytes += chunk.length;
+      if (bytes > limit) {
+        settled = true;
+        clearTimeout(timer);
+        killTree(child.pid);
+        finish(null, 'output_limit');
+      }
+    };
+    child.stdout?.on('data', (chunk: Buffer) => capture(stdout, chunk));
+    child.stderr?.on('data', (chunk: Buffer) => capture(stderr, chunk));
+    control?.signal?.addEventListener('abort', abort, { once: true });
+    if (control?.signal?.aborted) abort();
     child.on('error', (error: NodeJS.ErrnoException) => {
       if (settled) {
         return;
@@ -2417,28 +2477,16 @@ async function writeCapture(
   await writeFile(stderrPath, Buffer.concat(stderr));
 }
 
-function killTree(pid: number | undefined): void {
-  if (pid === undefined) {
-    return;
-  }
-  if (process.platform === 'win32') {
-    try {
-      spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], {
-        stdio: 'ignore',
-        windowsHide: true,
-      });
-    } catch {
-      // Fall through to a direct kill for minimal runtimes without taskkill.
-    }
-  }
-  try {
-    process.kill(pid, 'SIGKILL');
-  } catch {
-    // The adapter already exited; nothing left to kill.
-  }
-}
+const executionControl = new AsyncLocalStorage<RunOptions>();
 
 export interface RunOptions {
+  /** Cancels active execution and prevents subsequent cases from starting. */
+  signal?: AbortSignal;
+  /** Maximum combined stdout/stderr bytes per adapter or model judge, default 8 MiB. */
+  max_output_bytes?: number;
+  /** Called after a case result has been durably recorded. */
+  on_progress?: (event: { run_id: string; case_id: string; trial: number; verdict: Verdict }) => void;
+
   trials?: number;
   /** Number of independent case/trial jobs run at once. In-place cases stay serial. */
   parallelism?: number;
@@ -2468,7 +2516,25 @@ export interface RunOptions {
   keep_traces?: boolean;
 }
 
+/** Isolate controls between simultaneous runs; legacy numeric options remain supported. */
 export async function runSuite(
+  suitePath: string, subjectPath: string, runtimePath: string,
+  workspace: string, outputRoot: string, options: RunOptions | number = {},
+): Promise<string> {
+  // Caller callbacks may mutate their own options; a run keeps one immutable
+  // control snapshot so its recorded budget matches every executed case.
+  const captured = typeof options === 'number' ? options : Object.freeze({ ...options,
+    ...(options.workspace_snapshots === undefined ? {} : { workspace_snapshots: Object.freeze({ ...options.workspace_snapshots }) }),
+  });
+  const control = typeof captured === 'number' ? {} : captured;
+  control.signal?.throwIfAborted();
+  if (control.max_output_bytes !== undefined && (!Number.isSafeInteger(control.max_output_bytes) || control.max_output_bytes < 1)) {
+    throw new Error('max_output_bytes must be a positive safe integer');
+  }
+  return executionControl.run(control, () => runSuiteInternal(suitePath, subjectPath, runtimePath, workspace, outputRoot, captured));
+}
+
+async function runSuiteInternal(
   suitePath: string,
   subjectPath: string,
   runtimePath: string,
@@ -2490,6 +2556,7 @@ export async function runSuite(
     if (subject.host === undefined && item.prompt !== undefined) {
       throw new Error(`case ${item.id} prompt requires subject.host`);
     }
+    if (subject.context !== undefined && item.prompt === undefined) throw new Error(`case ${item.id} context requires a host prompt`);
   }
   if (!Number.isInteger(trials) || trials < 1 || trials > 20) {
     throw new Error('trials must be 1..20');
@@ -2554,8 +2621,15 @@ export async function runSuite(
       id: subject.id,
       version: subject.version,
       digest: digest(subject),
+      context: subject.context === undefined ? null : { id: subject.context.id, sha256: prepareTaskInput('', subject.context).receipt.context_sha256 },
     },
     runtime,
+    execution_controls: {
+      schema: 'craft-eval.execution-controls.v1',
+      max_output_bytes: typeof options === 'number' ? DEFAULT_OUTPUT_BYTES : (options.max_output_bytes ?? DEFAULT_OUTPUT_BYTES),
+      parallelism: workspaceMode === 'shared' || suite.cases.some(item => item.in_place === true) ? 1 : parallelism,
+      workspace_mode: workspaceMode, fail_fast: failFast, keep_traces: keepTraces,
+    } satisfies ExecutionControls,
     trials,
     expected: suite.cases.length * trials,
   };
@@ -2592,7 +2666,7 @@ export async function runSuite(
     let stopped = false;
     const worker = async (): Promise<void> => {
       for (;;) {
-        if (stopped) {
+        if (stopped || executionControl.getStore()?.signal?.aborted) {
           return;
         }
         const index = next;
@@ -2604,6 +2678,7 @@ export async function runSuite(
         const result = await oneCase(job.item, subject, job.workspace, runId, job.trial, sharedSandbox, keepTraces, runDir);
         results[index] = result;
         await atomicJson(join(runDir, 'results', `${job.item.id}-${job.trial}.json`), result);
+        executionControl.getStore()?.on_progress?.({ run_id: runId, case_id: job.item.id, trial: job.trial, verdict: result.verdict });
         const snapshot = workspaceSnapshots[job.item.id];
         if (snapshot !== undefined) {
           if (result.verdict !== 'passed') {
@@ -2652,6 +2727,24 @@ interface RunPlan {
   runtime: Runtime;
   trials: number;
   expected: number;
+  execution_controls?: ExecutionControls;
+}
+
+interface ExecutionControls {
+  schema: 'craft-eval.execution-controls.v1';
+  max_output_bytes: number;
+  parallelism: number;
+  workspace_mode: 'isolated' | 'shared';
+  fail_fast: boolean;
+  keep_traces: boolean;
+}
+function validExecutionControls(value: unknown): value is ExecutionControls {
+  const item = record(value);
+  return item !== null && item.schema === 'craft-eval.execution-controls.v1'
+    && Number.isSafeInteger(item.max_output_bytes) && Number(item.max_output_bytes) > 0
+    && Number.isInteger(item.parallelism) && Number(item.parallelism) >= 1 && Number(item.parallelism) <= 8
+    && (item.workspace_mode === 'isolated' || item.workspace_mode === 'shared')
+    && typeof item.fail_fast === 'boolean' && typeof item.keep_traces === 'boolean';
 }
 
 function missingResult(caseId: string, trial: number): CaseResult {
@@ -2910,6 +3003,10 @@ export async function compareRuns(baselinePath: string, candidatePath: string): 
   const candidate = await loadRun(candidatePath);
   const left = baseline.plan;
   const right = candidate.plan;
+  if (!validExecutionControls(left.execution_controls) || !validExecutionControls(right.execution_controls)
+    || JSON.stringify(sortDeep(left.execution_controls)) !== JSON.stringify(sortDeep(right.execution_controls))) {
+    throw new Error('actual execution controls are missing, invalid or different');
+  }
   if (
     left.suite_digest !== right.suite_digest ||
     JSON.stringify(sortDeep(left.runtime)) !== JSON.stringify(sortDeep(right.runtime)) ||

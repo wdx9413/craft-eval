@@ -1,6 +1,8 @@
+#!/usr/bin/env node
 /** Command line interface for local evaluation runs and comparisons. */
 
 import { resolve } from 'node:path';
+import { realpathSync, existsSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
@@ -39,6 +41,10 @@ function parse(argv: string[]): { command: string; positional: string[]; options
         }
         options.parallelism = Number(value);
         index += 1;
+      } else if (name === 'timeout-ms' || name === 'max-output-bytes') {
+        const value = rest[index + 1];
+        if (value === undefined) throw new Error(`--${name} requires a value`);
+        options[name] = Number(value); index += 1;
       } else if (name === 'fail-on-failed' || name === 'require-gain') {
         options[name] = true;
       } else if (name === 'workspace-mode') {
@@ -76,6 +82,8 @@ function parse(argv: string[]): { command: string; positional: string[]; options
       positional.push(token);
     }
   }
+  if (options['timeout-ms'] !== undefined && command !== 'calibrate') throw new Error('--timeout-ms is only supported by calibrate; run uses per-case timeout_s');
+  if (options['max-output-bytes'] !== undefined && command !== 'run' && command !== 'calibrate') throw new Error('--max-output-bytes is only supported by run and calibrate');
   return { command, positional, options };
 }
 
@@ -85,7 +93,7 @@ commands:
   validate <suite>
   audit <suite> [suite...]
   coverage <suite> [suite...]
-  run <suite> <subject> <runtime> --workspace <dir> --output <dir> [--trials N] [--parallelism N] [--workspace-mode isolated|shared] [--fail-fast] [--workspace-source <dir>] [--keep-traces] [--fail-on-failed]
+  run <suite> <subject> <runtime> --workspace <dir> --output <dir> [--trials N] [--parallelism N] [--workspace-mode isolated|shared] [--fail-fast] [--workspace-source <dir>] [--keep-traces] [--max-output-bytes N] [--fail-on-failed]
   report <run_dir>
   rescore <run_dir> --workspace <dir> --output <dir>
   compare <baseline> <candidate> [--require-gain]
@@ -93,7 +101,7 @@ commands:
   report-html <run_dir> --output <file>
   experiment <manifest> --workspace <dir> --output <dir>
   mutation <manifest> <suite> <runtime> --workspace <dir> --output <dir>
-  calibrate <manifest>
+  calibrate <manifest> [--timeout-ms N] [--max-output-bytes N]
   scenario <scenario> [<subject> <runtime>] --workspace <dir> --output <dir> [--resume-after <step>]`;
 
 export async function main(argv: string[] = process.argv.slice(2)): Promise<number> {
@@ -136,6 +144,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
         fail_fast: options.fail_fast === true,
         workspace_source: options.workspace_source === undefined ? undefined : String(options.workspace_source),
         keep_traces: options.keep_traces === true,
+        max_output_bytes: options['max-output-bytes'] === undefined ? undefined : Number(options['max-output-bytes']),
       });
       const report = await reportRun(path);
       result = { run_dir: path, report };
@@ -190,7 +199,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
       result = await runMutations(positional[0]!, positional[1]!, positional[2]!, String(options.workspace), String(options.output));
     } else if (command === 'calibrate') {
       requireArgs(positional, 1, USAGE);
-      result = await calibrateJudge(positional[0]!);
+      result = await calibrateJudge(positional[0]!, { timeout_ms: options['timeout-ms'] === undefined ? undefined : Number(options['timeout-ms']), max_output_bytes: options['max-output-bytes'] === undefined ? undefined : Number(options['max-output-bytes']) });
     } else if (command === 'scenario') {
       requireArgs(positional, 1, USAGE);
       if (options.workspace === undefined || options.output === undefined) {
@@ -251,7 +260,7 @@ function requireArgs(positional: string[], count: number, usage: string): void {
 
 // Run only when invoked directly, never when imported by another module.
 const invokedDirectly =
-  process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
+  process.argv[1] !== undefined && existsSync(process.argv[1]) && import.meta.url === pathToFileURL(realpathSync(resolve(process.argv[1]))).href;
 
 if (invokedDirectly) {
   process.exitCode = await main();

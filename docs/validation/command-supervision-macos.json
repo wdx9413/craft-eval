@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-10-30T16:47:03.148834+00:00",
+  "platform": {
+    "system": "macOS",
+    "architecture": "arm64",
+    "node": "v24.14.0"
+  },
+  "before": {
+    "real_evaluator_sigkill_test_failed": true,
+    "issue": "adapter survived evaluator SIGKILL"
+  },
+  "after": {
+    "eval_tests": 107,
+    "core_tests": 8,
+    "workbench_tests": 55,
+    "focused_tests": 24,
+    "new_modules_coverage": {
+      "modules": [
+        "command-process",
+        "command-guardian",
+        "command-guardian-entry"
+      ],
+      "lines": 100,
+      "branches": 100,
+      "functions": 100
+    },
+    "verified": [
+      "real evaluator SIGKILL reaps adapter and descendant",
+      "Craft worker SIGKILL is persisted unknown with no same-operation replay",
+      "Craft IPC disconnect reaps commands and exits cleanly",
+      "installed compiled CLI HTTP submission, worker SIGKILL, unknown state and no replay",
+      "stdin, exact target env and target-only NODE_OPTIONS",
+      "original spawn errors and signal exits",
+      "guardian failure cannot satisfy an expected command exit",
+      "normal completion, cancellation, timeout and output flood"
+    ],
+    "runtime_protocol": 1,
+    "plugin_package_check": "passed",
+    "typecheck": "passed"
+  },
+  "compiled_sha256": {
+    "eval:evaluation.js": "475b290325ad6a5a3cfaddbbfb0f9c4df6888aaf211cfed34ec466651619347a",
+    "eval:command-process.js": "b14c561a72e751c6e2eda524da9411aade1cc9630aaff3b413b6f2f4f1d0763b",
+    "eval:command-guardian.js": "c05ecde5e1d84d14d96944be110dbe84419e96d9276a850c5c52df9a9a748a6c",
+    "eval:command-guardian-entry.js": "2b6ce56e818f457fde8476c6eeb69d48873504994898f4b439cc09f965b4d75f",
+    "craft:core/evaluation-process.js": "bc2e924e5c2b22c23630960316487ec23cf9d6ed423fed7e20947a4d0c79a994",
+    "craft:core/workbench-evaluations.js": "a2de50df840e636ffd9d7dc4b6c6297ce23f3af6671afe8552a684a89b241eab",
+    "craft:bin/craft-evaluation-worker.js": "797e89cdcacdce394db68bcdfb5c27d3d8bf906978ab21cc01606a797b4af486"
+  },
+  "package_chain": "seven modules checked through source build, relevant archives, installed dependencies and sidecar; lock integrities match",
+  "benchmark": "command-supervision/startup-benchmark.json",
+  "logs": [
+    "before.txt",
+    "focused-coverage.txt",
+    "eval-tests.txt",
+    "core-tests.txt",
+    "workbench-tests.txt",
+    "core-typecheck.txt",
+    "core-build.txt",
+    "plugin-check.txt",
+    "runtime-check.txt",
+    "sidecar.txt",
+    "docs.txt",
+    "layering.txt"
+  ],
+  "limitations": [
+    "macOS actual-process evidence only. Windows taskkill fallback is mocked, not target-platform proof.",
+    "A guardian killed with SIGKILL itself, deliberate daemonization and whole-system failure remain outside this verification.",
+    "Synchronous environment requirement probes and judge calibration are not yet supervised.",
+    "Unknown evaluations remain safely blocked in the UI; explicit manual acknowledgement/recovery is still pending.",
+    "Whole-goal incremental coverage, complete UI/native desktop acceptance and formal releases remain incomplete.",
+    "Local development Eval 0.1.4 and Craft runtime 0.12.131 only; no registry/marketplace push or installed-plugin upgrade."
+  ],
+  "sha256": {
+    "craft-eval/src/command-process.ts": "c4475b264dc28a267e3ec9008224c2efd125527803d67f7e10465d740a1ba837",
+    "craft-eval/src/command-guardian.ts": "209f2d33ce187c6e2e0d2734be1186967733473a7400f7fa63641d511f8bdd17",
+    "craft-eval/src/command-guardian-entry.ts": "bb325dd8f0bf08f2fc931c9bbd503e90802fa18176fcebac10afd7761d2b04a7",
+    "craft-eval/src/evaluation.ts": "3cbce04f69b7f226a2df2ac787f4c878a231c01ffddb46bd076d1144c40a57c3",
+    "craft-eval/tests/command-process.test.ts": "7b2c52057584c4065d8412d8a18b5b549c26b97400e7490ca0b198047afe4a34",
+    "craft-eval/tests/command-guardian.test.ts": "9ab72d164dfdbf4746ceda871e0ca8d0fc2075b569754fa113bca0967b557222",
+    "craft-eval/tests/worker-crash.test.ts": "63b25b0a5383e64e3f28e38f60fdf898e556f78f95b5094ba7d58024111cc999",
+    "craft-eval/tests/process-lifecycle.test.ts": "fdb397d0bd69f88ba2dbd1f44b2f3395a8e824b69047a9738fce255f7bb0f8f5",
+    "craft-eval/scripts/benchmark-command-supervision.mjs": "aaf68c3de39d76bb922aefa05e6f6e02c7daf81cbd8eb08eb31326a03626bb05",
+    "craft-eval/package.json": "592002e0653ca2decd5969216b38041f047f16c9178d6050df8b94232bd1f00c",
+    "craft-eval/package-lock.json": "4a92e0d469047288ba30ca73af1e494f5b99014771e7c713df59060a8e39fc23",
+    "craft/core/evaluation-process.ts": "7d2acc37e6fe34d504e06c6a41b4a47d129dfa0a8631d0f0ec1fca5876dd3a66",
+    "craft/core/workbench-evaluations.ts": "f45a33a3dd07c5c9a1b0306267accbd3f561aee83e560c48819b1176f7896395",
+    "craft/bin/craft-evaluation-worker.ts": "9b3a94472ab9f569201b81a76528c3cf1ea1c14332ef6971a4ca5a7dfe93b9ea",
+    "craft/tests/evaluation-process-crash.test.ts": "b7df72bbe41847b757765701e49b4e3374271093ea747f8103464b9b3c952d90",
+    "craft/tests/workbench-evaluations.test.ts": "743c4a8591e064b7adcb6af49c2d9af9de1e6ae24750072fda3628cc921cd164",
+    "craft/package.json": "85fcfd193fc36db43d1015a7df2b694dec85fc1dfdfaa7e634bc63d71b27b824",
+    "craft/pnpm-lock.yaml": "ef7dfe29f21953856540bb392fc26a12f80c2b0841274219dce5809b09fe4495",
+    "craft/vendor/craft-eval-0.1.4.tgz": "30a7dcd33cee45fe8254df6525f6e2b5106bac2aefbf1fd5d8d732b13ea2dbc7",
+    "craft/vendor/craft-eval-0.1.4.provenance.json": "8e8ee661b4b8756b4adc6fb63295b8e14230d7bdf0bdae3bb8cb31e05d718469",
+    "craft-workbench/tests/runtime-package.test.ts": "5887eb6cf71411c58aa96d1c2772976af199a08270514edf69cf8e9cab154ee7",
+    "craft-workbench/pnpm-lock.yaml": "6276a4893960046933aa9beda4c4280187018de4a5491845fc4ccbce660522e6",
+    "craft-workbench/vendor/craft-agent-harness-0.12.131.tgz": "12926dc9690f82e21d26db59f1d07b590abb653ece65f5eb82633b49e93f9687"
+  },
+  "additional_checks": [
+    "Docs link audit passed",
+    "Layering audit passed",
+    "Three main branches and diff checks verified"
+  ]
+}

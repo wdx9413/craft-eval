@@ -1,0 +1,22 @@
+(node:[PID]) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ installed evaluation package executes in a worker and returns progress (375.979208ms)
+✔ installed evaluation worker completes when an adapter leaves inherited output pipes open (166.93275ms)
+(node:[PID]) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:[PID]) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+✔ task contracts require bounded deterministic outcomes and safety assertions (6.754875ms)
+✔ Knowledge authority requires exact adjudicated tasks and a controlled positive paired effect (505.825542ms)
+(node:[PID]) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:[PID]) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+✔ controlled worker preserves context input receipts from the installed evaluator package (253.056125ms)
+✔ evaluation API authenticates, freezes inputs, deduplicates, reports and cancels real workers (308.512208ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1262.399833

@@ -1,0 +1,6 @@
+$ node --experimental-strip-types scripts/ci/check-doc-links.ts
+(node:[PID]) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+doc check: 846 internal link(s) across 272 document(s)
+doc check: 20 decision record(s), 20 indexed
+doc check: clean (20 decision record(s) listed and present)

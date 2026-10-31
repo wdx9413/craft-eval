@@ -1,0 +1,147 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-10-30T18:11:06.306093+00:00",
+  "platform": {
+    "system": "macOS",
+    "architecture": "arm64",
+    "node": "v24.14.0"
+  },
+  "tests": {
+    "eval": 124,
+    "core": 8,
+    "workbench": 55,
+    "five_modules_coverage": {
+      "modules": [
+        "bounded-command",
+        "calibration",
+        "command-process",
+        "command-guardian",
+        "command-guardian-entry"
+      ],
+      "lines": 100,
+      "branches": 100,
+      "functions": 100
+    },
+    "evaluation_panel_coverage": {
+      "lines": 100,
+      "branches": 100,
+      "functions": 100
+    }
+  },
+  "verified": [
+    "requirement cancellation is responsive and prevents the case execution",
+    "calibration success, timeout, flood and cancellation clean descendants",
+    "probe and calibration evaluator SIGKILL clean command and descendant",
+    "calibration abort prevents later attempts/samples and returns no partial accuracy",
+    "mutating original RunOptions and CalibrationOptions cannot change the executed budget",
+    "new plans bind output limit, effective parallelism, workspace mode, fail-fast and trace retention",
+    "comparison rejects missing/invalid/different control bindings",
+    "CLI budget flags apply only to supported commands",
+    "old-package reports remain readable and cannot assert unrecorded execution controls",
+    "installed compiled CLI and real HTTP evaluation/worker-crash regressions"
+  ],
+  "legacy_fixture_producer": {
+    "producer": "craft-eval",
+    "version": "0.1.4",
+    "archive_sha256": "30a7dcd33cee45fe8254df6525f6e2b5106bac2aefbf1fd5d8d732b13ea2dbc7",
+    "purpose": "Actual legacy report compatibility fixture; diagnostic software process only, no Knowledge/release authority",
+    "case_command": [
+      "node",
+      "-e",
+      "process.exit(0)"
+    ],
+    "content_unchanged": true,
+    "sha256": {
+      "baseline/plan.json": "50ecf2b4f796992fde4a54311d36d68e0bbeded6297dbed9193ff444fbb009c7",
+      "baseline/results/one-1.json": "5dfd82e05888fd0a96153a359085765bdd6c14edffc41ab7bec39d9951aca814",
+      "candidate/plan.json": "812bd951c4778787c4f284097465a9a999dc467021491e0d39a44b7cd15068f4",
+      "candidate/results/one-1.json": "197b85285f9b9633461ab6eae7abd01c4435fb63d6774d51116a665f781ee271"
+    }
+  },
+  "package_chain": {
+    "version": "0.1.5",
+    "equal_compiled_modules_and_declarations": {
+      "evaluation.js": "8e9bde85e72f9bf4e8d0fdf69bf34f2f41c648a21616fdcf666b828001172407",
+      "calibration.js": "97b179c6c551047bcc634960d4e8cf6c855b6898d8ac74f8f20bf240830a0dfe",
+      "bounded-command.js": "6bd9ee07a26fb6036ca470d51b45377160672853589f07978e8ef3155aec3be0",
+      "command-process.js": "4be498eb8f63d53ed45f5218a824d5d7d09fbdde1cfb935d9df4dc52bb8aa3a6",
+      "command-guardian.js": "c05ecde5e1d84d14d96944be110dbe84419e96d9276a850c5c52df9a9a748a6c",
+      "command-guardian-entry.js": "2b6ce56e818f457fde8476c6eeb69d48873504994898f4b439cc09f965b4d75f",
+      "cli.js": "ef6d87c4bbecb79d085b9073774cddb2a0860e94ac4dd0abbb097376600f7d34",
+      "index.js": "7040b7945fb8ed61783d8b7f832f1a9fc1c1008b94b98d26c1023e518ddac46d",
+      "index.d.ts": "50158189539b8d0aa1bbd3aaecd1a1e1f479fc38a82c011c1575eef499570293",
+      "calibration.d.ts": "3caf83ff77b2bf9a5e1db6ecc30e54dd43b5990291db9dd32c5712bce12c8c16"
+    },
+    "verified_locations": [
+      "Eval build",
+      "Eval archive",
+      "Core installed",
+      "Core archive bundled dependency",
+      "Workbench installed runtime",
+      "sidecar"
+    ],
+    "lock_integrities_match": true
+  },
+  "ui_validation": {
+    "installed_runtime_serves_exact_panel_source": true,
+    "tauri_frontend_directory": "../../workbench",
+    "frontend_owned_by_workbench": true,
+    "sidecar_ui_copy_not_claimed": true,
+    "native_render_not_verified": true
+  },
+  "logs": [
+    "eval-tests-coverage.txt",
+    "controls-and-crashes.txt",
+    "core-tests.txt",
+    "workbench-tests.txt",
+    "panel-coverage.txt",
+    "core-typecheck.txt",
+    "core-build.txt",
+    "plugin-check.txt",
+    "runtime-check.txt",
+    "sidecar.txt"
+  ],
+  "limitations": [
+    "macOS actual-process evidence only; Windows/Linux target verification pending.",
+    "Guardian SIGKILL, deliberate daemonization and whole-system failure remain separate boundaries.",
+    "Probe failure/applicability categorization otherwise preserves previous behavior.",
+    "Calibration statistical rules unchanged; no new total attempt-count cap.",
+    "Legacy compatibility proven for fixed 0.1.4 fixtures, not all historical formats.",
+    "Five modules and panel coverage are not whole-goal incremental coverage.",
+    "Unknown-evaluation manual recovery, native desktop acceptance and formal release remain incomplete.",
+    "Local development packages only; no push, registry/marketplace publication or user-plugin upgrade."
+  ],
+  "sha256": {
+    "craft-eval/src/evaluation.ts": "48f26ce35e5b0b4acb21d1a740c98754966b022f7cc47b4d639119155737a216",
+    "craft-eval/src/calibration.ts": "7333abe78f538eb8ea328d86239d7d7a3249df0ab718964a345fe9105c63017c",
+    "craft-eval/src/command-process.ts": "edbabc07afed74363078f7f927f0f871e827d1a067257650669c59cfb7594de2",
+    "craft-eval/src/bounded-command.ts": "327375e3f0000da0adaaf11a22c0199bd9f78ab4059e296df434c1bb891b8cd5",
+    "craft-eval/src/cli.ts": "83cd9ce88a970bb95c80857e0e7ec50b85f7d6f8a147b0d1cdefe8735c95544b",
+    "craft-eval/src/index.ts": "50ec5ff2039a5b42a5ff59c7dad27a03c785239e644a6a920770edd61f4e9fd2",
+    "craft-eval/tests/auxiliary-execution.test.ts": "c7b555f26f863f5818f2d609056b67b2490d575c47cc93e5ffca90d4ec4421a5",
+    "craft-eval/tests/bounded-command.test.ts": "c0c1cc4ae6625f246959f31aa50f3c98ae96b68396789aab3f9e03a441a032cc",
+    "craft-eval/tests/calibration-controls.test.ts": "056eb31a95b54570361af4404f811f21d26ff4d5e5c83a3939b0125633d3e483",
+    "craft-eval/tests/execution-controls.test.ts": "e649732a09c6202e84d06d2b3c45e0314dc88a7626dad04e8583e434ea66f9e2",
+    "craft-eval/tests/worker-crash.test.ts": "cf0287654c10dac9830409fa9262b5eb92bc7f01113c021d516b40421eba2263",
+    "craft-eval/tests/command-guardian.test.ts": "1f3a8ac09cb812e88e14bd20b0652c8bc22700f499b42759bb0eea4a7887a4d9",
+    "craft-eval/tests/extensions.test.ts": "5815f6b9745d8abc316db9cf81cfbb28affea1186fcfe7d3fdb7fe827b6dddce",
+    "craft-eval/package.json": "b03745cb81f68856cfa94a3e23d4dc6ae2e490d40b93793a0e345ada55dfe726",
+    "craft-eval/package-lock.json": "b6ac10023f911cb2cad84895eb03cb222957c8027657c81fab85a5d413ad255d",
+    "craft/vendor/craft-eval-0.1.5.tgz": "6540f11a503bf58cba428dbb76a3d3348cda171b8787b1f8ec7d6ac5fd3d5c8e",
+    "craft/vendor/craft-eval-0.1.5.provenance.json": "121644268c8083dc6b2b74e24f1722e6da270fcafd00b918f3c69d69471253f8",
+    "craft/package.json": "427fd32b45df3afebbc3cc90f0aa5fc64fad4c2e6cd504de1e39526737926f4d",
+    "craft/pnpm-lock.yaml": "5b02c277864c19b01b3a226bc3c1160762d42ca61192471ace0c280e3e07c0f5",
+    "craft/tests/workbench-evaluations.test.ts": "cad4eef3e02cbef9e6388b167676c338f99d0c4aa879b1d298456064293aa1dd",
+    "craft-workbench/pnpm-lock.yaml": "8516f1f491d6ba34a04e1d20d75b64b2cbb6cb6c5d2e0e00d182c898e458804d",
+    "craft-workbench/vendor/craft-agent-harness-0.12.131.tgz": "1cf71a633a4b88e5153f48d4dda8f3d38fd76ca8daac35156eeab6221372f76d",
+    "craft-workbench/workbench/evaluation-panel.js": "1dd1bcc5483c6573352f99b79923b43698a74cae2d79918fc37eb727a5f9ac07",
+    "craft-workbench/tests/evaluation-panel.test.ts": "6d7f9899e7b6c08339889f6637c1bce765653455ae4126d226620977527608c2",
+    "craft-workbench/tests/workbench-assets.test.ts": "403f62d52f54b5a26ebff8296e6efe6d5332ce07cf413ff1bdf89493fb6a0fb7",
+    "craft-workbench/tests/runtime-package.test.ts": "89f04f9c3d7d7acc39f1e7b9c0208939a1b440629dcd32b976a144fc75560b08",
+    "craft-eval/tests/fixtures/legacy-execution-controls/baseline/plan.json": "50ecf2b4f796992fde4a54311d36d68e0bbeded6297dbed9193ff444fbb009c7",
+    "craft-eval/tests/fixtures/legacy-execution-controls/baseline/results/one-1.json": "5dfd82e05888fd0a96153a359085765bdd6c14edffc41ab7bec39d9951aca814",
+    "craft-eval/tests/fixtures/legacy-execution-controls/candidate/plan.json": "812bd951c4778787c4f284097465a9a999dc467021491e0d39a44b7cd15068f4",
+    "craft-eval/tests/fixtures/legacy-execution-controls/candidate/results/one-1.json": "197b85285f9b9633461ab6eae7abd01c4435fb63d6774d51116a665f781ee271",
+    "craft-eval/tests/fixtures/legacy-execution-controls/producer.json": "671dcba229aa9f24d7f5b810f3b7634570b3d4a85f9555568642e8de22659d57"
+  }
+}

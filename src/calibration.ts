@@ -9,7 +9,7 @@
 
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { runBoundedCommand } from './bounded-command.js';
 
 export interface GoldSample {
   id: string;
@@ -51,30 +51,40 @@ export interface CalibrationReport {
   per_sample: SampleResult[];
 }
 
-function scoreOnce(
+export interface CalibrationOptions {
+  signal?: AbortSignal;
+  /** Per scoring attempt; defaults to the existing 60 second timeout. */
+  timeout_ms?: number;
+  /** Combined stdout/stderr budget per attempt; defaults to 1 MiB. */
+  max_output_bytes?: number;
+}
+
+type ScoreOutcome = { score: number; error: null } | { score: null; error: string };
+
+async function scoreOnce(
   manifest: CalibrationManifest,
   answerPath: string,
-): { score: number | null; error: string | null } {
+  options: CalibrationOptions,
+): Promise<ScoreOutcome> {
   const env = {
     ...process.env,
     CRAFT_EVAL_JUDGE_ANSWER: answerPath,
     ...(manifest.rubric === undefined ? {} : { CRAFT_EVAL_JUDGE_RUBRIC: manifest.rubric }),
   } as Record<string, string>;
-  const result = spawnSync(manifest.command[0] ?? '', manifest.command.slice(1), {
+  const result = await runBoundedCommand(manifest.command[0]!, manifest.command.slice(1), {
     cwd: manifest.dir === undefined ? process.cwd() : resolve(manifest.dir),
     env,
-    encoding: 'utf8',
-    timeout: 60_000,
-    windowsHide: true,
+    timeout_ms: options.timeout_ms ?? 60_000,
+    max_output_bytes: options.max_output_bytes ?? 1024 * 1024,
+    signal: options.signal,
   });
-  if (result.error !== undefined) {
-    return { score: null, error: result.error.name };
-  }
+  options.signal?.throwIfAborted();
+  if (result.issue !== null) return { score: null, error: result.error?.name ?? result.issue };
   if (result.status !== 0) {
     return { score: null, error: `judge exited ${result.status}` };
   }
   try {
-    const parsed = JSON.parse(String(result.stdout ?? '')) as { score?: unknown };
+    const parsed = JSON.parse(result.stdout.toString('utf8')) as { score?: unknown };
     const score = typeof parsed.score === 'number' && Number.isFinite(parsed.score) ? parsed.score : null;
     if (score === null) {
       return { score: null, error: 'judge output has no numeric score' };
@@ -89,15 +99,18 @@ function scoreOnce(
  * Run the judge over a gold set. `accuracy` is agreement with known answers and
  * `consistency` is the share of samples whose repeated scorings agree.
  */
-export async function calibrateJudge(manifestPath: string): Promise<CalibrationReport> {
+export async function calibrateJudge(manifestPath: string, options: CalibrationOptions = {}): Promise<CalibrationReport> {
+  const control = Object.freeze({ ...options });
+  control.signal?.throwIfAborted();
   const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as CalibrationManifest;
-  if (!Array.isArray(manifest.command) || manifest.command.length === 0) {
+  if (!Array.isArray(manifest.command) || manifest.command.length === 0 || typeof manifest.command[0] !== 'string' || manifest.command[0].length === 0 || !manifest.command.every(arg => typeof arg === 'string')) {
     throw new Error('calibration manifest requires a non-empty command array');
   }
   if (!Array.isArray(manifest.samples) || manifest.samples.length === 0) {
     throw new Error('calibration manifest requires at least one gold sample');
   }
   const repeats = manifest.repeats ?? 3;
+  if (!Number.isSafeInteger(repeats) || repeats < 1) throw new Error('calibration repeats must be a positive safe integer');
   const base = resolve(manifestPath, '..');
   // Resolve `dir` relative to the manifest so configs stay machine-independent.
   const resolved: CalibrationManifest = {
@@ -112,9 +125,9 @@ export async function calibrateJudge(manifestPath: string): Promise<CalibrationR
     const verdicts: SampleResult['verdicts'] = [];
     let error: string | null = null;
     for (let attempt = 0; attempt < repeats; attempt += 1) {
-      const outcome = scoreOnce(resolved, answerPath);
+      const outcome = await scoreOnce(resolved, answerPath, control);
       if (outcome.score === null) {
-        error = outcome.error ?? 'unknown error';
+        error = outcome.error;
         verdicts.push('error');
         continue;
       }
@@ -135,7 +148,7 @@ export async function calibrateJudge(manifestPath: string): Promise<CalibrationR
     });
   }
   const scored = perSample.filter((item) => item.correct !== null);
-  const consistent = perSample.filter((item) => item.agreement !== null);
+  const consistent = perSample.filter((item): item is SampleResult & { agreement: number } => item.agreement !== null);
   return {
     schema: 'craft-eval.calibration.v1',
     samples: perSample.length,
@@ -143,7 +156,7 @@ export async function calibrateJudge(manifestPath: string): Promise<CalibrationR
     consistency:
       consistent.length === 0
         ? null
-        : consistent.reduce((sum, item) => sum + (item.agreement ?? 0), 0) / consistent.length,
+        : consistent.reduce((sum, item) => sum + item.agreement, 0) / consistent.length,
     repeats,
     per_sample: perSample,
   };

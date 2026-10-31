@@ -8,6 +8,8 @@ export {
   runSuite,
 } from './evaluation.js';
 export { auditSuites, auditSuiteFiles } from './audit.js';
+export { prepareTaskInput, validateTaskContext } from './task-context.js';
+export type { TaskContext, TaskInputReceipt } from './task-context.js';
 export { attributeRun } from './attribution.js';
 export {
   binaryEffect,
@@ -90,3 +92,11 @@ export type {
   SuiteMetadata,
   ToolBoundary,
 } from './contract.js';
+
+export { coverageSuiteFiles } from './audit.js';
+export type { SuiteCoverage } from './audit.js';
+export { writeHtmlReport } from './report-html.js';
+export { runMutations } from './mutation.js';
+export type { MutationSpec, MutationReport } from './mutation.js';
+export { calibrateJudge } from './calibration.js';
+export type { CalibrationManifest, CalibrationReport, CalibrationOptions } from './calibration.js';

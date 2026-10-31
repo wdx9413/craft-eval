@@ -822,6 +822,7 @@ test('experiment validates, resumes completed jobs, and records budget skips', a
     const fakeRun = async (): Promise<string> => {
       const runDir = await mkdtemp(join(root, 'run-'));
       await writeJson(runDir, 'plan.json', {
+        execution_controls: { schema: 'craft-eval.execution-controls.v1', max_output_bytes: 8 * 1024 * 1024, parallelism: 1, workspace_mode: 'isolated', fail_fast: false, keep_traces: false },
         schema: 'craft-eval.eval.v1',
         run_id: `run-${runDir}`,
         suite: await loadSuite(suitePath),
@@ -1029,6 +1030,7 @@ test('experiment records failed attempts and stops when retry probing cannot rea
       run: async () => {
         const runDir = await mkdtemp(join(root, 'probe-run-'));
         await writeJson(runDir, 'plan.json', {
+          execution_controls: { schema: 'craft-eval.execution-controls.v1', max_output_bytes: 8 * 1024 * 1024, parallelism: 1, workspace_mode: 'isolated', fail_fast: false, keep_traces: false },
           schema: 'craft-eval.eval.v1',
           run_id: `run-${runDir}`,
           suite: await loadSuite(suitePath),
@@ -1121,6 +1123,7 @@ test('experiment retries append attempts without overwriting the original failur
       await mkdir(runDir, { recursive: true });
       const suite = await loadSuite(suitePath);
       await writeJson(runDir, 'plan.json', {
+        execution_controls: { schema: 'craft-eval.execution-controls.v1', max_output_bytes: 8 * 1024 * 1024, parallelism: 1, workspace_mode: 'isolated', fail_fast: false, keep_traces: false },
         schema: 'craft-eval.eval.v1',
         run_id: `run-${attempts}`,
         suite,
@@ -1179,6 +1182,7 @@ test('experiment enforces cost budgets and treats unknown cost as unobserved', a
       const runDir = await mkdtemp(join(root, 'run-'));
       const suite = await loadSuite(suitePath);
       await writeJson(runDir, 'plan.json', {
+        execution_controls: { schema: 'craft-eval.execution-controls.v1', max_output_bytes: 8 * 1024 * 1024, parallelism: 1, workspace_mode: 'isolated', fail_fast: false, keep_traces: false },
         schema: 'craft-eval.eval.v1',
         run_id: `run-${runDir}`,
         suite,

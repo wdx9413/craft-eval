@@ -2334,3 +2334,61 @@ process.exit(target && !fixed ? 1 : 0);
     await fx.cleanup();
   }
 });
+
+
+test('runtime controls bound output, cancel adapters and publish progress', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'eval-controls-'));
+  try {
+    const workspace = join(root, 'workspace'); await mkdir(workspace);
+    const subject = await write(root, 'subject.json', { kind: 'software', id: 'controls', version: '1' });
+    const runtimePath = await write(root, 'runtime.json', runtime());
+    const makeSuite = (code: string) => write(root, 'suite.json', suiteDoc('software', [{ id: 'one', argv: [NODE_BINARY, '-e', code], timeout_s: 5, checks: [{ id: 'exit', kind: 'exit_code', equals: 0 }] }]));
+    const suite = await makeSuite("process.stdout.write('x'.repeat(10000))");
+    const progress: string[] = [];
+    const run = await runSuite(suite, subject, runtimePath, workspace, join(root, 'runs'), { max_output_bytes: 128, on_progress: event => { progress.push(event.case_id); } });
+    assert.equal((await firstResult(run)).issue, 'output_limit');
+    assert.deepEqual(progress, ['one']);
+    await assert.rejects(runSuite(suite, subject, runtimePath, workspace, join(root, 'runs'), { max_output_bytes: 0 }), /max_output_bytes/);
+    const aborted = new AbortController(); aborted.abort();
+    await assert.rejects(runSuite(suite, subject, runtimePath, workspace, join(root, 'runs'), { signal: aborted.signal }), /abort/i);
+    await makeSuite('setInterval(() => {}, 1000)');
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 200);
+    try {
+      const cancelled = await runSuite(suite, subject, runtimePath, workspace, join(root, 'runs'), { signal: controller.signal });
+      assert.equal((await firstResult(cancelled)).issue, 'cancelled');
+      assert.notEqual((await firstResult(cancelled)).verdict, 'passed');
+    } finally { clearTimeout(timer); }
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+
+test('CLI executes through an installed bin symlink', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'eval-bin-'));
+  try {
+    const cli = fileURLToPath(new URL('../src/cli.js', import.meta.url));
+    const bin = join(root, 'craft-eval');
+    await symlink(cli, bin);
+    const suite = await write(root, 'suite.json', suiteDoc('software', [{ id: 'one', argv: [NODE_BINARY, '-e', 'process.exit(0)'], checks: [{ id: 'exit', kind: 'exit_code', equals: 0 }] }]));
+    const result = spawnSync(NODE_BINARY, [bin, 'validate', suite], { encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(JSON.parse(result.stdout).status, 'valid');
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+
+test('execution reports pin copied source bytes instead of trusting Subject version labels', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'eval-source-pin-'));
+  try {
+    const workspace = join(root, 'workspace'); await mkdir(workspace);
+    await writeFile(join(workspace, 'source.bin'), Buffer.from([0, 255, 1]));
+    const suite = await write(root, 'suite.json', suiteDoc('software', [{ id: 'one', argv: [NODE_BINARY, '-e', 'process.exit(0)'], checks: [{ id: 'exit', kind: 'exit_code', equals: 0 }] }]));
+    const subject = await write(root, 'subject.json', { kind: 'software', id: 'fixed', version: '1' });
+    const runtimePath = await write(root, 'runtime.json', runtime());
+    const first = await firstResult(await runSuite(suite, subject, runtimePath, workspace, join(root, 'runs')));
+    assert.equal(first.workspace_snapshot?.files, 1); assert.equal(first.workspace_snapshot?.bytes, 3);
+    await writeFile(join(workspace, 'source.bin'), Buffer.from([0, 255, 2]));
+    const second = await firstResult(await runSuite(suite, subject, runtimePath, workspace, join(root, 'runs')));
+    assert.notEqual(first.workspace_snapshot?.digest, second.workspace_snapshot?.digest);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});

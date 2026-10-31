@@ -1,0 +1,2 @@
+$ node scripts/run-runtime.mjs check
+Craft runtime 0.12.131: protocol 1
