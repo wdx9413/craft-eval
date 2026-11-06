@@ -1,0 +1,9 @@
+[
+  {
+    "id": "sizes",
+    "tool": "list_directory_with_sizes",
+    "arguments": {
+      "path": "."
+    }
+  }
+]

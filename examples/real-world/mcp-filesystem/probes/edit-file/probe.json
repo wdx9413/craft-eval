@@ -1,0 +1,15 @@
+[
+  {
+    "id": "edit",
+    "tool": "edit_file",
+    "arguments": {
+      "path": "edit.txt",
+      "edits": [
+        {
+          "oldText": "AAA",
+          "newText": "BBB"
+        }
+      ]
+    }
+  }
+]

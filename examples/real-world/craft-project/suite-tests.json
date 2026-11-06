@@ -1,0 +1,849 @@
+{
+  "schema": "craft-eval.eval.v1",
+  "suite_id": "craft-project-tests",
+  "subject_kind": "software",
+  "partition": "development",
+  "sanitized": true,
+  "claim": {
+    "statement": "craft 的全部 TypeScript 单元/集成测试可通过",
+    "scope": "tests/ 下 393 个测试文件，分 20 组串行执行；76 个依赖 symlink 的文件已单独分组",
+    "limitations": [
+      "串行执行；单组超时 900s；无 symlink 权限的环境会跳过需要 symlink 的组"
+    ]
+  },
+  "metrics": {
+    "primary": {
+      "id": "task_pass",
+      "kind": "binary_pass_rate",
+      "direction": "higher_is_better",
+      "minimum_sample": 20
+    }
+  },
+  "cases": [
+    {
+      "id": "tests-01",
+      "category": "tests",
+      "risk": "high",
+      "language": "typescript",
+      "argv": [
+        "node",
+        "--test",
+        "--test-isolation=none",
+        "--test-concurrency=1",
+        "tests/a2a-discovery.test.ts",
+        "tests/acceptance-runner.test.ts",
+        "tests/acceptance.test.ts",
+        "tests/action-gate.test.ts",
+        "tests/action-handlers.test.ts",
+        "tests/activation-proof-and-history.test.ts",
+        "tests/adjudication-queue.test.ts",
+        "tests/agent-foundation.test.ts",
+        "tests/agent-native-runtime.test.ts",
+        "tests/assured-pilot.test.ts",
+        "tests/attention.test.ts",
+        "tests/authorization.test.ts",
+        "tests/autonomous-platform.test.ts",
+        "tests/autonomy.test.ts",
+        "tests/branch-boundary-fill.test.ts",
+        "tests/browser-cdp-adapter.test.ts",
+        "tests/browser-control.test.ts",
+        "tests/browser-driving.test.ts",
+        "tests/browser.test.ts",
+        "tests/capability-access.test.ts"
+      ],
+      "in_place": true,
+      "timeout_s": 900,
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "tests-02",
+      "category": "tests",
+      "risk": "high",
+      "language": "typescript",
+      "argv": [
+        "node",
+        "--test",
+        "--test-isolation=none",
+        "--test-concurrency=1",
+        "tests/capability-activation.test.ts",
+        "tests/capability-assets.test.ts",
+        "tests/capability-base.test.ts",
+        "tests/capability-canary.test.ts",
+        "tests/capability-connector.test.ts",
+        "tests/capability-experience-package.test.ts",
+        "tests/capability-knowledge-package.test.ts",
+        "tests/capability-memory-package.test.ts",
+        "tests/capability-platform.test.ts",
+        "tests/capability-protocol.test.ts",
+        "tests/capability-resolution.test.ts",
+        "tests/catalog-search-regression.test.ts",
+        "tests/cdp-session.test.ts",
+        "tests/certification.test.ts",
+        "tests/changeset-merge.test.ts",
+        "tests/claude-driver.test.ts",
+        "tests/claude-executable.test.ts",
+        "tests/claude-first-turn.test.ts",
+        "tests/claude-linked-turn.test.ts",
+        "tests/claude-native-sessions.test.ts"
+      ],
+      "in_place": true,
+      "timeout_s": 900,
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "tests-03",
+      "category": "tests",
+      "risk": "high",
+      "language": "typescript",
+      "argv": [
+        "node",
+        "--test",
+        "--test-isolation=none",
+        "--test-concurrency=1",
+        "tests/claude-run-registry.test.ts",
+        "tests/claude-workbench-adapter.test.ts",
+        "tests/claude-workbench-api.test.ts",
+        "tests/claude-workbench-approvals.test.ts",
+        "tests/claude-workbench-commands.test.ts",
+        "tests/claude-workbench-history.test.ts",
+        "tests/claude-workbench-models.test.ts",
+        "tests/claude-workbench-runs.test.ts",
+        "tests/claude-workbench-usage.test.ts",
+        "tests/closed-loop.test.ts",
+        "tests/codebase-context-search.test.ts",
+        "tests/codebase-definition-query.test.ts",
+        "tests/codebase-evaluation-graph.test.ts",
+        "tests/codebase-evaluation-source-policy.test.ts",
+        "tests/codebase-evaluation-source.test.ts",
+        "tests/codebase-failure.test.ts",
+        "tests/codebase-impact-evaluation.test.ts",
+        "tests/codebase-lsp-adapter.test.ts",
+        "tests/codebase-lsp-relations.test.ts",
+        "tests/codebase-lsp-snapshot-files.test.ts"
+      ],
+      "in_place": true,
+      "timeout_s": 900,
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "tests-04",
+      "category": "tests",
+      "risk": "high",
+      "language": "typescript",
+      "argv": [
+        "node",
+        "--test",
+        "--test-isolation=none",
+        "--test-concurrency=1",
+        "tests/codebase-lsp-stdio-client.test.ts",
+        "tests/codebase-lsp-worker.test.ts",
+        "tests/codebase-retrieval-strata.test.ts",
+        "tests/codebase-view-lifecycle.test.ts",
+        "tests/codex-app-server-client.test.ts",
+        "tests/codex-cli-learning-transport.test.ts",
+        "tests/codex-driver.test.ts",
+        "tests/codex-executable.test.ts",
+        "tests/codex-hook-process.test.ts",
+        "tests/codex-host-plugin-config.test.ts",
+        "tests/codex-linked-turn.test.ts",
+        "tests/codex-session-verification.test.ts",
+        "tests/codex-task-prose.test.ts",
+        "tests/codex-workbench-adapter.test.ts",
+        "tests/cognitive-workbench.test.ts",
+        "tests/cognitive-write.test.ts",
+        "tests/common-base-boundaries.test.ts",
+        "tests/compaction-edges.test.ts",
+        "tests/completion-contract.test.ts",
+        "tests/component-ablation-execution.test.ts"
+      ],
+      "in_place": true,
+      "timeout_s": 900,
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "tests-05",
+      "category": "tests",
+      "risk": "high",
+      "language": "typescript",
+      "argv": [
+        "node",
+        "--test",
+        "--test-isolation=none",
+        "--test-concurrency=1",
+        "tests/component-asset-revisions.test.ts",
+        "tests/component-hookless.test.ts",
+        "tests/component-observability.test.ts",
+        "tests/component-plugins.test.ts",
+        "tests/component-procedure-graph.test.ts",
+        "tests/component-remote-deployment.test.ts",
+        "tests/config.test.ts",
+        "tests/context-aggregation-policy.test.ts",
+        "tests/context-candidate-scope.test.ts",
+        "tests/context-distribution.test.ts",
+        "tests/context-feedback-weight.test.ts",
+        "tests/context-host-evaluation.test.ts",
+        "tests/context-optimization.test.ts",
+        "tests/context-profiles.test.ts",
+        "tests/context-projection.test.ts",
+        "tests/context-read-snapshot.test.ts",
+        "tests/context-remediation.test.ts",
+        "tests/context-response-projection.test.ts",
+        "tests/context-revocation-race.test.ts",
+        "tests/context-source-access.test.ts"
+      ],
+      "in_place": true,
+      "timeout_s": 900,
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "tests-06",
+      "category": "tests",
+      "risk": "high",
+      "language": "typescript",
+      "argv": [
+        "node",
+        "--test",
+        "--test-isolation=none",
+        "--test-concurrency=1",
+        "tests/context-spec-regressions.test.ts",
+        "tests/context-workflow-workbench.test.ts",
+        "tests/context-working-set-budget.test.ts",
+        "tests/continual-harness.test.ts",
+        "tests/continuous-runtime.test.ts",
+        "tests/contracts.test.ts",
+        "tests/control-authority.test.ts",
+        "tests/control-flow.test.ts",
+        "tests/control-plane-budget.test.ts",
+        "tests/control-plane.test.ts",
+        "tests/control-session.test.ts",
+        "tests/cost-ledger.test.ts",
+        "tests/coverage-fill.test.ts",
+        "tests/coverage-gate-report.test.ts",
+        "tests/coverage-inventory.test.ts",
+        "tests/craft-run-context.test.ts",
+        "tests/cross-domain-acceptance.test.ts",
+        "tests/data-flow.test.ts",
+        "tests/decision-context-gate-coverage.test.ts",
+        "tests/decision-surface.test.ts"
+      ],
+      "in_place": true,
+      "timeout_s": 900,
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "tests-07",
+      "category": "tests",
+      "risk": "high",
+      "language": "typescript",
+      "argv": [
+        "node",
+        "--test",
+        "--test-isolation=none",
+        "--test-concurrency=1",
+        "tests/declaration-consistency.test.ts",
+        "tests/default-orchestration.test.ts",
+        "tests/delivery-evaluation.test.ts",
+        "tests/delivery-loop.test.ts",
+        "tests/digest-canonical.test.ts",
+        "tests/docker-sandbox.test.ts",
+        "tests/domain-kit.test.ts",
+        "tests/dsh-product-adapter.test.ts",
+        "tests/durable-action-experience.test.ts",
+        "tests/effects.test.ts",
+        "tests/egress.test.ts",
+        "tests/engineering-eval-workflow.test.ts",
+        "tests/engineering-quality-profile.test.ts",
+        "tests/eval-suite.test.ts",
+        "tests/evaluation-model-workflow-evolution.test.ts",
+        "tests/evaluation.test.ts",
+        "tests/evidence-wiki.test.ts",
+        "tests/evolution-cycle.test.ts",
+        "tests/evolution-platform.test.ts",
+        "tests/execution-fabric.test.ts"
+      ],
+      "in_place": true,
+      "timeout_s": 900,
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "tests-08",
+      "category": "tests",
+      "risk": "high",
+      "language": "typescript",
+      "argv": [
+        "node",
+        "--test",
+        "--test-isolation=none",
+        "--test-concurrency=1",
+        "tests/execution-safety.test.ts",
+        "tests/experience-asset-worker.test.ts",
+        "tests/experience-contribution.test.ts",
+        "tests/experience-gate-signals.test.ts",
+        "tests/experience-learning-automation.test.ts",
+        "tests/experience-learning-worker.test.ts",
+        "tests/experience-mining.test.ts",
+        "tests/experience-publisher.test.ts",
+        "tests/experience-usage.test.ts",
+        "tests/experience-workflow-contract.test.ts",
+        "tests/failure-attribution.test.ts",
+        "tests/federated-runtime.test.ts",
+        "tests/federation.test.ts",
+        "tests/first-run-readiness.test.ts",
+        "tests/generic-adapter-runtime.test.ts",
+        "tests/generic-driver.test.ts",
+        "tests/governance-pinning.test.ts",
+        "tests/governed-capability-intake.test.ts",
+        "tests/guided-work.test.ts",
+        "tests/harness-session-decoupling.test.ts"
+      ],
+      "in_place": true,
+      "timeout_s": 900,
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "tests-09",
+      "category": "tests",
+      "risk": "high",
+      "language": "typescript",
+      "argv": [
+        "node",
+        "--test",
+        "--test-isolation=none",
+        "--test-concurrency=1",
+        "tests/home.test.ts",
+        "tests/honest-claims.test.ts",
+        "tests/hook-plane.test.ts",
+        "tests/hooks.test.ts",
+        "tests/host-context-dispatch.test.ts",
+        "tests/host-ecosystem-adapters.test.ts",
+        "tests/host-registry.test.ts",
+        "tests/host-run.test.ts",
+        "tests/hub-sync.test.ts",
+        "tests/human-touchpoints.test.ts",
+        "tests/hydration.test.ts",
+        "tests/ideal-state-gaps.test.ts",
+        "tests/integration.test.ts",
+        "tests/intent-compiler.test.ts",
+        "tests/internal-loop-coverage.test.ts",
+        "tests/internal-loop-dispatchable.test.ts",
+        "tests/internal-tool-authorization.test.ts",
+        "tests/java-analysis.test.ts",
+        "tests/java-incremental.test.ts",
+        "tests/json-schema.test.ts"
+      ],
+      "in_place": true,
+      "timeout_s": 900,
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "tests-10",
+      "category": "tests",
+      "risk": "high",
+      "language": "typescript",
+      "argv": [
+        "node",
+        "--test",
+        "--test-isolation=none",
+        "--test-concurrency=1",
+        "tests/knowledge-bound-work-launch.test.ts",
+        "tests/knowledge-bundle-promotion-import.test.ts",
+        "tests/knowledge-claim-import-authority.test.ts",
+        "tests/knowledge-context-compiler.test.ts",
+        "tests/knowledge-evaluation-provenance.test.ts",
+        "tests/knowledge-evaluation.test.ts",
+        "tests/knowledge-index.test.ts",
+        "tests/knowledge-managed-adjudication.test.ts",
+        "tests/knowledge-memory-operability.test.ts",
+        "tests/knowledge-promotion-authority.test.ts",
+        "tests/knowledge-promotion-policy.test.ts",
+        "tests/knowledge-relation.test.ts",
+        "tests/knowledge-scope.test.ts",
+        "tests/layer-graph.test.ts",
+        "tests/learning-worker-supervisor.test.ts",
+        "tests/lineage.test.ts",
+        "tests/local-candidate-import.test.ts",
+        "tests/loop-memory-access.test.ts",
+        "tests/low-gap-boundaries.test.ts",
+        "tests/maintenance-scheduler-recovery.test.ts"
+      ],
+      "in_place": true,
+      "timeout_s": 900,
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "tests-11",
+      "category": "tests",
+      "risk": "high",
+      "language": "typescript",
+      "argv": [
+        "node",
+        "--test",
+        "--test-isolation=none",
+        "--test-concurrency=1",
+        "tests/maintenance.test.ts",
+        "tests/managed-run-evaluation-lab.test.ts",
+        "tests/materialization.test.ts",
+        "tests/mcp-forward-compat.test.ts",
+        "tests/mcp-protocol-version.test.ts",
+        "tests/mcp-tasks.test.ts",
+        "tests/mcp.test.ts",
+        "tests/memory-archive-worker.test.ts",
+        "tests/memory-commit-optimization.test.ts",
+        "tests/memory-contribution.test.ts",
+        "tests/memory-observed-fact-tool.test.ts",
+        "tests/memory-tiers.test.ts",
+        "tests/memory-wiring.test.ts",
+        "tests/metrics.test.ts",
+        "tests/model-gateway.test.ts",
+        "tests/multi-language-analysis.test.ts",
+        "tests/object-hatching.test.ts",
+        "tests/object-model.test.ts",
+        "tests/object-rail.test.ts",
+        "tests/observability-memory.test.ts"
+      ],
+      "in_place": true,
+      "timeout_s": 900,
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "tests-12",
+      "category": "tests",
+      "risk": "high",
+      "language": "typescript",
+      "argv": [
+        "node",
+        "--test",
+        "--test-isolation=none",
+        "--test-concurrency=1",
+        "tests/operational-enterprise-a2a.test.ts",
+        "tests/orchestration-trial.test.ts",
+        "tests/orchestration.test.ts",
+        "tests/platform-execution.test.ts",
+        "tests/platform-ideal-state.test.ts",
+        "tests/platform-settings.test.ts",
+        "tests/prepared-state.test.ts",
+        "tests/presentation-cli.test.ts",
+        "tests/private-json.test.ts",
+        "tests/procedure-automation.test.ts",
+        "tests/procedure-composition.test.ts",
+        "tests/procedure-decision.test.ts",
+        "tests/procedure-host-control.test.ts",
+        "tests/procedure-invocation.test.ts",
+        "tests/procedure-runtime-graph.test.ts",
+        "tests/project-brain-work-session.test.ts",
+        "tests/promotion-gates.test.ts",
+        "tests/python-analysis.test.ts",
+        "tests/python-incremental.test.ts",
+        "tests/receipt.test.ts"
+      ],
+      "in_place": true,
+      "timeout_s": 900,
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "tests-13",
+      "category": "tests",
+      "risk": "high",
+      "language": "typescript",
+      "argv": [
+        "node",
+        "--test",
+        "--test-isolation=none",
+        "--test-concurrency=1",
+        "tests/recovery.test.ts",
+        "tests/release-architecture-contract.test.ts",
+        "tests/remote-mcp-access.test.ts",
+        "tests/retrieval-excerpt.test.ts",
+        "tests/retrieval-port.test.ts",
+        "tests/runtime-assurance.test.ts",
+        "tests/runtime-boundaries.test.ts",
+        "tests/runtime-completion.test.ts",
+        "tests/runtime-contracts.test.ts",
+        "tests/runtime-driver.test.ts",
+        "tests/runtime-package-start.test.ts",
+        "tests/runtime-proof-kernel.test.ts",
+        "tests/runtime-proof.test.ts",
+        "tests/runtime-truth.test.ts",
+        "tests/runtime.test.ts",
+        "tests/sandbox.test.ts",
+        "tests/security.test.ts",
+        "tests/semantic.test.ts",
+        "tests/service-coverage.test.ts",
+        "tests/service-edge-coverage.test.ts"
+      ],
+      "in_place": true,
+      "timeout_s": 900,
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "tests-14",
+      "category": "tests",
+      "risk": "high",
+      "language": "typescript",
+      "argv": [
+        "node",
+        "--test",
+        "--test-isolation=none",
+        "--test-concurrency=1",
+        "tests/service.test.ts",
+        "tests/session-knowledge-adjudication.test.ts",
+        "tests/session-memory-scope.test.ts",
+        "tests/session-observer.test.ts",
+        "tests/session-verification-evidence.test.ts",
+        "tests/skill-release-compatibility.test.ts",
+        "tests/speculative.test.ts",
+        "tests/state-view.test.ts",
+        "tests/storage-migration-apply.test.ts",
+        "tests/store-migrations.test.ts",
+        "tests/store.test.ts",
+        "tests/strategy-recommendations.test.ts",
+        "tests/subagent-execution.test.ts",
+        "tests/subagent-run.test.ts",
+        "tests/subscription-authorization.test.ts",
+        "tests/subscription-drift.test.ts",
+        "tests/supervisor.test.ts",
+        "tests/supply-chain.test.ts",
+        "tests/task-benchmark.test.ts",
+        "tests/task-control.test.ts"
+      ],
+      "in_place": true,
+      "timeout_s": 900,
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "tests-15",
+      "category": "tests",
+      "risk": "high",
+      "language": "typescript",
+      "argv": [
+        "node",
+        "--test",
+        "--test-isolation=none",
+        "--test-concurrency=1",
+        "tests/task-run.test.ts",
+        "tests/ticket-dispatch.test.ts",
+        "tests/token-budget.test.ts",
+        "tests/tool-plane.test.ts",
+        "tests/trace-archive-storage.test.ts",
+        "tests/trace-archive-store.test.ts",
+        "tests/trace-retention-worker.test.ts",
+        "tests/trajectory-abstraction.test.ts",
+        "tests/trigger.test.ts",
+        "tests/trust-web-runtime.test.ts",
+        "tests/turn-cognitive-runtime.test.ts",
+        "tests/typescript-incremental.test.ts",
+        "tests/validation.test.ts",
+        "tests/verification-plane.test.ts",
+        "tests/verification-sensor.test.ts",
+        "tests/verified-autonomous-work.test.ts",
+        "tests/verified-evaluation-receipt.test.ts",
+        "tests/verified-iteration.test.ts",
+        "tests/verified-scripts.test.ts",
+        "tests/wiki-candidate-evaluation-bridge.test.ts"
+      ],
+      "in_place": true,
+      "timeout_s": 900,
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "tests-16",
+      "category": "tests",
+      "risk": "high",
+      "language": "typescript",
+      "argv": [
+        "node",
+        "--test",
+        "--test-isolation=none",
+        "--test-concurrency=1",
+        "tests/wiki-capability-candidates.test.ts",
+        "tests/windows-desktop-automation.test.ts",
+        "tests/windows-desktop-vision.test.ts",
+        "tests/work-delivery.test.ts",
+        "tests/work-launch-context.test.ts",
+        "tests/work-launch.test.ts",
+        "tests/work-object-graph.test.ts",
+        "tests/workbench-agent-session-api.test.ts",
+        "tests/workbench-agent-session-links.test.ts",
+        "tests/workbench-cli-path.test.ts",
+        "tests/workbench-message-queue.test.ts",
+        "tests/workbench-server.test.ts",
+        "tests/workbench-ui-server.test.ts",
+        "tests/workbuddy-expert.test.ts",
+        "tests/workflow-dag-coverage.test.ts",
+        "tests/workspace-repository-state.test.ts",
+        "tests/workspace-transactions.test.ts"
+      ],
+      "in_place": true,
+      "timeout_s": 900,
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "tests-17",
+      "category": "tests",
+      "risk": "high",
+      "language": "typescript",
+      "requires": {
+        "symlink": true
+      },
+      "argv": [
+        "node",
+        "--test",
+        "--test-isolation=none",
+        "--test-concurrency=1",
+        "tests/acceptance-worker.test.ts",
+        "tests/catalog.test.ts",
+        "tests/cli-entrypoint.test.ts",
+        "tests/codebase-context-projection.test.ts",
+        "tests/codebase-evaluation-provenance.test.ts",
+        "tests/codebase-evaluation-store.test.ts",
+        "tests/codebase-lsp-config.test.ts",
+        "tests/codebase-project-analysis-cache.test.ts",
+        "tests/codebase-project-data-git-exclude.test.ts",
+        "tests/codebase-project-graph-store.test.ts",
+        "tests/codebase-shard-store.test.ts",
+        "tests/codebase-storage-migration-command.test.ts",
+        "tests/codebase-storage-migration.test.ts",
+        "tests/codebase-storage-preflight.test.ts",
+        "tests/codex-hook-bridge.test.ts",
+        "tests/codex-hook-runtime-diagnostics.test.ts",
+        "tests/codex-session-archive.test.ts",
+        "tests/codex-workbench-sessions.test.ts",
+        "tests/common-packages.test.ts",
+        "tests/component-integration.test.ts"
+      ],
+      "in_place": true,
+      "timeout_s": 900,
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "tests-18",
+      "category": "tests",
+      "risk": "high",
+      "language": "typescript",
+      "requires": {
+        "symlink": true
+      },
+      "argv": [
+        "node",
+        "--test",
+        "--test-isolation=none",
+        "--test-concurrency=1",
+        "tests/component-standalone-readiness.test.ts",
+        "tests/content-store.test.ts",
+        "tests/context-extensions.test.ts",
+        "tests/core-coverage.test.ts",
+        "tests/craft-codebase.test.ts",
+        "tests/craft-datasec.test.ts",
+        "tests/engineering-evaluation-runner.test.ts",
+        "tests/evolution-candidate-workspace.test.ts",
+        "tests/experience-graph-assets.test.ts",
+        "tests/experience-scenario-catalog.test.ts",
+        "tests/experience-scenario-classification.test.ts",
+        "tests/experience-task-goals.test.ts",
+        "tests/graph-version-manifest.test.ts",
+        "tests/industry-gaps.test.ts",
+        "tests/knowledge-classification-state.test.ts",
+        "tests/knowledge-classification-worker.test.ts",
+        "tests/knowledge-contribution.test.ts",
+        "tests/knowledge-learning-worker.test.ts",
+        "tests/knowledge-partition-store.test.ts",
+        "tests/knowledge-scenario-catalog.test.ts"
+      ],
+      "in_place": true,
+      "timeout_s": 900,
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "tests-19",
+      "category": "tests",
+      "risk": "high",
+      "language": "typescript",
+      "requires": {
+        "symlink": true
+      },
+      "argv": [
+        "node",
+        "--test",
+        "--test-isolation=none",
+        "--test-concurrency=1",
+        "tests/knowledge-session-evidence.test.ts",
+        "tests/knowledge-stage-scheduler.test.ts",
+        "tests/knowledge-storage-worker.test.ts",
+        "tests/learning-worker-diagnostic.test.ts",
+        "tests/legacy-knowledge-migration-coverage.test.ts",
+        "tests/legacy-knowledge-migration.test.ts",
+        "tests/legacy-repository-storage-migration-command.test.ts",
+        "tests/legacy-repository-storage-migration.test.ts",
+        "tests/legacy-repository-storage-preflight.test.ts",
+        "tests/legacy-session-memory-preflight.test.ts",
+        "tests/legacy-session-memory-quarantine.test.ts",
+        "tests/memory-partition-store.test.ts",
+        "tests/memory-session-storage.test.ts",
+        "tests/procedure-projection.test.ts",
+        "tests/project-experience-directory.test.ts",
+        "tests/project-knowledge-content.test.ts",
+        "tests/project-storage-paths.test.ts",
+        "tests/remaining-branch-cases.test.ts",
+        "tests/repository-context.test.ts",
+        "tests/root-design-documents.test.ts"
+      ],
+      "in_place": true,
+      "timeout_s": 900,
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "tests-20",
+      "category": "tests",
+      "risk": "high",
+      "language": "typescript",
+      "requires": {
+        "symlink": true
+      },
+      "argv": [
+        "node",
+        "--test",
+        "--test-isolation=none",
+        "--test-concurrency=1",
+        "tests/runtime-artifact.test.ts",
+        "tests/scenario-evaluation.test.ts",
+        "tests/scope-identity.test.ts",
+        "tests/session-knowledge-adjudication-state.test.ts",
+        "tests/session-knowledge-candidates.test.ts",
+        "tests/storage-migration-preflight.test.ts",
+        "tests/store-partition-atomicity.test.ts",
+        "tests/trace-evolution.test.ts",
+        "tests/trace-shard-store.test.ts",
+        "tests/universal-runtime.test.ts",
+        "tests/verified-work-loop.test.ts",
+        "tests/workbench-cli-detection.test.ts",
+        "tests/workbench-directories.test.ts",
+        "tests/workflow-registry.test.ts",
+        "tests/workflow.test.ts",
+        "tests/workspace-checkpoints.test.ts"
+      ],
+      "in_place": true,
+      "timeout_s": 900,
+      "checks": [
+        {
+          "id": "exit",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    }
+  ]
+}

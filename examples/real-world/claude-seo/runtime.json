@@ -1,0 +1,7 @@
+{
+  "environment_digest": "windows-py313",
+  "budget_digest": "720s-per-case",
+  "host_digest": "craft-eval-driver",
+  "model_digest": "none",
+  "tools_digest": "pytest-junit"
+}

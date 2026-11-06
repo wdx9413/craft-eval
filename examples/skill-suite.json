@@ -1,0 +1,23 @@
+{
+  "schema": "craft-eval.eval.v1",
+  "suite_id": "skill-smoke",
+  "subject_kind": "skill",
+  "partition": "development",
+  "sanitized": true,
+  "cases": [
+    {
+      "id": "skill-positive",
+      "argv": ["node", "host.mjs"],
+      "timeout_s": 10,
+      "checks": [{"id": "task", "kind": "json_equals", "path": "outputs/result.json", "key": "task_done", "equals": true}],
+      "skill": {"skill_id": "example-skill", "skill_path": "skills/example-skill", "should_trigger": true}
+    },
+    {
+      "id": "skill-negative",
+      "argv": ["node", "host.mjs"],
+      "timeout_s": 10,
+      "checks": [{"id": "task", "kind": "json_equals", "path": "outputs/result.json", "key": "task_done", "equals": true}],
+      "skill": {"skill_id": "example-skill", "skill_path": "skills/example-skill", "should_trigger": false}
+    }
+  ]
+}

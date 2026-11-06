@@ -1,0 +1,10 @@
+[
+  {
+    "id": "head",
+    "tool": "read_text_file",
+    "arguments": {
+      "path": "long.txt",
+      "head": 2
+    }
+  }
+]

@@ -1,0 +1,9 @@
+{
+  "build_exit": 0,
+  "build_ok": true,
+  "tests": 22,
+  "passed": 22,
+  "failed": 0,
+  "all_pass": true,
+  "tail": " env config \"side-effects-cache\". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.\nnpm warn Unknown env config \"side-effects-cache\". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.\n"
+}

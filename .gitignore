@@ -1,0 +1,9 @@
+node_modules/
+dist/
+coverage/
+runs/
+*.log
+*.tsbuildinfo
+__pycache__/
+*.pyc
+.coverage

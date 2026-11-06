@@ -1,0 +1,8 @@
+{
+    "env":  {
+                "POCKETFLOW_REPO":  "{{subjects}}\\pocketflow"
+            },
+    "version":  "baseline",
+    "id":  "pocketflow",
+    "kind":  "software"
+}

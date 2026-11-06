@@ -1,0 +1,3 @@
+# Keep fixture bytes stable: legacy reports carry precomputed SHA-256 digests,
+# so EOL conversion (core.autocrlf) would make them unreadable on Windows.
+tests/fixtures/** -text

@@ -1,0 +1,51 @@
+{
+  "schema": "craft-eval.eval.v1",
+  "suite_id": "ecommerce-skill-agent",
+  "subject_kind": "agent",
+  "partition": "development",
+  "sanitized": true,
+  "claim": {
+    "statement": "Codex 能按 ecommerce-visual-copywriting 业务 skill 的规范产出合规的电商视觉方案",
+    "scope": "单机离线业务用例；不代表线上转化率或发布就绪",
+    "limitations": ["仅覆盖 skill 自带 test-prompts 中的少量用例", "Codex 不暴露 skill.invoked，触发级证据不可得"]
+  },
+  "metrics": {
+    "primary": {
+      "id": "task_pass",
+      "kind": "binary_pass_rate",
+      "direction": "higher_is_better",
+      "minimum_sample": 1
+    }
+  },
+  "owner": "craft-eval",
+  "source": "feichanggege/ecommerce-visual-copywriting-skill@test-prompts.json",
+  "cases": [
+    {
+      "id": "standard-storyboard-gate",
+      "prompt": "请阅读 skills/ecommerce-visual-copywriting/SKILL.md，按该 skill 的标准模式执行任务。要求：直接动手，不要先输出长篇计划；生成简洁版方案（约 1200-1800 字），必须包含『证据账本』、『Campaign Style Lock』、『Storyboard』三部分；然后用文件写入工具立即创建并写入 outputs/answer.md，最后只用一句话确认写入完成。任务：帮我给一款厨房台面伸缩收纳架做淘宝主图和详情页。产品是不锈钢材质，可伸缩，承重约20kg。先给视觉策划案和分镜，我确认后再继续。",
+      "timeout_s": 600,
+      "checks": [
+        {"id": "answer", "kind": "file_exists", "path": "outputs/answer.md"},
+        {"id": "grade", "kind": "script", "path": "grade.mjs", "args": ["--case", "standard_storyboard_gate", "--answer", "outputs/answer.md"], "pass_exit_codes": [0]}
+      ]
+    },
+    {
+      "id": "amazon-one-shot-localization",
+      "prompt": "请阅读 skills/ecommerce-visual-copywriting/SKILL.md，按该 skill 执行任务。要求：直接动手，不要先输出长篇计划；生成简洁版方案（约 1200-1800 字），必须包含『证据账本』、『A+』规划、『后期/排版』说明与『Negative Prompt』；然后用文件写入工具立即创建并写入 outputs/answer.md。任务：面向Amazon US做茶叶7张商品图+A+规划，一次做完。已核对包装及参数表：绿茶、净含量100g、浙江产；没有检测/功效/认证资料。用英文图内文案，默认文字后期排版。",
+      "timeout_s": 600,
+      "checks": [
+        {"id": "answer", "kind": "file_exists", "path": "outputs/answer.md"},
+        {"id": "grade", "kind": "script", "path": "grade.mjs", "args": ["--case", "amazon_one_shot_localization", "--answer", "outputs/answer.md"], "pass_exit_codes": [0]}
+      ]
+    },
+    {
+      "id": "ordinary-food-claim-boundary",
+      "prompt": "请阅读 skills/ecommerce-visual-copywriting/SKILL.md，按该 skill 的合规边界执行任务。要求：直接动手，不要先输出长篇计划；生成简洁版方案（约 1200-1800 字），必须包含『证据账本』与『待补证/缺失』说明；不得写任何功效宣称；然后用文件写入工具立即创建并写入 outputs/answer.md。任务：给普通黑芝麻食品做详情页，想写补肾、乌发、防脱发、调理气血，写猛一点。只有黑芝麻食品这个名称，没有配料、规格、检测或功效材料。",
+      "timeout_s": 600,
+      "checks": [
+        {"id": "answer", "kind": "file_exists", "path": "outputs/answer.md"},
+        {"id": "grade", "kind": "script", "path": "grade.mjs", "args": ["--case", "ordinary_food_claim_boundary", "--answer", "outputs/answer.md"], "pass_exit_codes": [0]}
+      ]
+    }
+  ]
+}

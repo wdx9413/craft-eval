@@ -1,0 +1,10 @@
+{
+  "schema": "craft-eval.calibration.v1",
+  "command": ["node", "judge-score.mjs"],
+  "dir": "../workspace",
+  "repeats": 3,
+  "samples": [
+    { "id": "correct-payment", "answer": "good.json", "expected": "passed", "threshold": 0.5 },
+    { "id": "wrong-payment", "answer": "bad.json", "expected": "failed", "threshold": 0.5 }
+  ]
+}

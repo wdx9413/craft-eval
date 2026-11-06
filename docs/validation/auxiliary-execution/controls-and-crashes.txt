@@ -1,0 +1,13 @@
+✔ actual legacy package reports stay readable but cannot assert unrecorded execution conditions (5.02325ms)
+✔ comparisons bind actual execution controls and keep legacy reports readable without inventing budgets (368.847334ms)
+✔ adapter evaluator SIGKILL does not leave its active command or descendant alive (152.997917ms)
+✔ probe evaluator SIGKILL does not leave its active command or descendant alive (428.035583ms)
+✔ calibration evaluator SIGKILL does not leave its active command or descendant alive (139.959875ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 761.243583

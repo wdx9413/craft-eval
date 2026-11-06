@@ -1,0 +1,9 @@
+[
+  {
+    "id": "read",
+    "tool": "read_text_file",
+    "arguments": {
+      "path": "does-not-exist.txt"
+    }
+  }
+]

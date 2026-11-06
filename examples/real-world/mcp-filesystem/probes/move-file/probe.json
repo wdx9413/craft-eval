@@ -1,0 +1,10 @@
+[
+  {
+    "id": "move",
+    "tool": "move_file",
+    "arguments": {
+      "source": "mv-src.txt",
+      "destination": "mv-dst.txt"
+    }
+  }
+]
