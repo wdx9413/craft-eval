@@ -58,7 +58,7 @@ const cases = [
     risk: 'high',
     language: 'typescript',
     in_place: true,
-    argv: ['node', '--test', '--test-isolation=none', '--test-reporter=spec', `--test-name-pattern=^${escapeRegExp(name)}$`, '{{craft-eval}}/dist/tests/evaluation.test.js'],
+    argv: ['node', '--test', '--test-reporter=spec', `--test-name-pattern=^${escapeRegExp(name)}$`, '{{craft-eval}}/dist/tests/evaluation.test.js'],
     timeout_s: 60,
     expected_behavior: `The named evaluator regression test passes: ${name}.`,
     provenance: { source: 'craft-eval/tests/evaluation.test.ts', source_digest: sourceDigest },

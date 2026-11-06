@@ -20,6 +20,7 @@ import { dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node
 import { fileURLToPath } from 'node:url';
 
 import { startHttpMocks, type HttpMockServer } from './http-mock.js';
+import { probeLoopback } from './loopback.js';
 import { prepareTaskInput, validateTaskContext } from './task-context.js';
 
 import {
@@ -223,6 +224,8 @@ export interface CaseRequirement {
   python_modules?: string[];
   /** When true, require the ability to create a file symlink (Windows dev mode). */
   symlink?: boolean;
+  /** When true, require permission to bind an ephemeral localhost TCP port. */
+  network_loopback?: boolean;
   /** Relative paths (files or directories) that must exist in the workspace. */
   paths?: string[];
 }
@@ -723,13 +726,13 @@ export async function loadSuite(path: string): Promise<Suite> {
         throw new Error(`case ${caseId} requires must be an object`);
       }
       for (const [key, values] of Object.entries(requirement as Record<string, unknown>)) {
-        if (key !== 'commands' && key !== 'env' && key !== 'python_modules' && key !== 'symlink' && key !== 'paths') {
+        if (key !== 'commands' && key !== 'env' && key !== 'python_modules' && key !== 'symlink' && key !== 'network_loopback' && key !== 'paths') {
           throw new Error(`case ${caseId} requires contains unsupported field: ${key}`);
         }
-        if (key === 'symlink' && typeof values !== 'boolean') {
-          throw new Error(`case ${caseId} requires.symlink must be a boolean`);
+        if ((key === 'symlink' || key === 'network_loopback') && typeof values !== 'boolean') {
+          throw new Error(`case ${caseId} requires.${key} must be a boolean`);
         }
-        if (key !== 'symlink' && (!Array.isArray(values) || values.some((value) => typeof value !== 'string' || value === ''))) {
+        if (key !== 'symlink' && key !== 'network_loopback' && (!Array.isArray(values) || values.some((value) => typeof value !== 'string' || value === ''))) {
           throw new Error(`case ${caseId} requires.${key} must be non-empty strings`);
         }
       }
@@ -1905,6 +1908,9 @@ async function unmetRequirement(requires?: CaseRequirement, workspace?: string):
   if (requires.symlink === true && !canCreateSymlink()) {
     return 'capability:symlink';
   }
+  if (requires.network_loopback === true && !(await canBindLoopback())) {
+    return 'capability:network_loopback';
+  }
   if (workspace !== undefined) {
     for (const relative of requires.paths ?? []) {
       if (!existsSync(join(workspace, relative))) {
@@ -1932,6 +1938,14 @@ function canCreateSymlink(): boolean {
     symlinkProbe = false;
   }
   return symlinkProbe;
+}
+
+/** Probe once per process: sandboxes can forbid localhost binds even when Node is installed. */
+let loopbackProbe: Promise<boolean> | null = null;
+function canBindLoopback(): Promise<boolean> {
+  if (loopbackProbe !== null) return loopbackProbe;
+  loopbackProbe = probeLoopback();
+  return loopbackProbe;
 }
 
 async function oneCase(

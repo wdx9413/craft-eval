@@ -55,7 +55,6 @@
         "tests/queue-recovery.test.ts",
         "tests/rail-nav.test.ts",
         "tests/recall-audit.test.ts",
-        "tests/runtime-package.test.ts",
         "tests/tauri-desktop-contract.test.ts",
         "tests/ui-primitives.test.ts",
         "tests/visual-layer.test.ts",
@@ -67,7 +66,7 @@
         "tests/workbench-runtime-client.test.ts"
       ],
       "timeout_s": 300,
-      "expected_behavior": "All Workbench automated tests complete with zero failures and the local HTTP integration test can bind loopback.",
+      "expected_behavior": "All Workbench automated tests complete with zero failures; the separately gated localhost integration case runs only when loopback binding is available.",
       "provenance": {
         "source": "craft-workbench/package.json:scripts.test"
       },
@@ -82,6 +81,51 @@
           "kind": "stdout_not_contains",
           "value": "tests 0"
         }
+      ]
+    },
+    {
+      "id": "runtime-package-unit",
+      "category": "runtime-integration",
+      "risk": "high",
+      "language": "javascript",
+      "in_place": true,
+      "argv": [
+        "node",
+        "--experimental-strip-types",
+        "--test",
+        "--test-name-pattern",
+        "^(installed runtime resolves without a sibling checkout and prepares the public sidecar|the installed runtime declares fixed mandatory peers for its Claude SDK|the installed public runtime inventories legacy project data without changing it|the installed runtime imports pinned legacy assets as candidates and restores data before registration)$",
+        "tests/runtime-package.test.ts"
+      ],
+      "timeout_s": 90,
+      "expected_behavior": "Installed Runtime package resolution, protocol declarations and offline migration behavior pass without network access.",
+      "provenance": { "source": "craft-workbench/tests/runtime-package.test.ts" },
+      "checks": [
+        { "id": "runtime-package-unit-exits-zero", "kind": "exit_code", "equals": 0 },
+        { "id": "unit-tests-ran", "kind": "stdout_not_contains", "value": "tests 0" }
+      ]
+    },
+    {
+      "id": "runtime-http-loopback",
+      "category": "runtime-integration",
+      "risk": "high",
+      "language": "javascript",
+      "requires": { "network_loopback": true },
+      "in_place": true,
+      "argv": [
+        "node",
+        "--experimental-strip-types",
+        "--test",
+        "--test-name-pattern",
+        "^the installed CLI serves recovery assets, reconciles an input and executes its pinned evaluator over HTTP$",
+        "tests/runtime-package.test.ts"
+      ],
+      "timeout_s": 60,
+      "expected_behavior": "The installed CLI binds localhost and completes its HTTP recovery and evaluation integration path.",
+      "provenance": { "source": "craft-workbench/tests/runtime-package.test.ts" },
+      "checks": [
+        { "id": "integration-exits-zero", "kind": "exit_code", "equals": 0 },
+        { "id": "integration-ran", "kind": "stdout_contains", "value": "the installed CLI serves recovery assets" }
       ]
     },
     {

@@ -15,5 +15,7 @@ test('generated evaluator cases bind to the test source and escape regex titles'
 
   assert.equal(cases.length, 22);
   assert(cases.every((item: { provenance: { source_digest: string } }) => item.provenance.source_digest === digest));
+  assert(cases.every((item: { argv: string[] }) => !item.argv.includes('--test-isolation=none')));
+  assert(cases.every((item: { argv: string[] }) => item.argv.some((arg) => arg.startsWith('--test-name-pattern='))));
   assert.equal(generator.escapeRegExp('requires.paths'), 'requires\\.paths');
 });

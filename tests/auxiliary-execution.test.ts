@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { calibrateJudge, type CalibrationOptions } from '../src/calibration.js';
 import { reportRun, runSuite } from '../src/evaluation.js';
+import { processTreeInspectionSkip } from './process-inspection.js';
 
 const marker = 'CRAFT_EVAL_AUXILIARY';
 const pause = () => new Promise(resolve => setTimeout(resolve, 10));
@@ -48,7 +49,7 @@ async function cleanup(f: Awaited<ReturnType<typeof fixture>>): Promise<void> {
 }
 
 for (const mode of ['success', 'timeout', 'output_limit', 'cancel']) {
-  test(`calibration ${mode} is bounded, remains responsive and reaps descendants`, { skip: process.platform === 'win32' }, async () => {
+  test(`calibration ${mode} is bounded, remains responsive and reaps descendants`, { skip: processTreeInspectionSkip }, async () => {
     const code = mode === 'success' ? "console.log(JSON.stringify({score:1}));"
       : mode === 'output_limit' ? "process.stdout.write('x'.repeat(4096));setInterval(()=>{},1000);"
         : "process.on('SIGTERM',()=>{});setInterval(()=>{},1000);";
@@ -73,7 +74,7 @@ for (const mode of ['success', 'timeout', 'output_limit', 'cancel']) {
   });
 }
 
-test('calibration keeps one control snapshot across repeated scoring attempts', { skip: process.platform === 'win32' }, async () => {
+test('calibration keeps one control snapshot across repeated scoring attempts', { skip: processTreeInspectionSkip }, async () => {
   const f = await fixture("import {existsSync} from 'node:fs';const waiting=setInterval(()=>{if(existsSync(GATE_PATH)){clearInterval(waiting);console.log(JSON.stringify({score:1}));}},5);");
   try {
     const gate = join(f.root, 'continue');
@@ -87,7 +88,7 @@ test('calibration keeps one control snapshot across repeated scoring attempts', 
   } finally { await cleanup(f); }
 });
 
-test('requirement probes can be cancelled before the case executes', { skip: process.platform === 'win32' }, async () => {
+test('requirement probes can be cancelled before the case executes', { skip: processTreeInspectionSkip }, async () => {
   const f = await fixture("process.on('SIGTERM',()=>{});setInterval(()=>{},1000);"), controller = new AbortController();
   try {
     const suite = join(f.root, 'suite.json'), subject = join(f.root, 'subject.json'), runtime = join(f.root, 'runtime.json');
@@ -103,7 +104,7 @@ test('requirement probes can be cancelled before the case executes', { skip: pro
   } finally { controller.abort(); await cleanup(f); }
 });
 
-test('an existing version probe may exit nonzero without making its command unavailable', { skip: process.platform === 'win32' }, async () => {
+test('an existing version probe may exit nonzero without making its command unavailable', { skip: processTreeInspectionSkip }, async () => {
   const f = await fixture('process.exit(3);');
   try {
     const suite = join(f.root, 'suite.json'), subject = join(f.root, 'subject.json'), runtime = join(f.root, 'runtime.json');

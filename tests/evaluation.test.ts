@@ -3,6 +3,7 @@ import test from 'node:test';
 import { spawnSync } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, rm, symlink, unlink, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
+import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -61,6 +62,16 @@ function resolveNodeBinary(): string {
 }
 
 const NODE_BINARY = resolveNodeBinary();
+
+async function loopbackAvailable(): Promise<boolean> {
+  return new Promise(resolve => {
+    const server = createServer();
+    server.once('error', () => resolve(false));
+    server.listen({ host: '127.0.0.1', port: 0, exclusive: true }, () => {
+      server.close(error => resolve(error === undefined));
+    });
+  });
+}
 
 function runtime(): Record<string, string> {
   const value: Record<string, string> = {};
@@ -485,6 +496,7 @@ test('suite validation rejects unsafe or ambiguous contracts', async () => {
       [{ ...base, cases: [caseDoc('../bad')] }, /identifier/],
       [{ ...base, cases: [caseDoc('a', { checks: [{ id: 'x', kind: 'file_exists', path: '../secret' }] })] }, /relative/],
       [{ ...base, cases: [caseDoc('a', { checks: [{ id: 'x', kind: 'unknown' }] })] }, /unsupported/],
+      [{ ...base, cases: [caseDoc('a', { requires: { network_loopback: 'yes' } })] }, /network_loopback must be a boolean/],
       [{ ...base, cases: [noCommand] }, /argv or prompt/],
       [{ ...base, cases: [{ ...caseDoc('a'), prompt: 'task' }] }, /both argv and prompt/],
     ];
@@ -958,7 +970,7 @@ test('rescore leaves not_applicable cases untouched', async () => {
   }
 });
 
-test('http_mock injects a local fixture API into the subject', async () => {
+test('http_mock injects a local fixture API into the subject', { skip: !(await loopbackAvailable()) && 'localhost binding is unavailable' }, async () => {
   const fx = new Fixture();
   await fx.setup();
   try {
@@ -1039,6 +1051,29 @@ test('unmet requires records not_applicable and attributes an external dependenc
     assert.equal(report.by_language?.['python']?.not_applicable, 1);
     const attribution = attributeRun(report);
     assert.equal(attribution.failures[0]?.category, 'external_dependency_missing');
+  } finally {
+    await fx.cleanup();
+  }
+});
+
+test('loopback-bound cases are not_applicable when the evaluator cannot bind localhost', async () => {
+  const fx = new Fixture();
+  await fx.setup();
+  try {
+    await fx.project('process.stdout.write("ran\\n");\n');
+    const run = await fx.runEval('software', [caseDoc('needs-loopback', {
+      requires: { network_loopback: true },
+      checks: [{ id: 'ran', kind: 'stdout_contains', value: 'ran' }],
+    })]);
+    const report = await reportRun(run);
+    const result = only(report.results);
+    if (result.verdict === 'not_applicable') {
+      assert.match(String(result.issue), /requirement_unmet:capability:network_loopback/u);
+      assert.equal(report.failed, 0);
+    } else {
+      assert.equal(result.verdict, 'passed');
+      assert.equal(report.failed, 0);
+    }
   } finally {
     await fx.cleanup();
   }
@@ -1370,7 +1405,13 @@ test('calibrate reports inconsistency for a flaky judge', async () => {
     await writeFile(join(fx.root, 'answer.md'), 'content', 'utf8');
     await writeFile(
       join(fx.workspace, 'flaky.mjs'),
-      'console.log(JSON.stringify({ score: Math.random() > 0.5 ? 0.9 : 0.1 }));\n',
+      `import { readFileSync, writeFileSync } from 'node:fs';
+const path = new URL('./flaky-count.txt', import.meta.url);
+let count = 0;
+try { count = Number(readFileSync(path, 'utf8')); } catch {}
+writeFileSync(path, String(count + 1));
+console.log(JSON.stringify({ score: count % 2 === 0 ? 0.9 : 0.1 }));
+`,
       'utf8',
     );
     const manifest = await write(fx.root, 'calib-flaky.json', {

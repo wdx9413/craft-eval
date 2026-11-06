@@ -136,7 +136,7 @@ Suite 新增字段均为可选，旧 Suite 仍可运行。建议为每个主张�
 
 Case 可声明 `tags`、`category`、`difficulty`、`risk`、`owner`、`expected_behavior`、`claim` 和 `provenance`。留出用例建议写明 `provenance.reviewed_by` 与 `provenance.independent_of_training`。`sanitized: true` 只表示已脱敏，**不是污染或独立性的证明**。
 
-Case 还可声明 `requires` 与 `language`。`requires` 是**环境门控**：`commands`（PATH 上必须有）、`env`（变量必须非空）、`python_modules`（`py -3 -c "import <name>"` 必须成功）、`paths`（workspace 内必须存在的文件/目录，例如 `node_modules/craft-eval`）、`symlink`（需能创建文件符号链接，Windows 需开发者模式）。任一不满足时该 case 记为 **`not_applicable`**（`issue: requirement_unmet:<tag>`），**不计为 failed**，`analyze` 归因为 `external_dependency_missing`。`language` 用于 `report.by_language` 的按语言聚合（`expected/passed/failed/not_applicable`），便于发现「Python 检索 MRR=0」这类单语言退化。
+Case 还可声明 `requires` 与 `language`。`requires` 是**环境门控**：`commands`（PATH 上必须有）、`env`（变量必须非空）、`python_modules`（`py -3 -c "import <name>"` 必须成功）、`paths`（workspace 内必须存在的文件/目录，例如 `node_modules/craft-eval`）、`symlink`（需能创建文件符号链接，Windows 需开发者模式）、`network_loopback`（需能绑定临时 `127.0.0.1` 端口）。任一不满足时该 case 记为 **`not_applicable`**（`issue: requirement_unmet:<tag>`），**不计为 failed**，`analyze` 归因为 `external_dependency_missing`。`language` 用于 `report.by_language` 的按语言聚合（`expected/passed/failed/not_applicable`），便于发现「Python 检索 MRR=0」这类单语言退化。
 
 ### 静态检查（无需执行命令）
 

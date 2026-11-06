@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test, { mock } from 'node:test';
 import { reportRun, runSuite } from '../src/evaluation.js';
+import { processTreeInspectionSkip } from './process-inspection.js';
 
 const marker = 'CRAFT_EVAL_DESCENDANT_TEST';
 const pause = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -62,7 +63,7 @@ async function untilStopped(pid: number): Promise<void> {
 for (const role of ['adapter', 'script', 'judge'] as const) {
   for (const inheritedPipes of [false, true]) {
     for (const mode of ['exit', ...(!inheritedPipes ? ['cancel', 'timeout'] : []), ...(role === 'judge' && !inheritedPipes ? ['output_limit'] : [])]) {
-    test(`${role} ${mode} cleans descendants with ${inheritedPipes ? 'inherited' : 'closed'} output pipes`, { skip: process.platform === 'win32' }, async () => {
+    test(`${role} ${mode} cleans descendants with ${inheritedPipes ? 'inherited' : 'closed'} output pipes`, { skip: processTreeInspectionSkip }, async () => {
       const root = await mkdtemp(join(tmpdir(), 'craft-eval-process-'));
       const workspace = join(root, 'workspace'); await mkdir(workspace);
       const pidPath = join(root, 'descendant.pid');

@@ -61,7 +61,6 @@
       "argv": [
         "node",
         "--test",
-        "--test-isolation=none",
         "--test-reporter=spec",
         "--test-name-pattern=^software executes in copy and reports observed failures$",
         "{{craft-eval}}/dist/tests/evaluation.test.js"
@@ -70,7 +69,7 @@
       "expected_behavior": "The named evaluator regression test passes: software executes in copy and reports observed failures.",
       "provenance": {
         "source": "craft-eval/tests/evaluation.test.ts",
-        "source_digest": "sha256:43204c9f880c180a6c42c3e69f5aaee1c21197a2cb871e9f8ec7f697fde8e5b1"
+        "source_digest": "sha256:7d903a3900b39e494c6d68703405b34db3a0852fae37c08651f5cc66361130d9"
       },
       "checks": [
         {
@@ -109,7 +108,6 @@
       "argv": [
         "node",
         "--test",
-        "--test-isolation=none",
         "--test-reporter=spec",
         "--test-name-pattern=^agent checks environment state and completed host trace$",
         "{{craft-eval}}/dist/tests/evaluation.test.js"
@@ -118,7 +116,7 @@
       "expected_behavior": "The named evaluator regression test passes: agent checks environment state and completed host trace.",
       "provenance": {
         "source": "craft-eval/tests/evaluation.test.ts",
-        "source_digest": "sha256:43204c9f880c180a6c42c3e69f5aaee1c21197a2cb871e9f8ec7f697fde8e5b1"
+        "source_digest": "sha256:7d903a3900b39e494c6d68703405b34db3a0852fae37c08651f5cc66361130d9"
       },
       "checks": [
         {
@@ -157,7 +155,6 @@
       "argv": [
         "node",
         "--test",
-        "--test-isolation=none",
         "--test-reporter=spec",
         "--test-name-pattern=^missing terminal trace is inconclusive even when skill not selected$",
         "{{craft-eval}}/dist/tests/evaluation.test.js"
@@ -166,7 +163,7 @@
       "expected_behavior": "The named evaluator regression test passes: missing terminal trace is inconclusive even when skill not selected.",
       "provenance": {
         "source": "craft-eval/tests/evaluation.test.ts",
-        "source_digest": "sha256:43204c9f880c180a6c42c3e69f5aaee1c21197a2cb871e9f8ec7f697fde8e5b1"
+        "source_digest": "sha256:7d903a3900b39e494c6d68703405b34db3a0852fae37c08651f5cc66361130d9"
       },
       "checks": [
         {
@@ -205,7 +202,6 @@
       "argv": [
         "node",
         "--test",
-        "--test-isolation=none",
         "--test-reporter=spec",
         "--test-name-pattern=^agent local argv checks do not require a host trace$",
         "{{craft-eval}}/dist/tests/evaluation.test.js"
@@ -214,7 +210,7 @@
       "expected_behavior": "The named evaluator regression test passes: agent local argv checks do not require a host trace.",
       "provenance": {
         "source": "craft-eval/tests/evaluation.test.ts",
-        "source_digest": "sha256:43204c9f880c180a6c42c3e69f5aaee1c21197a2cb871e9f8ec7f697fde8e5b1"
+        "source_digest": "sha256:7d903a3900b39e494c6d68703405b34db3a0852fae37c08651f5cc66361130d9"
       },
       "checks": [
         {
@@ -253,7 +249,6 @@
       "argv": [
         "node",
         "--test",
-        "--test-isolation=none",
         "--test-reporter=spec",
         "--test-name-pattern=^skill paired gain requires evaluator-observed host events$",
         "{{craft-eval}}/dist/tests/evaluation.test.js"
@@ -262,7 +257,7 @@
       "expected_behavior": "The named evaluator regression test passes: skill paired gain requires evaluator-observed host events.",
       "provenance": {
         "source": "craft-eval/tests/evaluation.test.ts",
-        "source_digest": "sha256:43204c9f880c180a6c42c3e69f5aaee1c21197a2cb871e9f8ec7f697fde8e5b1"
+        "source_digest": "sha256:7d903a3900b39e494c6d68703405b34db3a0852fae37c08651f5cc66361130d9"
       },
       "checks": [
         {
@@ -301,7 +296,6 @@
       "argv": [
         "node",
         "--test",
-        "--test-isolation=none",
         "--test-reporter=spec",
         "--test-name-pattern=^plan and result tampering or incomplete work cannot pass$",
         "{{craft-eval}}/dist/tests/evaluation.test.js"
@@ -310,7 +304,7 @@
       "expected_behavior": "The named evaluator regression test passes: plan and result tampering or incomplete work cannot pass.",
       "provenance": {
         "source": "craft-eval/tests/evaluation.test.ts",
-        "source_digest": "sha256:43204c9f880c180a6c42c3e69f5aaee1c21197a2cb871e9f8ec7f697fde8e5b1"
+        "source_digest": "sha256:7d903a3900b39e494c6d68703405b34db3a0852fae37c08651f5cc66361130d9"
       },
       "checks": [
         {
@@ -349,7 +343,6 @@
       "argv": [
         "node",
         "--test",
-        "--test-isolation=none",
         "--test-reporter=spec",
         "--test-name-pattern=^suite validation rejects unsafe or ambiguous contracts$",
         "{{craft-eval}}/dist/tests/evaluation.test.js"
@@ -358,7 +351,7 @@
       "expected_behavior": "The named evaluator regression test passes: suite validation rejects unsafe or ambiguous contracts.",
       "provenance": {
         "source": "craft-eval/tests/evaluation.test.ts",
-        "source_digest": "sha256:43204c9f880c180a6c42c3e69f5aaee1c21197a2cb871e9f8ec7f697fde8e5b1"
+        "source_digest": "sha256:7d903a3900b39e494c6d68703405b34db3a0852fae37c08651f5cc66361130d9"
       },
       "checks": [
         {
@@ -397,7 +390,6 @@
       "argv": [
         "node",
         "--test",
-        "--test-isolation=none",
         "--test-reporter=spec",
         "--test-name-pattern=^runtime mismatch and adapter errors are explicit$",
         "{{craft-eval}}/dist/tests/evaluation.test.js"
@@ -406,7 +398,7 @@
       "expected_behavior": "The named evaluator regression test passes: runtime mismatch and adapter errors are explicit.",
       "provenance": {
         "source": "craft-eval/tests/evaluation.test.ts",
-        "source_digest": "sha256:43204c9f880c180a6c42c3e69f5aaee1c21197a2cb871e9f8ec7f697fde8e5b1"
+        "source_digest": "sha256:7d903a3900b39e494c6d68703405b34db3a0852fae37c08651f5cc66361130d9"
       },
       "checks": [
         {
@@ -445,7 +437,6 @@
       "argv": [
         "node",
         "--test",
-        "--test-isolation=none",
         "--test-reporter=spec",
         "--test-name-pattern=^timeout and untrusted trace cannot count as success$",
         "{{craft-eval}}/dist/tests/evaluation.test.js"
@@ -454,7 +445,7 @@
       "expected_behavior": "The named evaluator regression test passes: timeout and untrusted trace cannot count as success.",
       "provenance": {
         "source": "craft-eval/tests/evaluation.test.ts",
-        "source_digest": "sha256:43204c9f880c180a6c42c3e69f5aaee1c21197a2cb871e9f8ec7f697fde8e5b1"
+        "source_digest": "sha256:7d903a3900b39e494c6d68703405b34db3a0852fae37c08651f5cc66361130d9"
       },
       "checks": [
         {
@@ -493,7 +484,6 @@
       "argv": [
         "node",
         "--test",
-        "--test-isolation=none",
         "--test-reporter=spec",
         "--test-name-pattern=^artifact links cannot read outside workspace$",
         "{{craft-eval}}/dist/tests/evaluation.test.js"
@@ -502,7 +492,7 @@
       "expected_behavior": "The named evaluator regression test passes: artifact links cannot read outside workspace.",
       "provenance": {
         "source": "craft-eval/tests/evaluation.test.ts",
-        "source_digest": "sha256:43204c9f880c180a6c42c3e69f5aaee1c21197a2cb871e9f8ec7f697fde8e5b1"
+        "source_digest": "sha256:7d903a3900b39e494c6d68703405b34db3a0852fae37c08651f5cc66361130d9"
       },
       "checks": [
         {
@@ -541,7 +531,6 @@
       "argv": [
         "node",
         "--test",
-        "--test-isolation=none",
         "--test-reporter=spec",
         "--test-name-pattern=^contract rejects all invalid case and check shapes$",
         "{{craft-eval}}/dist/tests/evaluation.test.js"
@@ -550,7 +539,7 @@
       "expected_behavior": "The named evaluator regression test passes: contract rejects all invalid case and check shapes.",
       "provenance": {
         "source": "craft-eval/tests/evaluation.test.ts",
-        "source_digest": "sha256:43204c9f880c180a6c42c3e69f5aaee1c21197a2cb871e9f8ec7f697fde8e5b1"
+        "source_digest": "sha256:7d903a3900b39e494c6d68703405b34db3a0852fae37c08651f5cc66361130d9"
       },
       "checks": [
         {
@@ -589,7 +578,6 @@
       "argv": [
         "node",
         "--test",
-        "--test-isolation=none",
         "--test-reporter=spec",
         "--test-name-pattern=^subject workspace trials and cli errors$",
         "{{craft-eval}}/dist/tests/evaluation.test.js"
@@ -598,7 +586,7 @@
       "expected_behavior": "The named evaluator regression test passes: subject workspace trials and cli errors.",
       "provenance": {
         "source": "craft-eval/tests/evaluation.test.ts",
-        "source_digest": "sha256:43204c9f880c180a6c42c3e69f5aaee1c21197a2cb871e9f8ec7f697fde8e5b1"
+        "source_digest": "sha256:7d903a3900b39e494c6d68703405b34db3a0852fae37c08651f5cc66361130d9"
       },
       "checks": [
         {
@@ -637,7 +625,6 @@
       "argv": [
         "node",
         "--test",
-        "--test-isolation=none",
         "--test-reporter=spec",
         "--test-name-pattern=^artifact and trace failure modes$",
         "{{craft-eval}}/dist/tests/evaluation.test.js"
@@ -646,7 +633,7 @@
       "expected_behavior": "The named evaluator regression test passes: artifact and trace failure modes.",
       "provenance": {
         "source": "craft-eval/tests/evaluation.test.ts",
-        "source_digest": "sha256:43204c9f880c180a6c42c3e69f5aaee1c21197a2cb871e9f8ec7f697fde8e5b1"
+        "source_digest": "sha256:7d903a3900b39e494c6d68703405b34db3a0852fae37c08651f5cc66361130d9"
       },
       "checks": [
         {
@@ -685,7 +672,6 @@
       "argv": [
         "node",
         "--test",
-        "--test-isolation=none",
         "--test-reporter=spec",
         "--test-name-pattern=^comparison guards and pair directions$",
         "{{craft-eval}}/dist/tests/evaluation.test.js"
@@ -694,7 +680,7 @@
       "expected_behavior": "The named evaluator regression test passes: comparison guards and pair directions.",
       "provenance": {
         "source": "craft-eval/tests/evaluation.test.ts",
-        "source_digest": "sha256:43204c9f880c180a6c42c3e69f5aaee1c21197a2cb871e9f8ec7f697fde8e5b1"
+        "source_digest": "sha256:7d903a3900b39e494c6d68703405b34db3a0852fae37c08651f5cc66361130d9"
       },
       "checks": [
         {
@@ -733,7 +719,6 @@
       "argv": [
         "node",
         "--test",
-        "--test-isolation=none",
         "--test-reporter=spec",
         "--test-name-pattern=^self-reported triggers can diagnose but never support a gain claim$",
         "{{craft-eval}}/dist/tests/evaluation.test.js"
@@ -742,7 +727,7 @@
       "expected_behavior": "The named evaluator regression test passes: self-reported triggers can diagnose but never support a gain claim.",
       "provenance": {
         "source": "craft-eval/tests/evaluation.test.ts",
-        "source_digest": "sha256:43204c9f880c180a6c42c3e69f5aaee1c21197a2cb871e9f8ec7f697fde8e5b1"
+        "source_digest": "sha256:7d903a3900b39e494c6d68703405b34db3a0852fae37c08651f5cc66361130d9"
       },
       "checks": [
         {
@@ -781,7 +766,6 @@
       "argv": [
         "node",
         "--test",
-        "--test-isolation=none",
         "--test-reporter=spec",
         "--test-name-pattern=^script checks grade by exit code and classify failures$",
         "{{craft-eval}}/dist/tests/evaluation.test.js"
@@ -790,7 +774,7 @@
       "expected_behavior": "The named evaluator regression test passes: script checks grade by exit code and classify failures.",
       "provenance": {
         "source": "craft-eval/tests/evaluation.test.ts",
-        "source_digest": "sha256:43204c9f880c180a6c42c3e69f5aaee1c21197a2cb871e9f8ec7f697fde8e5b1"
+        "source_digest": "sha256:7d903a3900b39e494c6d68703405b34db3a0852fae37c08651f5cc66361130d9"
       },
       "checks": [
         {
@@ -829,7 +813,6 @@
       "argv": [
         "node",
         "--test",
-        "--test-isolation=none",
         "--test-reporter=spec",
         "--test-name-pattern=^development suite and command entry points$",
         "{{craft-eval}}/dist/tests/evaluation.test.js"
@@ -838,7 +821,7 @@
       "expected_behavior": "The named evaluator regression test passes: development suite and command entry points.",
       "provenance": {
         "source": "craft-eval/tests/evaluation.test.ts",
-        "source_digest": "sha256:43204c9f880c180a6c42c3e69f5aaee1c21197a2cb871e9f8ec7f697fde8e5b1"
+        "source_digest": "sha256:7d903a3900b39e494c6d68703405b34db3a0852fae37c08651f5cc66361130d9"
       },
       "checks": [
         {
@@ -877,7 +860,6 @@
       "argv": [
         "node",
         "--test",
-        "--test-isolation=none",
         "--test-reporter=spec",
         "--test-name-pattern=^mocked mcp servers serve tools and tool_call checks grade from evaluator evidence$",
         "{{craft-eval}}/dist/tests/evaluation.test.js"
@@ -886,7 +868,7 @@
       "expected_behavior": "The named evaluator regression test passes: mocked mcp servers serve tools and tool_call checks grade from evaluator evidence.",
       "provenance": {
         "source": "craft-eval/tests/evaluation.test.ts",
-        "source_digest": "sha256:43204c9f880c180a6c42c3e69f5aaee1c21197a2cb871e9f8ec7f697fde8e5b1"
+        "source_digest": "sha256:7d903a3900b39e494c6d68703405b34db3a0852fae37c08651f5cc66361130d9"
       },
       "checks": [
         {
@@ -925,7 +907,6 @@
       "argv": [
         "node",
         "--test",
-        "--test-isolation=none",
         "--test-reporter=spec",
         "--test-name-pattern=^mcp contract validation rejects malformed declarations$",
         "{{craft-eval}}/dist/tests/evaluation.test.js"
@@ -934,7 +915,7 @@
       "expected_behavior": "The named evaluator regression test passes: mcp contract validation rejects malformed declarations.",
       "provenance": {
         "source": "craft-eval/tests/evaluation.test.ts",
-        "source_digest": "sha256:43204c9f880c180a6c42c3e69f5aaee1c21197a2cb871e9f8ec7f697fde8e5b1"
+        "source_digest": "sha256:7d903a3900b39e494c6d68703405b34db3a0852fae37c08651f5cc66361130d9"
       },
       "checks": [
         {
@@ -973,7 +954,6 @@
       "argv": [
         "node",
         "--test",
-        "--test-isolation=none",
         "--test-reporter=spec",
         "--test-name-pattern=^script checks accept an explicit interpreter for any language$",
         "{{craft-eval}}/dist/tests/evaluation.test.js"
@@ -982,7 +962,7 @@
       "expected_behavior": "The named evaluator regression test passes: script checks accept an explicit interpreter for any language.",
       "provenance": {
         "source": "craft-eval/tests/evaluation.test.ts",
-        "source_digest": "sha256:43204c9f880c180a6c42c3e69f5aaee1c21197a2cb871e9f8ec7f697fde8e5b1"
+        "source_digest": "sha256:7d903a3900b39e494c6d68703405b34db3a0852fae37c08651f5cc66361130d9"
       },
       "checks": [
         {
@@ -1021,7 +1001,6 @@
       "argv": [
         "node",
         "--test",
-        "--test-isolation=none",
         "--test-reporter=spec",
         "--test-name-pattern=^server-mode cases start a service, drive it, and terminate it$",
         "{{craft-eval}}/dist/tests/evaluation.test.js"
@@ -1030,7 +1009,7 @@
       "expected_behavior": "The named evaluator regression test passes: server-mode cases start a service, drive it, and terminate it.",
       "provenance": {
         "source": "craft-eval/tests/evaluation.test.ts",
-        "source_digest": "sha256:43204c9f880c180a6c42c3e69f5aaee1c21197a2cb871e9f8ec7f697fde8e5b1"
+        "source_digest": "sha256:7d903a3900b39e494c6d68703405b34db3a0852fae37c08651f5cc66361130d9"
       },
       "checks": [
         {
@@ -1069,7 +1048,6 @@
       "argv": [
         "node",
         "--test",
-        "--test-isolation=none",
         "--test-reporter=spec",
         "--test-name-pattern=^stdout assertions work for a bare-print adapter$",
         "{{craft-eval}}/dist/tests/evaluation.test.js"
@@ -1078,7 +1056,7 @@
       "expected_behavior": "The named evaluator regression test passes: stdout assertions work for a bare-print adapter.",
       "provenance": {
         "source": "craft-eval/tests/evaluation.test.ts",
-        "source_digest": "sha256:43204c9f880c180a6c42c3e69f5aaee1c21197a2cb871e9f8ec7f697fde8e5b1"
+        "source_digest": "sha256:7d903a3900b39e494c6d68703405b34db3a0852fae37c08651f5cc66361130d9"
       },
       "checks": [
         {

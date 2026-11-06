@@ -4,6 +4,7 @@ import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
+import { processTreeInspectionSkip } from './process-inspection.js';
 
 function running(pid: number): boolean {
   const state = spawnSync('ps', ['-p', String(pid), '-o', 'stat='], { encoding: 'utf8' }).stdout.trim();
@@ -11,7 +12,7 @@ function running(pid: number): boolean {
 }
 
 for (const role of ['adapter', 'probe', 'calibration']) {
-test(`${role} evaluator SIGKILL does not leave its active command or descendant alive`, { skip: process.platform === 'win32' }, async () => {
+test(`${role} evaluator SIGKILL does not leave its active command or descendant alive`, { skip: processTreeInspectionSkip }, async () => {
   const root = await mkdtemp(join(tmpdir(), 'craft-eval-worker-crash-'));
   const workspace = join(root, 'workspace'); await mkdir(workspace);
   const identity = join(root, 'owned-processes.json');
