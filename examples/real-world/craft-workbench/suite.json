@@ -20,7 +20,12 @@
       "minimum_sample": 2
     },
     "guardrails": [
-      { "id": "runtime_protocol_compatible", "metric": "runtime_protocol_compatible", "comparator": "gte", "threshold": 1 }
+      {
+        "id": "runtime_protocol_compatible",
+        "metric": "runtime_protocol_compatible",
+        "comparator": "gte",
+        "threshold": 1
+      }
     ]
   },
   "cases": [
@@ -30,13 +35,52 @@
       "risk": "high",
       "language": "javascript",
       "in_place": true,
-      "argv": ["node", "--experimental-strip-types", "--test", "tests/*.test.ts"],
+      "argv": [
+        "node",
+        "--experimental-strip-types",
+        "--test",
+        "tests/agent-workspace.test.ts",
+        "tests/asset-focus.test.ts",
+        "tests/asset-revisions-page.test.ts",
+        "tests/composer-controls.test.ts",
+        "tests/context-workflow-pages.test.ts",
+        "tests/evaluation-panel.test.ts",
+        "tests/message-dock.test.ts",
+        "tests/mod-pages.test.ts",
+        "tests/mode-pages.test.ts",
+        "tests/mode-shell.test.ts",
+        "tests/native-tools-panel.test.ts",
+        "tests/project-shell.test.ts",
+        "tests/queue-recovery.test.ts",
+        "tests/rail-nav.test.ts",
+        "tests/recall-audit.test.ts",
+        "tests/runtime-package.test.ts",
+        "tests/tauri-desktop-contract.test.ts",
+        "tests/ui-primitives.test.ts",
+        "tests/visual-layer.test.ts",
+        "tests/workbench-assets.test.ts",
+        "tests/workbench-latest-request.test.ts",
+        "tests/workbench-model-setup.test.ts",
+        "tests/workbench-project-page.test.ts",
+        "tests/workbench-resource-pages.test.ts",
+        "tests/workbench-runtime-client.test.ts"
+      ],
       "timeout_s": 300,
       "expected_behavior": "All Workbench automated tests complete with zero failures and the local HTTP integration test can bind loopback.",
-      "provenance": { "source": "craft-workbench/package.json:scripts.test" },
+      "provenance": {
+        "source": "craft-workbench/package.json:scripts.test"
+      },
       "checks": [
-        { "id": "test-process-exits-zero", "kind": "exit_code", "equals": 0 },
-        { "id": "tests-ran", "kind": "stdout_not_contains", "value": "tests 0" }
+        {
+          "id": "test-process-exits-zero",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "tests-ran",
+          "kind": "stdout_not_contains",
+          "value": "tests 0"
+        }
       ]
     },
     {
@@ -45,13 +89,27 @@
       "risk": "high",
       "language": "javascript",
       "in_place": true,
-      "argv": ["node", "scripts/run-runtime.mjs", "check"],
+      "argv": [
+        "node",
+        "scripts/run-runtime.mjs",
+        "check"
+      ],
       "timeout_s": 90,
       "expected_behavior": "Workbench resolves its installed Craft package and confirms the supported runtime protocol.",
-      "provenance": { "source": "craft-workbench/scripts/run-runtime.mjs; craft-workbench/scripts/runtime-package.mjs" },
+      "provenance": {
+        "source": "craft-workbench/scripts/run-runtime.mjs; craft-workbench/scripts/runtime-package.mjs"
+      },
       "checks": [
-        { "id": "runtime-check-exits-zero", "kind": "exit_code", "equals": 0 },
-        { "id": "runtime-version-reported", "kind": "stdout_contains", "value": "Craft runtime" }
+        {
+          "id": "runtime-check-exits-zero",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "runtime-version-reported",
+          "kind": "stdout_contains",
+          "value": "Craft runtime"
+        }
       ]
     }
   ]

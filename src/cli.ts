@@ -3,7 +3,7 @@
 
 import { resolve } from 'node:path';
 import { realpathSync, existsSync } from 'node:fs';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
 import { auditSuiteFiles, coverageSuiteFiles } from './audit.js';
@@ -14,6 +14,7 @@ import { loadScenario, runScenario, scenarioCases } from './scenario.js';
 import { writeHtmlReport } from './report-html.js';
 import { runMutations } from './mutation.js';
 import { calibrateJudge } from './calibration.js';
+import { auditContextPack } from './context-audit.js';
 
 interface Options {
   [key: string]: string | number | boolean | undefined;
@@ -102,6 +103,7 @@ commands:
   experiment <manifest> --workspace <dir> --output <dir>
   mutation <manifest> <suite> <runtime> --workspace <dir> --output <dir>
   calibrate <manifest> [--timeout-ms N] [--max-output-bytes N]
+  context-audit <context-pack.json> <expectations.json>
   scenario <scenario> [<subject> <runtime>] --workspace <dir> --output <dir> [--resume-after <step>]`;
 
 export async function main(argv: string[] = process.argv.slice(2)): Promise<number> {
@@ -121,6 +123,13 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
       requireArgs(positional, 1, USAGE);
       const suite = await loadSuite(positional[0]!);
       result = { status: 'valid', suite_id: suite.suite_id, cases: suite.cases.length };
+    } else if (command === 'context-audit') {
+      requireArgs(positional, 2, USAGE);
+      const [packPath, manifestPath] = positional;
+      const [packValue, manifestValue] = await Promise.all([readJsonInput(packPath!, 'Context pack'), readJsonInput(manifestPath!, 'Context audit manifest')]);
+      result = auditContextPack(packValue, manifestValue);
+      process.stdout.write(JSON.stringify(result) + '\n');
+      return (result as { status: string }).status === 'passed' ? 0 : 1;
     } else if (command === 'audit') {
       requireArgs(positional, 1, USAGE);
       const audit = await auditSuiteFiles(positional);
@@ -256,6 +265,12 @@ function requireArgs(positional: string[], count: number, usage: string): void {
   if (positional.length < count) {
     throw new Error(`missing arguments\n${usage}`);
   }
+}
+
+async function readJsonInput(path: string, name: string): Promise<unknown> {
+  const text = await readFile(path, 'utf8');
+  if (Buffer.byteLength(text, 'utf8') > 1_000_000) throw new Error(`${name} exceeds 1000000 bytes`);
+  return JSON.parse(text);
 }
 
 // Run only when invoked directly, never when imported by another module.

@@ -1,0 +1,32 @@
+{
+  "asset_refs": [
+    { "member": "knowledge", "id": "claim.example", "version": 1 },
+    { "member": "codebase", "id": "symbol.example", "version": 1 }
+  ],
+  "items": [],
+  "contributions": [
+    {
+      "member": "knowledge",
+      "items": [
+        { "claim_id": "claim.example", "claim_version": 1, "content_excerpt": "仅在独立任务验证通过后晋升。" }
+      ]
+    }
+  ],
+  "codebase": {
+    "references": [
+      { "node_id": "symbol.example", "version": 1, "path": "src/example.ts", "span": { "start_line": 12, "end_line": 19 } }
+    ]
+  },
+  "pack_receipt": {
+    "max_items": 3,
+    "max_chars": 1200,
+    "total_items": 2,
+    "total_used_chars": 72,
+    "partial": false
+  },
+  "injection_measurement": {
+    "estimated_tokens": 70,
+    "exact": false,
+    "host_measured_tokens": null
+  }
+}

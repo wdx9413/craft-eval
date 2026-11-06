@@ -10,6 +10,8 @@ export {
 export { auditSuites, auditSuiteFiles } from './audit.js';
 export { prepareTaskInput, validateTaskContext } from './task-context.js';
 export type { TaskContext, TaskInputReceipt } from './task-context.js';
+export { auditContextPack } from './context-audit.js';
+export type { ContextAuditCheck, ContextAuditManifest, ContextAuditReference, ContextAuditReport, ContextMember } from './context-audit.js';
 export { attributeRun } from './attribution.js';
 export {
   binaryEffect,

@@ -1,0 +1,68 @@
+{
+  "schema": "craft-eval.eval.v1",
+  "suite_id": "craft-context-contract-regressions",
+  "subject_kind": "software",
+  "partition": "development",
+  "sanitized": true,
+  "claim": {
+    "statement": "Craft Context selection, budgets, provenance, lifecycle and integration regression tests pass.",
+    "scope": "The named deterministic tests in the pinned Craft checkout; each group runs serially in place.",
+    "limitations": [
+      "These tests verify implementation contracts and fixtures, not live Host use or task benefit.",
+      "Independent retrieval labels and live paired task outcomes are required before claiming Context effectiveness."
+    ]
+  },
+  "metrics": {
+    "primary": { "id": "context_contract_pass_rate", "kind": "binary_pass_rate", "direction": "higher_is_better", "minimum_sample": 4 }
+  },
+  "cases": [
+    {
+      "id": "selection-and-budget",
+      "category": "context-selection",
+      "risk": "high",
+      "language": "typescript",
+      "in_place": true,
+      "argv": ["node", "--experimental-strip-types", "--test", "--test-isolation=none", "--test-concurrency=1", "tests/context-aggregation-policy.test.ts", "tests/context-projection.test.ts", "tests/context-working-set-budget.test.ts", "tests/context-response-projection.test.ts", "tests/context-optimization.test.ts", "tests/context-profiles.test.ts"],
+      "timeout_s": 240,
+      "expected_behavior": "Selected Context material, required references, omissions, shared budgets and bounded response projection satisfy deterministic assertions.",
+      "provenance": { "source": "craft/tests/context-aggregation-policy.test.ts; context-projection.test.ts; context-working-set-budget.test.ts; context-response-projection.test.ts; context-optimization.test.ts; context-profiles.test.ts" },
+      "checks": [{ "id": "tests-pass", "kind": "exit_code", "equals": 0 }]
+    },
+    {
+      "id": "scope-and-revocation",
+      "category": "context-lifecycle",
+      "risk": "high",
+      "language": "typescript",
+      "in_place": true,
+      "argv": ["node", "--experimental-strip-types", "--test", "--test-isolation=none", "--test-concurrency=1", "tests/context-remediation.test.ts", "tests/context-revocation-race.test.ts", "tests/context-read-snapshot.test.ts", "tests/context-feedback-weight.test.ts", "tests/context-storage-mirror.test.ts", "tests/context-candidate-scope.test.ts", "tests/context-source-access.test.ts"],
+      "timeout_s": 360,
+      "expected_behavior": "Scope, correction, revocation, snapshot and source access remain consistent under lifecycle transitions.",
+      "provenance": { "source": "craft/tests/context-remediation.test.ts; context-revocation-race.test.ts; context-read-snapshot.test.ts; context-feedback-weight.test.ts; context-storage-mirror.test.ts; context-candidate-scope.test.ts; context-source-access.test.ts" },
+      "checks": [{ "id": "tests-pass", "kind": "exit_code", "equals": 0 }]
+    },
+    {
+      "id": "host-and-workbench-integration",
+      "category": "context-integration",
+      "risk": "high",
+      "language": "typescript",
+      "in_place": true,
+      "argv": ["node", "--experimental-strip-types", "--test", "--test-isolation=none", "--test-concurrency=1", "tests/context-extensions.test.ts", "tests/context-distribution.test.ts", "tests/context-directory.test.ts", "tests/context-workflow-workbench.test.ts", "tests/host-context-dispatch.test.ts", "tests/context-host-evaluation.test.ts", "tests/craft-run-context.test.ts"],
+      "timeout_s": 360,
+      "expected_behavior": "Context integrations preserve the explicit host, workbench, extension and evaluation boundaries.",
+      "provenance": { "source": "craft/tests/context-extensions.test.ts; context-distribution.test.ts; context-directory.test.ts; context-workflow-workbench.test.ts; host-context-dispatch.test.ts; context-host-evaluation.test.ts; craft-run-context.test.ts" },
+      "checks": [{ "id": "tests-pass", "kind": "exit_code", "equals": 0 }]
+    },
+    {
+      "id": "knowledge-memory-codebase-contributions",
+      "category": "context-capabilities",
+      "risk": "high",
+      "language": "typescript",
+      "in_place": true,
+      "argv": ["node", "--experimental-strip-types", "--test", "--test-isolation=none", "--test-concurrency=1", "tests/knowledge-contribution.test.ts", "tests/knowledge-context-compiler.test.ts", "tests/memory-contribution.test.ts", "tests/codebase-context-search.test.ts", "tests/codebase-context-projection.test.ts", "tests/context-spec-regressions.test.ts"],
+      "timeout_s": 300,
+      "expected_behavior": "Knowledge, Memory and Codebase contributions obey their source, budget and typed reference contracts.",
+      "provenance": { "source": "craft/tests/knowledge-contribution.test.ts; knowledge-context-compiler.test.ts; memory-contribution.test.ts; codebase-context-search.test.ts; codebase-context-projection.test.ts; context-spec-regressions.test.ts" },
+      "checks": [{ "id": "tests-pass", "kind": "exit_code", "equals": 0 }]
+    }
+  ]
+}

@@ -22,6 +22,16 @@ Agent Subject 可以声明 `context: { "id": "claim-revision", "text": "待评�
 
 回执只证明提交了哪些字节，不证明模型理解或采用了知识，更不签发知识晋级或发布许可。效果结论仍需要独立留出任务、相同环境与引擎配置、真实执行结果和统计护栏。测试中的模拟 Host 只验证输入与回执的实现。
 
+## Craft Context 回执审计
+
+`context-audit <context-pack.json> <expectations.json>` 对保存的 `craft_context_open` MCP 响应或其 `structuredContent` 做确定性审计。期望清单可锁定必需/禁止/允许的资产引用、资产数、字符数、估算 Token 上限，以及要求只传引用的能力。审计输出带回执对象与清单的 SHA-256，只包含计数、判定和限制，不回显记忆或知识正文。示例文件位于 `examples/context-audit/`。
+
+```bash
+node dist/src/cli.js context-audit examples/context-audit/pack.json examples/context-audit/expectations.json
+```
+
+回执标记为 partial、或清单要求 Host Token 实测但回执没有该数据时，结果为 `inconclusive`，命令以非零状态退出。Token 估算不会冒充 Host 实测。该审计只证明回执符合给定标签和预算，不能证明检索标签正确、模型实际使用材料或任务因此变好；效果仍须通过隔离的独立任务，对比正式基线与候选版本来评测。
+
 ## 安装与运行
 
 需要 Node.js 22+。运行时零第三方依赖，仅用 devDependencies 里的 `typescript` 与 `@types/node` 做构建：
@@ -34,6 +44,7 @@ npm test             # 先构建，再跑 node:test
 
 ```bash
 node dist/src/cli.js validate examples/software-suite.json
+node dist/src/cli.js context-audit examples/context-audit/pack.json examples/context-audit/expectations.json
 node dist/src/cli.js audit examples/software-suite.json examples/agent-suite.json
 node dist/src/cli.js run examples/software-suite.json examples/software-subject.json examples/runtime.json \
   --workspace examples/workspace --output /tmp/craft-eval-runs --parallelism 2

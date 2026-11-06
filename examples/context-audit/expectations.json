@@ -1,0 +1,19 @@
+{
+  "schema": "craft-eval.context-audit.v1",
+  "case_id": "bounded-repository-help",
+  "required_refs": [
+    { "member": "knowledge", "id": "claim.example", "version": 1 },
+    { "member": "codebase", "id": "symbol.example", "version": 1 }
+  ],
+  "forbidden_refs": [
+    { "member": "memory", "id": "unrelated.example" }
+  ],
+  "allowed_refs": [
+    { "member": "knowledge", "id": "claim.example", "version": 1 },
+    { "member": "codebase", "id": "symbol.example", "version": 1 }
+  ],
+  "max_items": 3,
+  "max_chars": 1200,
+  "max_estimated_tokens": 400,
+  "reference_only_members": ["codebase"]
+}
