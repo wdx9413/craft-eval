@@ -1,7 +1,7 @@
 {
-  "environment_digest": "windows-node24-py313",
+  "environment_digest": "local-macos-node23",
   "budget_digest": "600s-per-case",
   "host_digest": "craft-eval-driver",
   "model_digest": "none",
-  "tools_digest": "npm-build-test"
+  "tools_digest": "npm-build-node-test"
 }

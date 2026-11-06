@@ -1,0 +1,7 @@
+{
+  "environment_digest": "local-macos-node24-pnpm11",
+  "budget_digest": "300s-per-case",
+  "host_digest": "craft-eval-local-command",
+  "model_digest": "none",
+  "tools_digest": "workbench-tests-runtime-package"
+}

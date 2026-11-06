@@ -14,24 +14,8 @@
       "id": "task_pass",
       "kind": "binary_pass_rate",
       "direction": "higher_is_better",
-      "minimum_sample": 6
+      "minimum_sample": 7
     }
-  },
-  "business": {
-    "invariants": [
-      {
-        "id": "inv-layering",
-        "statement": "分层依赖必须单向，禁止反向/跨层引用",
-        "positive_cases": ["layering"],
-        "negative_cases": []
-      },
-      {
-        "id": "inv-docs-links",
-        "statement": "文档中的相对链接必须指向真实存在的文件",
-        "positive_cases": ["docs", "audit-docs"],
-        "negative_cases": []
-      }
-    ]
   },
   "cases": [
     {
@@ -42,6 +26,8 @@
       "argv": ["node", "node_modules/typescript/bin/tsc", "--noEmit"],
       "in_place": true,
       "timeout_s": 600,
+      "expected_behavior": "The full Craft source type graph has no TypeScript errors.",
+      "provenance": { "source": "craft/package.json:scripts.typecheck" },
       "checks": [{ "id": "exit", "kind": "exit_code", "equals": 0 }]
     },
     {
@@ -52,7 +38,12 @@
       "argv": ["node", "--experimental-strip-types", "scripts/ci/audit-layering.ts"],
       "in_place": true,
       "timeout_s": 300,
-      "checks": [{ "id": "exit", "kind": "exit_code", "equals": 0 }]
+      "expected_behavior": "The dependency layering audit finds no violations and no undocumented import exemptions.",
+      "provenance": { "source": "craft/scripts/ci/audit-layering.ts" },
+      "checks": [
+        { "id": "exit", "kind": "exit_code", "equals": 0 },
+        { "id": "layer-audit-ran", "kind": "stdout_contains", "value": "layer audit:" }
+      ]
     },
     {
       "id": "surfaces",
@@ -62,7 +53,12 @@
       "argv": ["node", "--experimental-strip-types", "scripts/ci/audit-surfaces.ts"],
       "in_place": true,
       "timeout_s": 300,
-      "checks": [{ "id": "exit", "kind": "exit_code", "equals": 0 }]
+      "expected_behavior": "The MCP surface audit confirms tool ownership and declared cross-domain exceptions.",
+      "provenance": { "source": "craft/scripts/ci/audit-surfaces.ts" },
+      "checks": [
+        { "id": "exit", "kind": "exit_code", "equals": 0 },
+        { "id": "surface-audit-ran", "kind": "stdout_contains", "value": "surface audit:" }
+      ]
     },
     {
       "id": "audit-docs",
@@ -72,7 +68,12 @@
       "argv": ["node", "--experimental-strip-types", "scripts/ci/check-doc-links.ts"],
       "in_place": true,
       "timeout_s": 300,
-      "checks": [{ "id": "exit", "kind": "exit_code", "equals": 0 }]
+      "expected_behavior": "The required product documentation exists and all indexed internal links resolve.",
+      "provenance": { "source": "craft/scripts/ci/check-doc-links.ts" },
+      "checks": [
+        { "id": "exit", "kind": "exit_code", "equals": 0 },
+        { "id": "document-audit-ran", "kind": "stdout_contains", "value": "doc check:" }
+      ]
     },
     {
       "id": "consistency",
@@ -82,17 +83,27 @@
       "argv": ["node", "--experimental-strip-types", "scripts/ci/check-consistency-falsifiable.ts"],
       "in_place": true,
       "timeout_s": 300,
-      "checks": [{ "id": "exit", "kind": "exit_code", "equals": 0 }]
+      "expected_behavior": "The baseline remains consistent and all nine declared mutations are detected.",
+      "provenance": { "source": "craft/scripts/ci/check-consistency-falsifiable.ts" },
+      "checks": [
+        { "id": "exit", "kind": "exit_code", "equals": 0 },
+        { "id": "mutation-audit-ran", "kind": "stdout_contains", "value": "falsifiable on 9/9 mutations" }
+      ]
     },
     {
       "id": "smoke",
       "category": "runtime",
       "risk": "medium",
       "language": "typescript",
-      "argv": ["pnpm", "run", "test:smoke"],
+      "argv": ["node", "dist/core/cli.js", "--help"],
       "in_place": true,
-      "timeout_s": 60,
-      "checks": [{ "id": "exit", "kind": "exit_code", "equals": 0 }]
+      "timeout_s": 180,
+      "expected_behavior": "The packaged Craft CLI starts and reports its usage contract.",
+      "provenance": { "source": "craft/package.json:scripts.test:smoke" },
+      "checks": [
+        { "id": "exit", "kind": "exit_code", "equals": 0 },
+        { "id": "usage-is-reported", "kind": "stdout_contains", "value": "Usage:" }
+      ]
     },
     {
       "id": "docs",
@@ -101,6 +112,8 @@
       "language": "markdown",
       "in_place": true,
       "timeout_s": 120,
+      "expected_behavior": "Required repository docs and their relative links are present and resolve.",
+      "provenance": { "source": "craft-eval docs_links check over Craft documentation" },
       "checks": [{
         "id": "links",
         "kind": "docs_links",

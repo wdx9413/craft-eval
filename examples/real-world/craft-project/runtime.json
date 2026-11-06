@@ -1,1 +1,1 @@
-{"environment_digest":"local-windows-node24","budget_digest":"60s-per-case","host_digest":"craft-eval-driver","model_digest":"none","tools_digest":"mcp-stdio"}
+{"environment_digest":"local-macos-node23","budget_digest":"600s-per-case","host_digest":"craft-eval-driver","model_digest":"none","tools_digest":"node-typescript-cli-mcp-stdio"}

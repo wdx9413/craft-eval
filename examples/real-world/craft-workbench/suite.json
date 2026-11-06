@@ -1,0 +1,58 @@
+{
+  "schema": "craft-eval.eval.v1",
+  "suite_id": "craft-workbench-local-quality-gates",
+  "subject_kind": "software",
+  "partition": "development",
+  "sanitized": true,
+  "claim": {
+    "statement": "The Workbench repository's automated tests and installed Runtime protocol check pass on the pinned local environment.",
+    "scope": "Local deterministic checks in the craft-workbench checkout.",
+    "limitations": [
+      "Does not establish desktop packaging, accessibility, visual usability, real Host behavior or user task benefit.",
+      "The Runtime check validates package resolution and protocol compatibility, not end-to-end task execution."
+    ]
+  },
+  "metrics": {
+    "primary": {
+      "id": "quality_gate_pass_rate",
+      "kind": "binary_pass_rate",
+      "direction": "higher_is_better",
+      "minimum_sample": 2
+    },
+    "guardrails": [
+      { "id": "runtime_protocol_compatible", "metric": "runtime_protocol_compatible", "comparator": "gte", "threshold": 1 }
+    ]
+  },
+  "cases": [
+    {
+      "id": "workbench-tests",
+      "category": "regression",
+      "risk": "high",
+      "language": "javascript",
+      "in_place": true,
+      "argv": ["node", "--experimental-strip-types", "--test", "tests/*.test.ts"],
+      "timeout_s": 300,
+      "expected_behavior": "All Workbench automated tests complete with zero failures and the local HTTP integration test can bind loopback.",
+      "provenance": { "source": "craft-workbench/package.json:scripts.test" },
+      "checks": [
+        { "id": "test-process-exits-zero", "kind": "exit_code", "equals": 0 },
+        { "id": "tests-ran", "kind": "stdout_not_contains", "value": "tests 0" }
+      ]
+    },
+    {
+      "id": "runtime-package-compatible",
+      "category": "runtime-integration",
+      "risk": "high",
+      "language": "javascript",
+      "in_place": true,
+      "argv": ["node", "scripts/run-runtime.mjs", "check"],
+      "timeout_s": 90,
+      "expected_behavior": "Workbench resolves its installed Craft package and confirms the supported runtime protocol.",
+      "provenance": { "source": "craft-workbench/scripts/run-runtime.mjs; craft-workbench/scripts/runtime-package.mjs" },
+      "checks": [
+        { "id": "runtime-check-exits-zero", "kind": "exit_code", "equals": 0 },
+        { "id": "runtime-version-reported", "kind": "stdout_contains", "value": "Craft runtime" }
+      ]
+    }
+  ]
+}

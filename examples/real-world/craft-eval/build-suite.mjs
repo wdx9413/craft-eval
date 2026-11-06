@@ -1,18 +1,16 @@
 ﻿// Generate the craft-eval self-check suite: one case per evaluator capability.
-//
-// The evaluator's own tests are organised as one file of 22 named tests. Running
-// them as a single blob tells you "something regressed"; selecting one test at a
-// time makes the failing case name the capability that broke (trace handling,
-// artifact guards, MCP mocking, comparison guards, ...).
-import { writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 /** Test names, in file order. Kept explicit so a renamed test fails loudly. */
 const tests = [
   'software executes in copy and reports observed failures',
   'agent checks environment state and completed host trace',
   'missing terminal trace is inconclusive even when skill not selected',
-  'agent requires completed host trace even for file checks',
-  'skill paired gain requires positive negative and real distinct runs',
+  'agent local argv checks do not require a host trace',
+  'skill paired gain requires evaluator-observed host events',
   'plan and result tampering or incomplete work cannot pass',
   'suite validation rejects unsafe or ambiguous contracts',
   'runtime mismatch and adapter errors are explicit',
@@ -32,12 +30,21 @@ const tests = [
   'stdout assertions work for a bare-print adapter',
 ];
 
+export const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
+const sourceDigest = `sha256:${createHash('sha256').update(readFileSync(join(root, 'tests/evaluation.test.ts'))).digest('hex')}`;
+
 const cases = [
   {
     id: 'build-succeeds',
+    category: 'build',
+    risk: 'high',
+    language: 'typescript',
     in_place: true,
-    argv: ['cmd', '/c', 'npm', 'run', 'build'],
+    argv: ['npm', 'run', 'build'],
     timeout_s: 300,
+    expected_behavior: 'The craft-eval TypeScript package builds successfully on the current host.',
+    provenance: { source: 'craft-eval/package.json:scripts.build' },
     checks: [{ id: 'built', kind: 'exit_code', equals: 0 }],
   },
   ...tests.map((name, index) => ({
@@ -47,14 +54,20 @@ const cases = [
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '')
       .slice(0, 48)}`,
+    category: 'evaluator-regression',
+    risk: 'high',
+    language: 'typescript',
     in_place: true,
-    argv: ['py', '-3', 'run-self-test.py', name],
-    timeout_s: 180,
+    argv: ['node', '--test', '--test-isolation=none', '--test-reporter=spec', `--test-name-pattern=^${escapeRegExp(name)}$`, '{{craft-eval}}/dist/tests/evaluation.test.js'],
+    timeout_s: 60,
+    expected_behavior: `The named evaluator regression test passes: ${name}.`,
+    provenance: { source: 'craft-eval/tests/evaluation.test.ts', source_digest: sourceDigest },
     checks: [
-      { id: 'ran', kind: 'exit_code', equals: 0 },
-      // A filter that matches nothing exits 0; the launcher turns that into a
-      // failure, and this check keeps the intent visible in the report.
-      { id: 'matched', kind: 'stdout_not_contains', value: 'tests 0' },
+      { id: 'named-test-ran-once', kind: 'stdout_contains', value: 'ℹ tests 1' },
+      { id: 'named-test-passed', kind: 'stdout_contains', value: `✔ ${name}` },
+      { id: 'single-selected-test-passed', kind: 'stdout_contains', value: 'ℹ pass 1' },
+      { id: 'no-test-failures', kind: 'stdout_contains', value: 'ℹ fail 0' },
+      { id: 'process-exited-successfully', kind: 'exit_code', equals: 0 },
     ],
   })),
 ];
@@ -65,8 +78,18 @@ const suite = {
   subject_kind: 'software',
   partition: 'development',
   sanitized: true,
+  claim: {
+    statement: 'The named craft-eval regression tests and package build pass on the declared local runtime.',
+    scope: 'Local deterministic regression checks for craft-eval only.',
+    limitations: ['Does not establish Craft or Workbench product quality or real-world task benefit.'],
+  },
+  metrics: {
+    primary: { id: 'case_pass_rate', kind: 'binary_pass_rate', direction: 'higher_is_better', minimum_sample: cases.length },
+    guardrails: [{ id: 'build_pass', metric: 'build_pass', comparator: 'gte', threshold: 1 }],
+  },
   cases,
 };
 
-writeFileSync('suite.json', JSON.stringify(suite, null, 2) + '\n');
+const output = join(dirname(fileURLToPath(import.meta.url)), 'suite.json');
+writeFileSync(output, JSON.stringify(suite, null, 2) + '\n');
 console.log(`wrote suite.json with ${cases.length} cases`);
