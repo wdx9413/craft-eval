@@ -17,7 +17,7 @@
       "id": "quality_gate_pass_rate",
       "kind": "binary_pass_rate",
       "direction": "higher_is_better",
-      "minimum_sample": 2
+      "minimum_sample": 3
     },
     "guardrails": [
       {
@@ -44,6 +44,7 @@
         "tests/asset-revisions-page.test.ts",
         "tests/composer-controls.test.ts",
         "tests/context-workflow-pages.test.ts",
+        "tests/context-audit-panel.test.ts",
         "tests/evaluation-panel.test.ts",
         "tests/message-dock.test.ts",
         "tests/mod-pages.test.ts",
@@ -110,6 +111,24 @@
           "kind": "stdout_contains",
           "value": "Craft runtime"
         }
+      ]
+    },
+    {
+      "id": "context-audit-panel-coverage",
+      "category": "static",
+      "risk": "high",
+      "language": "javascript",
+      "in_place": true,
+      "argv": [
+        "node", "--experimental-strip-types", "--test", "--test-isolation=none", "--experimental-test-coverage", "--test-coverage-lines=100", "--test-coverage-functions=100", "--test-coverage-branches=100",
+        "--test-coverage-include=workbench/context-audit-panel.js", "tests/context-audit-panel.test.ts"
+      ],
+      "timeout_s": 180,
+      "expected_behavior": "The Context audit interface passes strict line, function and branch coverage.",
+      "provenance": { "source": "craft-workbench/package.json:scripts.test:coverage:context-audit" },
+      "checks": [
+        { "id": "coverage-exits-zero", "kind": "exit_code", "equals": 0 },
+        { "id": "coverage-reaches-100", "kind": "stdout_contains", "value": "100.00" }
       ]
     }
   ]

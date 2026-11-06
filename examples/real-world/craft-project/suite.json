@@ -14,7 +14,7 @@
       "id": "task_pass",
       "kind": "binary_pass_rate",
       "direction": "higher_is_better",
-      "minimum_sample": 7
+      "minimum_sample": 9
     }
   },
   "cases": [
@@ -120,6 +120,44 @@
         "required": ["README.md", "CONTEXT.md", "DESIGN.md", "GLOSSARY.md", "UX-CONTRACT.md"],
         "dirs": ["docs"]
       }]
+    },
+    {
+      "id": "context-receipt-audit-coverage",
+      "category": "static",
+      "risk": "high",
+      "language": "typescript",
+      "argv": [
+        "node", "--test", "--test-isolation=none", "--experimental-test-coverage", "--test-coverage-lines=100", "--test-coverage-functions=100", "--test-coverage-branches=100",
+        "--test-coverage-include=core/workbench-context-audit.ts", "--test-coverage-include=core/interfaces/workbench-context-audit-route.ts",
+        "tests/workbench-context-audit.test.ts", "tests/workbench-context-audit-route.test.ts"
+      ],
+      "in_place": true,
+      "timeout_s": 180,
+      "expected_behavior": "The Context audit persistence and Workbench route matcher meet strict line, function and branch coverage.",
+      "provenance": { "source": "craft/package.json:scripts.test:coverage:workbench-context-audit" },
+      "checks": [
+        { "id": "coverage-exits-zero", "kind": "exit_code", "equals": 0 },
+        { "id": "coverage-reaches-100", "kind": "stdout_contains", "value": "100.00" }
+      ]
+    },
+    {
+      "id": "workbench-evaluation-coverage",
+      "category": "static",
+      "risk": "high",
+      "language": "typescript",
+      "argv": [
+        "node_modules/.bin/c8", "--reporter=text", "--include=core/workbench-evaluations.ts", "--check-coverage", "--lines", "100", "--branches", "100", "--functions", "100",
+        "node", "--test", "--test-isolation=none", "--test-concurrency=1",
+        "tests/workbench-evaluation-concurrency.test.ts", "tests/bundled-knowledge-task-effects.test.ts", "tests/workbench-evaluations.test.ts", "tests/workbench-context-audit.test.ts", "tests/knowledge-task-effects.test.ts", "tests/evaluation-process.test.ts"
+      ],
+      "in_place": true,
+      "timeout_s": 240,
+      "expected_behavior": "Controlled Workbench evaluation and Context audit delegation meet strict line, function and branch coverage.",
+      "provenance": { "source": "craft/tests/coverage-gates.json:workbench-controlled-evaluations" },
+      "checks": [
+        { "id": "coverage-exits-zero", "kind": "exit_code", "equals": 0 },
+        { "id": "coverage-reaches-100", "kind": "stdout_contains", "value": "100" }
+      ]
     }
   ]
 }
