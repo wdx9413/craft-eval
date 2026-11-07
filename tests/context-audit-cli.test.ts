@@ -14,6 +14,13 @@ test('context-audit CLI returns a machine-readable pass or failure and rejects m
     await writeFile(manifestPath, JSON.stringify({ schema: 'craft-eval.context-audit.v1', case_id: 'one', required_refs: [{ member: 'knowledge', id: 'claim-a' }] }));
     const passed = spawnSync(process.execPath, [cli, 'context-audit', packPath, manifestPath], { encoding: 'utf8' });
     assert.equal(passed.status, 0); assert.equal(JSON.parse(passed.stdout).status, 'passed');
+    await writeFile(packPath, JSON.stringify({ asset_refs: [{ member: 'knowledge', id: 'claim-a' }],
+      pack_receipt: { max_items: 2, max_chars: 40, total_items: 1, total_used_chars: 20, partial: false },
+      response_partial: true, response_omitted_items: 2, response_omission_reason: 'response_token_budget' }));
+    const partial = spawnSync(process.execPath, [cli, 'context-audit', packPath, manifestPath], { encoding: 'utf8' });
+    assert.equal(partial.status, 1); assert.equal(JSON.parse(partial.stdout).status, 'inconclusive');
+    assert.equal(JSON.parse(partial.stdout).metrics.response_omitted_items, 2);
+    await writeFile(packPath, JSON.stringify({ asset_refs: [{ member: 'knowledge', id: 'claim-a' }], pack_receipt: { max_items: 2, max_chars: 40, total_items: 1, total_used_chars: 20, partial: false } }));
     await writeFile(manifestPath, JSON.stringify({ schema: 'craft-eval.context-audit.v1', case_id: 'one', required_refs: [{ member: 'knowledge', id: 'missing' }] }));
     const failed = spawnSync(process.execPath, [cli, 'context-audit', packPath, manifestPath], { encoding: 'utf8' });
     assert.equal(failed.status, 1); assert.equal(JSON.parse(failed.stdout).status, 'failed');

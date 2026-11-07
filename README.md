@@ -24,13 +24,13 @@ Agent Subject 可以声明 `context: { "id": "claim-revision", "text": "待评�
 
 ## Craft Context 回执审计
 
-`context-audit <context-pack.json> <expectations.json>` 对保存的 `craft_context_open` MCP 响应或其 `structuredContent` 做确定性审计。期望清单可锁定必需/禁止/允许的资产引用、资产数、字符数、估算 Token 上限，以及要求只传引用的能力。审计输出带回执对象与清单的 SHA-256，只包含计数、判定和限制，不回显记忆或知识正文。示例文件位于 `examples/context-audit/`。
+`context-audit <context-pack.json> <expectations.json>` 对保存的 `craft_context_open` MCP 响应或其 `structuredContent` 做确定性审计。期望清单可锁定必需/禁止/允许的资产引用、资产数、字符数、估算 Token 上限，以及要求只传引用的能力。审计也检查 `response_partial` 与 `response_omitted_items`：素材包完整但最终响应因 token 上限省略条目时，结果仍为 `inconclusive`。审计输出带回执对象与清单的 SHA-256，只包含计数、判定和限制，不回显记忆或知识正文。示例文件位于 `examples/context-audit/`。
 
 ```bash
 node dist/src/cli.js context-audit examples/context-audit/pack.json examples/context-audit/expectations.json
 ```
 
-回执标记为 partial、或清单要求 Host Token 实测但回执没有该数据时，结果为 `inconclusive`，命令以非零状态退出。Token 估算不会冒充 Host 实测。该审计只证明回执符合给定标签和预算，不能证明检索标签正确、模型实际使用材料或任务因此变好；效果仍须通过隔离的独立任务，对比正式基线与候选版本来评测。
+素材包或最终响应标记为 partial、或清单要求 Host Token 实测但回执没有该数据时，结果为 `inconclusive`，命令以非零状态退出。响应级省略数单独列入报告，不能被“素材包已完整生成”抵消。Token 估算不会冒充 Host 实测。该审计只证明回执符合给定标签和预算，不能证明检索标签正确、模型实际使用材料或任务因此变好；效果仍须通过隔离的独立任务，对比正式基线与候选版本来评测。
 
 ## 安装与运行
 

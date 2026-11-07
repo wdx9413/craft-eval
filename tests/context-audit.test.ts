@@ -32,7 +32,7 @@ test('context audit accepts an exact bounded pack and reports only measurable se
   assert.match(result.expectations_sha256, /^[a-f0-9]{64}$/u);
   assert.deepEqual(result.metrics, {
     selected_ref_count: 2, selected_item_count: 2, selected_chars: 50, estimated_tokens: 12,
-    host_measured_tokens: null, required_ref_recall: 1, forbidden_ref_count: 0, duplicate_ref_count: 0,
+    host_measured_tokens: null, required_ref_recall: 1, forbidden_ref_count: 0, duplicate_ref_count: 0, response_omitted_items: 0,
   });
   assert.equal(result.checks.every(check => check.status === 'passed'), true);
   assert.match(result.limitations.join(' '), /does not prove.*used|使用/u);
@@ -65,6 +65,21 @@ test('partial packs and absent Host token measurements remain inconclusive rathe
   assert.equal(result.checks.some(check => check.id === 'complete_pack' && check.status === 'inconclusive'), true);
   assert.equal(result.checks.some(check => check.id === 'host_token_measurement' && check.status === 'inconclusive'), true);
   assert.equal(result.metrics.estimated_tokens, null);
+});
+
+test('response-level budget omissions are inconclusive even when the selected pack was complete', () => {
+  const result = auditContextPack(pack({
+    response_partial: true,
+    response_omitted_items: 2,
+    response_omission_reason: 'response_token_budget',
+    pack_receipt: { max_items: 3, max_chars: 100, total_items: 2, total_used_chars: 50, partial: false },
+    partial: false,
+  }), manifest());
+  assert.equal(result.status, 'inconclusive');
+  assert.equal(result.partial, true);
+  assert.equal((result.metrics as unknown as Record<string, unknown>).response_omitted_items, 2);
+  assert.equal(result.checks.some(check => check.id === 'complete_pack' && check.status === 'passed'), true);
+  assert.equal(result.checks.some(check => check.id === 'complete_response' && check.status === 'inconclusive' && check.observed === 2), true);
 });
 
 test('context audit checks reference-only members across every response group without inspecting prose values', () => {
@@ -103,6 +118,10 @@ test('context audit validates contradictory labels, receipt counters, Host token
   assert.throws(() => auditContextPack(pack({ pack_receipt: { max_items: 0, max_chars: 1, total_items: 0, total_used_chars: 0 } }), manifest()), /positive integer/u);
   assert.throws(() => auditContextPack(pack({ pack_receipt: { max_items: 1, max_chars: 1, total_items: -1, total_used_chars: 0 } }), manifest()), /non-negative integer/u);
   assert.throws(() => auditContextPack(pack({ pack_receipt: { max_items: 1, max_chars: 1, total_items: 0, total_used_chars: 0, partial: 'yes' } }), manifest()), /partial must be boolean/u);
+  assert.throws(() => auditContextPack(pack({ response_partial: 'yes' }), manifest()), /response_partial must be boolean/u);
+  assert.throws(() => auditContextPack(pack({ response_partial: true }), manifest()), /requires response_omitted_items/u);
+  assert.throws(() => auditContextPack(pack({ response_omitted_items: -1 }), manifest()), /non-negative integer/u);
+  assert.throws(() => auditContextPack(pack({ response_omitted_items: 1 }), manifest()), /requires response_partial=true/u);
 });
 
 test('context audit handles optional assertions and rejects oversized or mistyped manifests and packs', () => {

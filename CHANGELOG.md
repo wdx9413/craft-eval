@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.0
+
+- Detect response-level omissions in Craft Context receipts and return inconclusive rather than passing an incomplete response.
+- Validate omission metadata consistency and report omitted item counts without exposing content.
+- Add complete branch, line, and function coverage for the Context Audit contract.
+
 ## 0.5.0
 
 - Add release-critical checks for Craft npm/runtime artifact alignment and Workbench desktop sidecar preparation.

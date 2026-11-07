@@ -17,7 +17,7 @@ export interface ContextAuditManifest {
 export interface ContextAuditCheck { id: string; status: 'passed' | 'failed' | 'inconclusive'; observed: number | boolean | null; expected: number | boolean | null }
 export interface ContextAuditReport {
   schema: 'craft-eval.context-audit-report.v1'; case_id: string; status: 'passed' | 'failed' | 'inconclusive'; pack_sha256: string; expectations_sha256: string;
-  metrics: { selected_ref_count: number; selected_item_count: number; selected_chars: number; estimated_tokens: number | null; host_measured_tokens: number | null; required_ref_recall: number | null; forbidden_ref_count: number; duplicate_ref_count: number };
+  metrics: { selected_ref_count: number; selected_item_count: number; selected_chars: number; estimated_tokens: number | null; host_measured_tokens: number | null; required_ref_recall: number | null; forbidden_ref_count: number; duplicate_ref_count: number; response_omitted_items: number };
   checks: ContextAuditCheck[]; partial: boolean;
   limitations: string[];
 }
@@ -116,6 +116,10 @@ function unwrapPack(value: unknown): Record<string, unknown> {
   positiveInteger(receipt.max_items, 'pack_receipt.max_items'); positiveInteger(receipt.max_chars, 'pack_receipt.max_chars');
   nonNegativeInteger(receipt.total_items, 'pack_receipt.total_items'); nonNegativeInteger(receipt.total_used_chars, 'pack_receipt.total_used_chars');
   if (receipt.partial !== undefined && typeof receipt.partial !== 'boolean') throw new Error('pack_receipt.partial must be boolean');
+  if (pack.response_partial !== undefined && typeof pack.response_partial !== 'boolean') throw new Error('context pack.response_partial must be boolean');
+  const responseOmittedItems = pack.response_omitted_items === undefined ? 0 : nonNegativeInteger(pack.response_omitted_items, 'context pack.response_omitted_items');
+  if (pack.response_partial === true && responseOmittedItems === 0) throw new Error('context pack.response_partial requires response_omitted_items');
+  if (responseOmittedItems > 0 && pack.response_partial !== true) throw new Error('context pack.response_omitted_items requires response_partial=true');
   return pack;
 }
 
@@ -171,6 +175,8 @@ export function auditContextPack(packValue: unknown, manifestValue: unknown): Co
   const selectedChars = numberOrNull(receipt.total_used_chars)!;
   const estimatedTokens = numberOrNull(injection.estimated_tokens);
   const hostMeasuredTokens = numberOrNull(injection.host_measured_tokens);
+  const responseOmittedItems = pack.response_omitted_items === undefined ? 0 : Number(pack.response_omitted_items);
+  const responsePartial = pack.response_partial === true;
   const duplicateRefCount = refs.length - new Set(refs.map(identity)).size;
   const requiredFound = spec.required_refs.filter(expected => refs.some(actual => matches(actual, expected))).length;
   const forbiddenFound = spec.forbidden_refs.filter(expected => refs.some(actual => matches(actual, expected))).length;
@@ -182,21 +188,22 @@ export function auditContextPack(packValue: unknown, manifestValue: unknown): Co
   add(checks, 'no_duplicate_refs', duplicateRefCount === 0, duplicateRefCount, 0);
   add(checks, 'reported_item_budget', selectedItems <= Number(receipt.max_items), selectedItems, Number(receipt.max_items));
   add(checks, 'reported_char_budget', selectedChars <= Number(receipt.max_chars), selectedChars, Number(receipt.max_chars));
+  add(checks, 'complete_response', responsePartial ? null : true, responseOmittedItems, 0);
   if (spec.max_items !== undefined) add(checks, 'selected_item_budget', selectedItems <= spec.max_items, selectedItems, spec.max_items);
   if (spec.max_chars !== undefined) add(checks, 'selected_char_budget', selectedChars <= spec.max_chars, selectedChars, spec.max_chars);
   if (spec.max_estimated_tokens !== undefined) add(checks, 'token_budget', estimatedTokens === null ? null : estimatedTokens <= spec.max_estimated_tokens, estimatedTokens, spec.max_estimated_tokens);
   if (spec.require_host_token_measurement === true) add(checks, 'host_token_measurement', hostMeasuredTokens === null ? null : true, hostMeasuredTokens, true);
   for (const member of spec.reference_only_members) add(checks, `no_inline_${member}`, !hasInlineBody(pack, member), hasInlineBody(pack, member), false);
-  const partialValue = receipt.partial ?? pack.partial ?? false;
-  const partial = partialValue === true;
-  add(checks, 'complete_pack', partial ? null : true, partial, false);
+  const selectedPartial = receipt.partial === true || pack.partial === true;
+  const partial = selectedPartial || responsePartial;
+  add(checks, 'complete_pack', selectedPartial === true ? null : true, selectedPartial, false);
   const failed = checks.some(check => check.status === 'failed');
   const inconclusive = checks.some(check => check.status === 'inconclusive');
   const status = failed ? 'failed' : inconclusive ? 'inconclusive' : 'passed';
   const recall = spec.required_refs.length === 0 ? null : requiredFound / spec.required_refs.length;
   return { schema: 'craft-eval.context-audit-report.v1', case_id: spec.case_id, status, pack_sha256: sha256Json(pack), expectations_sha256: sha256Json(spec),
     metrics: { selected_ref_count: refs.length, selected_item_count: selectedItems, selected_chars: selectedChars, estimated_tokens: estimatedTokens,
-      host_measured_tokens: hostMeasuredTokens, required_ref_recall: recall, forbidden_ref_count: forbiddenFound, duplicate_ref_count: duplicateRefCount },
+      host_measured_tokens: hostMeasuredTokens, required_ref_recall: recall, forbidden_ref_count: forbiddenFound, duplicate_ref_count: duplicateRefCount, response_omitted_items: responseOmittedItems },
     checks, partial,
     limitations: ['Measures a saved Context receipt against explicit labels and budgets; it does not prove the Host used or benefited from the material.',
       'Token estimates are approximate. Host token cost is verified only when a Host measurement is present.'] };
