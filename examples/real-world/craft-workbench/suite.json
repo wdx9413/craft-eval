@@ -30,6 +30,18 @@
   },
   "cases": [
     {
+      "id": "runtime-sidecar-contract",
+      "category": "release",
+      "risk": "critical",
+      "language": "javascript",
+      "in_place": true,
+      "argv": ["node", "desktop/scripts/prepare-sidecar.mjs"],
+      "timeout_s": 120,
+      "expected_behavior": "The installed immutable Craft package can be staged as the Workbench desktop sidecar using its declared npm artifact contract.",
+      "provenance": { "source": "craft-workbench/desktop/scripts/prepare-sidecar.mjs" },
+      "checks": [{ "id": "sidecar-preflight-exits-zero", "kind": "exit_code", "equals": 0 }]
+    },
+    {
       "id": "workbench-tests",
       "category": "regression",
       "risk": "high",
@@ -45,6 +57,7 @@
         "tests/composer-controls.test.ts",
         "tests/context-workflow-pages.test.ts",
         "tests/context-audit-panel.test.ts",
+        "tests/hook-diagnostics.test.ts",
         "tests/evaluation-panel.test.ts",
         "tests/message-dock.test.ts",
         "tests/mod-pages.test.ts",
@@ -170,6 +183,24 @@
       "timeout_s": 180,
       "expected_behavior": "The Context audit interface passes strict line, function and branch coverage.",
       "provenance": { "source": "craft-workbench/package.json:scripts.test:coverage:context-audit" },
+      "checks": [
+        { "id": "coverage-exits-zero", "kind": "exit_code", "equals": 0 },
+        { "id": "coverage-reaches-100", "kind": "stdout_contains", "value": "100.00" }
+      ]
+    },
+    {
+      "id": "hook-diagnostics-panel-coverage",
+      "category": "static",
+      "risk": "high",
+      "language": "javascript",
+      "in_place": true,
+      "argv": [
+        "node", "--experimental-strip-types", "--test", "--test-isolation=none", "--experimental-test-coverage", "--test-coverage-lines=100", "--test-coverage-functions=100", "--test-coverage-branches=100",
+        "--test-coverage-include=workbench/hook-diagnostics.js", "tests/hook-diagnostics.test.ts"
+      ],
+      "timeout_s": 120,
+      "expected_behavior": "The on-demand Hook diagnostic view distinguishes failure, skipped, unmatched and partial evidence with strict coverage.",
+      "provenance": { "source": "craft-workbench/package.json:scripts.test:coverage:hook-diagnostics" },
       "checks": [
         { "id": "coverage-exits-zero", "kind": "exit_code", "equals": 0 },
         { "id": "coverage-reaches-100", "kind": "stdout_contains", "value": "100.00" }

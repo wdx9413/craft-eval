@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.5.0
+
+- Add release-critical checks for Craft npm/runtime artifact alignment and Workbench desktop sidecar preparation.
+- Keep Hook diagnostics coverage cases tied to the installed package versions under evaluation.
+- These local deterministic checks do not establish rendered UI quality, Host timeout attribution, or user task benefit.
+
+
+## 0.4.0
+
+- Add strict Craft Hook diagnostic coverage and authenticated Workbench API cases to the Craft project suite.
+- Add on-demand Workbench Hook diagnostics coverage to the installed runtime quality suite.
+- Fix suite coverage assertions to match the actual coverage reporters and their output stream.
+- These local deterministic checks do not establish rendered UI quality, Host timeout attribution, or user task benefit.
+
 ## 0.3.0
 
 - Add an explicit localhost-bind requirement so cases that need local servers report `not_applicable` when the evaluator cannot bind loopback.

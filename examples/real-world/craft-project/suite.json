@@ -19,6 +19,21 @@
   },
   "cases": [
     {
+      "id": "runtime-artifact-contract",
+      "category": "release",
+      "risk": "critical",
+      "language": "typescript",
+      "argv": ["node", "--experimental-strip-types", "--test", "--test-isolation=none", "--test-name-pattern", "npm package files and the runtime artifact contract stay aligned", "tests/runtime-artifact.test.ts"],
+      "in_place": true,
+      "timeout_s": 90,
+      "expected_behavior": "Craft npm files match the runtime artifact allowlist so Workbench sidecar preparation cannot accept a mismatched package contract.",
+      "provenance": { "source": "craft/tests/runtime-artifact.test.ts" },
+      "checks": [
+        { "id": "artifact-contract-test-exits-zero", "kind": "exit_code", "equals": 0 },
+        { "id": "artifact-contract-test-ran", "kind": "stdout_contains", "value": "npm package files and the runtime artifact contract stay aligned" }
+      ]
+    },
+    {
       "id": "typecheck",
       "category": "static",
       "risk": "high",
@@ -138,6 +153,43 @@
       "checks": [
         { "id": "coverage-exits-zero", "kind": "exit_code", "equals": 0 },
         { "id": "coverage-reaches-100", "kind": "stdout_contains", "value": "100.00" }
+      ]
+    },
+    {
+      "id": "hook-diagnostics-coverage",
+      "category": "runtime",
+      "risk": "high",
+      "language": "typescript",
+      "argv": [
+        "node", "node_modules/c8/bin/c8.js", "--clean", "--reporter=text", "--include=core/interfaces/codex-hook-runtime-diagnostics.ts",
+        "--include=core/interfaces/hook-runtime-query.ts", "--check-coverage", "--lines", "100", "--branches", "100", "--functions", "100",
+        "node", "--experimental-strip-types", "--test", "--test-isolation=none", "tests/codex-hook-runtime-diagnostics.test.ts"
+      ],
+      "in_place": true,
+      "timeout_s": 180,
+      "expected_behavior": "Hook diagnostics preserve content-free lifecycle records and query recent completion or unmatched-start evidence with strict coverage.",
+      "provenance": { "source": "craft/package.json:scripts.test:coverage:hook-diagnostics" },
+      "checks": [
+        { "id": "coverage-exits-zero", "kind": "exit_code", "equals": 0 },
+        { "id": "coverage-reaches-100", "kind": "stdout_contains", "value": "100 |" }
+      ]
+    },
+    {
+      "id": "hook-diagnostics-workbench-api",
+      "category": "runtime",
+      "risk": "high",
+      "language": "typescript",
+      "argv": [
+        "node", "--experimental-strip-types", "--test", "--test-isolation=none", "--test-name-pattern", "Workbench exposes authenticated bounded Hook diagnostics",
+        "tests/workbench-ui-server.test.ts"
+      ],
+      "in_place": true,
+      "timeout_s": 90,
+      "expected_behavior": "Workbench API requires its token, rejects cross-origin and oversized reads, and returns content-free Hook diagnostic states.",
+      "provenance": { "source": "craft/tests/workbench-ui-server.test.ts" },
+      "checks": [
+        { "id": "api-test-exits-zero", "kind": "exit_code", "equals": 0 },
+        { "id": "api-test-ran", "kind": "stdout_contains", "value": "Workbench exposes authenticated bounded Hook diagnostics" }
       ]
     },
     {
