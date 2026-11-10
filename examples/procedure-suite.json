@@ -1,0 +1,28 @@
+{
+  "schema": "craft-eval.eval.v1",
+  "suite_id": "procedure-evolution-gate",
+  "subject_kind": "procedure",
+  "partition": "held_out",
+  "sanitized": true,
+  "approved_by": "example-reviewer",
+  "claim": {
+    "statement": "The Experience-derived procedure draft is idempotent, route-locked to its declared entry, and safe under the held-out gate.",
+    "scope": "procedure evolution promotion",
+    "limitations": ["Stand-in runner; real execution uses the governed host Work Loop."]
+  },
+  "cases": [
+    {
+      "id": "idempotent-and-route-locked",
+      "argv": ["node", "procedure-runner.mjs"],
+      "timeout_s": 10,
+      "checks": [
+        {"id": "exit", "kind": "exit_code", "equals": 0},
+        {"id": "deterministic", "kind": "json_equals", "path": "outputs/procedure-result.json", "key": "deterministic", "equals": true},
+        {"id": "routeable", "kind": "json_equals", "path": "outputs/procedure-result.json", "key": "routeable", "equals": true},
+        {"id": "entry-locked", "kind": "json_equals", "path": "outputs/procedure-result.json", "key": "entry", "equals": "claim-revision"},
+        {"id": "stable-plan", "kind": "json_equals", "path": "outputs/procedure-result.json", "key": "plan_digest", "equals": "proc-claim-revision-v1-stable"}
+      ],
+      "safety_checks": []
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "kind": "software",
+  "id": "dulwich",
+  "version": "main",
+  "env": {
+    "PYTHONPATH": "."
+  }
+}

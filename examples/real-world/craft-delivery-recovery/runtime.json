@@ -1,0 +1,7 @@
+{
+  "environment_digest": "local-deterministic-tests",
+  "budget_digest": "bounded-case-runtime",
+  "host_digest": "node-test-runner-no-model",
+  "model_digest": "none",
+  "tools_digest": "none"
+}

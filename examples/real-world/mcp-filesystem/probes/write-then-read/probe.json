@@ -1,0 +1,10 @@
+[
+  {
+    "id": "write",
+    "tool": "write_file",
+    "arguments": {
+      "path": "a.txt",
+      "content": "hello-craft"
+    }
+  }
+]

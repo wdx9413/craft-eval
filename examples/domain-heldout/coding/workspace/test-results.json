@@ -1,0 +1,11 @@
+{
+  "tests": [
+    {"id": "unit-parse", "passed": true, "covered_lines": 120, "total_lines": 140},
+    {"id": "unit-validate", "passed": true, "covered_lines": 95, "total_lines": 100},
+    {"id": "unit-render", "passed": true, "covered_lines": 80, "total_lines": 90},
+    {"id": "integration-cli", "passed": true, "covered_lines": 150, "total_lines": 160},
+    {"id": "integration-api", "passed": true, "covered_lines": 110, "total_lines": 120},
+    {"id": "e2e-flow", "passed": true, "covered_lines": 200, "total_lines": 210}
+  ],
+  "previously_passing": ["unit-parse", "unit-validate", "unit-render", "integration-cli", "integration-api", "e2e-flow"]
+}

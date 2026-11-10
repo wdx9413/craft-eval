@@ -1,0 +1,7 @@
+[
+  {
+    "id": "roots",
+    "tool": "list_allowed_directories",
+    "arguments": {}
+  }
+]

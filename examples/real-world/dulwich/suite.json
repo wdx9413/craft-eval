@@ -1,0 +1,32 @@
+{
+  "schema": "craft-eval.eval.v1",
+  "suite_id": "dulwich-object-store",
+  "subject_kind": "software",
+  "partition": "development",
+  "sanitized": true,
+  "claim": {
+    "statement": "dulwich 的 Git 对象存储实现通过其自身测试套件",
+    "scope": "tests/test_object_store.py 一个测试文件；单机离线",
+    "limitations": ["只覆盖对象存储层，不含网络/协议层"]
+  },
+  "metrics": {
+    "primary": {
+      "id": "task_pass",
+      "kind": "binary_pass_rate",
+      "direction": "higher_is_better",
+      "minimum_sample": 1
+    }
+  },
+  "cases": [
+    {
+      "id": "object-store",
+      "language": "python",
+      "argv": ["py", "-3", "-m", "pytest", "tests/test_object_store.py", "-q", "--no-header", "-p", "no:cacheprovider"],
+      "in_place": true,
+      "timeout_s": 120,
+      "checks": [
+        {"id": "exit", "kind": "exit_code", "equals": 0}
+      ]
+    }
+  ]
+}

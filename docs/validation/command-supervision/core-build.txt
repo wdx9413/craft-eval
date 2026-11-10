@@ -1,0 +1,51 @@
+$ pnpm run clean && pnpm run build:core && pnpm run build:common && pnpm run build:plugin && pnpm run build:datasec && pnpm run build:deepseek && pnpm run pack:plugin
+$ node --experimental-strip-types scripts/clean.ts
+(node:[PID]) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+$ node node_modules/typescript/bin/tsc -p tsconfig.build.json
+$ node --experimental-strip-types scripts/release/build-common-packages.ts
+(node:[PID]) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+Built standalone package common/craft-common-store-local
+Built standalone package common/craft-common-base
+Built standalone package common/craft-common-log
+Built standalone package capability/craft-knowledge
+Built standalone package capability/craft-memory
+Built standalone package capability/craft-experience
+Built standalone package capability/craft-codebase
+$ node --experimental-strip-types scripts/release/prepare-typescript-compiler.ts && esbuild bin/craft-mcp.ts --bundle --define:CRAFT_TYPESCRIPT_BUNDLE=true --platform=node --format=cjs --target=node23 --define:import.meta.url=undefined --outfile=dist/plugin/craft-mcp.cjs && esbuild bin/craft-mcp-full.ts --bundle --define:CRAFT_TYPESCRIPT_BUNDLE=true --platform=node --format=cjs --target=node23 --define:import.meta.url=undefined --outfile=dist/plugin/craft-mcp-full.cjs && esbuild bin/craft-mcp-http.ts --bundle --define:CRAFT_TYPESCRIPT_BUNDLE=true --platform=node --format=cjs --target=node23 --define:import.meta.url=undefined --outfile=dist/plugin/craft-mcp-http.cjs && esbuild bin/craft-codex-hook.ts --bundle --define:CRAFT_TYPESCRIPT_BUNDLE=true --platform=node --format=cjs --target=node23 --define:import.meta.url=undefined --outfile=dist/plugin/craft-codex-hook.cjs && esbuild bin/craft-parser-worker.ts --bundle --define:CRAFT_TYPESCRIPT_BUNDLE=true --platform=node --format=esm --target=node23 --outfile=dist/plugin/craft-parser-worker.js && esbuild deploy/experience-learning/worker.ts --bundle --define:CRAFT_TYPESCRIPT_BUNDLE=true --platform=node --format=esm --target=node23 --outfile=dist/plugin/craft-experience-learning-worker.js
+(node:[PID]) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+  dist/plugin/craft-mcp.cjs  4.5mb ⚠️
+
+⚡ Done in 60ms
+
+  dist/plugin/craft-mcp-full.cjs  4.4mb ⚠️
+
+⚡ Done in 61ms
+
+  dist/plugin/craft-mcp-http.cjs  4.4mb ⚠️
+
+⚡ Done in 61ms
+
+  dist/plugin/craft-codex-hook.cjs  4.7mb ⚠️
+
+⚡ Done in 67ms
+
+  dist/plugin/craft-parser-worker.js  5.2kb
+
+⚡ Done in 7ms
+
+  dist/plugin/craft-experience-learning-worker.js  333.5kb
+
+⚡ Done in 14ms
+$ node --experimental-strip-types capability/craft-datasec/build.ts
+(node:[PID]) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+Built independent plugin: [WORKSPACE]/craft/plugins/craft-datasec
+$ node node_modules/typescript/bin/tsc -p adapters/deepseek-harness/tsconfig.json && node -e "const fs=require('node:fs'); fs.mkdirSync('dist/adapters/deepseek-harness',{recursive:true}); fs.copyFileSync('adapters/deepseek-harness/package.json','dist/adapters/deepseek-harness/package.json')"
+$ node --experimental-strip-types scripts/release/pack-plugin.ts
+(node:[PID]) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+Packed Craft and 1 component plugins.

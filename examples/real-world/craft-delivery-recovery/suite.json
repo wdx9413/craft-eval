@@ -1,0 +1,68 @@
+{
+  "schema": "craft-eval.eval.v1",
+  "suite_id": "craft-personal-agent-delivery-recovery",
+  "subject_kind": "software",
+  "partition": "development",
+  "sanitized": true,
+  "claim": {
+    "statement": "The personal-agent task can be reopened with its goal, sources, pending work and current artifact digest; safe local updates preserve unrelated human edits and refuse stale writes.",
+    "scope": "Deterministic Craft service, Workbench HTTP projection, filesystem patch and task retry tests in the pinned Craft checkout.",
+    "limitations": [
+      "These tests use local temporary workspaces and synthetic page responses; they do not prove live web or model accuracy.",
+      "UI installation, macOS restart, and real user benefit require separate runtime evidence."
+    ]
+  },
+  "metrics": {
+    "primary": { "id": "delivery_recovery_case_pass_rate", "kind": "binary_pass_rate", "direction": "higher_is_better", "minimum_sample": 4 }
+  },
+  "cases": [
+    {
+      "id": "reopen-task-with-sources-and-current-markdown",
+      "category": "task-recovery",
+      "risk": "high",
+      "language": "typescript",
+      "in_place": true,
+      "argv": ["node", "--experimental-strip-types", "--test", "--test-isolation=none", "tests/issue-34-markdown-resume.test.ts"],
+      "timeout_s": 180,
+      "expected_behavior": "After closing and reopening the local store, the Workbench task still exposes the original goal, page source locator, pending checkpoint and attention item, Task Run handle and current artifact version/digest. A Markdown patch changes only Beta, a stale file digest refuses after a human edit, and a fresh targeted patch preserves that edit.",
+      "provenance": { "source": "craft/tests/issue-34-markdown-resume.test.ts" },
+      "checks": [{ "id": "tests-pass", "kind": "exit_code", "equals": 0 }]
+    },
+    {
+      "id": "unknown-host-result-reconciles-without-replay",
+      "category": "task-recovery",
+      "risk": "high",
+      "language": "typescript",
+      "in_place": true,
+      "argv": ["node", "--experimental-strip-types", "--test", "--test-isolation=none", "--test-name-pattern", "completed external work survives restart as unknown until its exact receipt is reconciled", "tests/task-run.test.ts"],
+      "timeout_s": 180,
+      "expected_behavior": "An unlinked completion remains result_unknown after reopening, exact receipt reconciliation is idempotent, and the completed Host action is not retried.",
+      "provenance": { "source": "craft/tests/task-run.test.ts" },
+      "checks": [{ "id": "tests-pass", "kind": "exit_code", "equals": 0 }]
+    },
+    {
+      "id": "partial-update-and-human-edit-conflict",
+      "category": "artifact-protection",
+      "risk": "high",
+      "language": "typescript",
+      "in_place": true,
+      "argv": ["node", "--experimental-strip-types", "--test", "--test-isolation=none", "--test-name-pattern", "concurrent human edits are not overwritten between preview and apply|selected patches can be accepted independently and retried without overwriting human edits", "tests/changeset-merge.test.ts"],
+      "timeout_s": 180,
+      "expected_behavior": "Concurrent human changes are preserved; only selected non-conflicting entries are applied, and conflicts remain unaccepted.",
+      "provenance": { "source": "craft/tests/changeset-merge.test.ts" },
+      "checks": [{ "id": "tests-pass", "kind": "exit_code", "equals": 0 }]
+    },
+    {
+      "id": "retry-inherits-the-original-budget",
+      "category": "attempt-budget",
+      "risk": "high",
+      "language": "typescript",
+      "in_place": true,
+      "argv": ["node", "--experimental-strip-types", "--test", "--test-isolation=none", "--test-name-pattern", "cumulative USD shrinks each attempt cap and exhaustion blocks new records before the retry-count limit|unknown cost stays reserved across attempts and explicit overrun accounting does not enlarge the total cap", "tests/work-attempt-budget.test.ts"],
+      "timeout_s": 240,
+      "expected_behavior": "Retries consume the existing total budget, unknown spend stays reserved, and approval or resume does not mint a fresh budget.",
+      "provenance": { "source": "craft/tests/work-attempt-budget.test.ts" },
+      "checks": [{ "id": "tests-pass", "kind": "exit_code", "equals": 0 }]
+    }
+  ]
+}

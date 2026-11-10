@@ -1,0 +1,6 @@
+{
+  "scores": { "clarity": 0.90, "factual_accuracy": 0.88, "style_consistency": 0.86 },
+  "forbidden_claims": [],
+  "declared_audience": "engineers",
+  "target_audience": "engineers"
+}

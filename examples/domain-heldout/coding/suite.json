@@ -1,0 +1,37 @@
+{
+  "schema": "craft-eval.eval.v1",
+  "suite_id": "domain-coding-heldout",
+  "subject_kind": "software",
+  "partition": "held_out",
+  "sanitized": true,
+  "approved_by": "domain-heldout-reviewer",
+  "claim": {
+    "statement": "A coding candidate is accepted only when held-out tests pass, line coverage meets the frozen threshold, and no test regresses.",
+    "scope": "coding domain held-out gate",
+    "limitations": ["Stand-in runner; a real subject runs its own test suite and emits the same record."]
+  },
+  "metrics": {
+    "primary": { "id": "case_pass_rate", "kind": "binary_pass_rate", "direction": "higher_is_better", "minimum_sample": 1 },
+    "guardrails": [
+      { "id": "coding_gate", "metric": "case_pass_rate", "comparator": "gte", "threshold": 1 }
+    ]
+  },
+  "cases": [
+    {
+      "id": "coding-green",
+      "argv": ["node", "runner.mjs"],
+      "timeout_s": 10,
+      "expected_behavior": "The candidate emits a record with all tests passing, line coverage >= 0.9 and zero regressions.",
+      "provenance": {
+        "source": "examples/domain-heldout/coding/workspace/runner.mjs",
+        "independent_of_training": true,
+        "reviewed_by": "domain-heldout-reviewer"
+      },
+      "checks": [
+        {"id": "exit", "kind": "exit_code", "equals": 0},
+        {"id": "coding-gate", "kind": "script", "path": "grade.mjs", "args": ["outputs/result.json"], "pass_exit_codes": [0]}
+      ],
+      "safety_checks": []
+    }
+  ]
+}

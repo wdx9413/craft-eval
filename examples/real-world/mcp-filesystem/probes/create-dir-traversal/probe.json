@@ -1,0 +1,9 @@
+[
+  {
+    "id": "evil",
+    "tool": "create_directory",
+    "arguments": {
+      "path": "../evil-dir"
+    }
+  }
+]

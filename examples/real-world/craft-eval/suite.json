@@ -1,0 +1,1090 @@
+{
+  "schema": "craft-eval.eval.v1",
+  "suite_id": "craft-eval-capabilities",
+  "subject_kind": "software",
+  "partition": "development",
+  "sanitized": true,
+  "claim": {
+    "statement": "The named craft-eval regression tests and package build pass on the declared local runtime.",
+    "scope": "Local deterministic regression checks for craft-eval only.",
+    "limitations": [
+      "Does not establish Craft or Workbench product quality or real-world task benefit."
+    ]
+  },
+  "metrics": {
+    "primary": {
+      "id": "case_pass_rate",
+      "kind": "binary_pass_rate",
+      "direction": "higher_is_better",
+      "minimum_sample": 23
+    },
+    "guardrails": [
+      {
+        "id": "build_pass",
+        "metric": "build_pass",
+        "comparator": "gte",
+        "threshold": 1
+      }
+    ]
+  },
+  "cases": [
+    {
+      "id": "build-succeeds",
+      "category": "build",
+      "risk": "high",
+      "language": "typescript",
+      "in_place": true,
+      "argv": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "timeout_s": 300,
+      "expected_behavior": "The craft-eval TypeScript package builds successfully on the current host.",
+      "provenance": {
+        "source": "craft-eval/package.json:scripts.build"
+      },
+      "checks": [
+        {
+          "id": "built",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "01-software-executes-in-copy-and-reports-observed-f",
+      "category": "evaluator-regression",
+      "risk": "high",
+      "language": "typescript",
+      "in_place": true,
+      "argv": [
+        "node",
+        "--test",
+        "--test-reporter=spec",
+        "--test-name-pattern=^software executes in copy and reports observed failures$",
+        "{{craft-eval}}/dist/tests/evaluation.test.js"
+      ],
+      "timeout_s": 60,
+      "expected_behavior": "The named evaluator regression test passes: software executes in copy and reports observed failures.",
+      "provenance": {
+        "source": "craft-eval/tests/evaluation.test.ts",
+        "source_digest": "sha256:ba905d99156b1c7cbe5ba2f3b5c69609e55f9d30291fa3d2b45c20e6e23a364f"
+      },
+      "checks": [
+        {
+          "id": "named-test-ran-once",
+          "kind": "stdout_contains",
+          "value": "ℹ tests 1"
+        },
+        {
+          "id": "named-test-passed",
+          "kind": "stdout_contains",
+          "value": "✔ software executes in copy and reports observed failures"
+        },
+        {
+          "id": "single-selected-test-passed",
+          "kind": "stdout_contains",
+          "value": "ℹ pass 1"
+        },
+        {
+          "id": "no-test-failures",
+          "kind": "stdout_contains",
+          "value": "ℹ fail 0"
+        },
+        {
+          "id": "process-exited-successfully",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "02-agent-checks-environment-state-and-completed-hos",
+      "category": "evaluator-regression",
+      "risk": "high",
+      "language": "typescript",
+      "in_place": true,
+      "argv": [
+        "node",
+        "--test",
+        "--test-reporter=spec",
+        "--test-name-pattern=^agent checks environment state and completed host trace$",
+        "{{craft-eval}}/dist/tests/evaluation.test.js"
+      ],
+      "timeout_s": 60,
+      "expected_behavior": "The named evaluator regression test passes: agent checks environment state and completed host trace.",
+      "provenance": {
+        "source": "craft-eval/tests/evaluation.test.ts",
+        "source_digest": "sha256:ba905d99156b1c7cbe5ba2f3b5c69609e55f9d30291fa3d2b45c20e6e23a364f"
+      },
+      "checks": [
+        {
+          "id": "named-test-ran-once",
+          "kind": "stdout_contains",
+          "value": "ℹ tests 1"
+        },
+        {
+          "id": "named-test-passed",
+          "kind": "stdout_contains",
+          "value": "✔ agent checks environment state and completed host trace"
+        },
+        {
+          "id": "single-selected-test-passed",
+          "kind": "stdout_contains",
+          "value": "ℹ pass 1"
+        },
+        {
+          "id": "no-test-failures",
+          "kind": "stdout_contains",
+          "value": "ℹ fail 0"
+        },
+        {
+          "id": "process-exited-successfully",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "03-missing-terminal-trace-is-inconclusive-even-when",
+      "category": "evaluator-regression",
+      "risk": "high",
+      "language": "typescript",
+      "in_place": true,
+      "argv": [
+        "node",
+        "--test",
+        "--test-reporter=spec",
+        "--test-name-pattern=^missing terminal trace is inconclusive even when skill not selected$",
+        "{{craft-eval}}/dist/tests/evaluation.test.js"
+      ],
+      "timeout_s": 60,
+      "expected_behavior": "The named evaluator regression test passes: missing terminal trace is inconclusive even when skill not selected.",
+      "provenance": {
+        "source": "craft-eval/tests/evaluation.test.ts",
+        "source_digest": "sha256:ba905d99156b1c7cbe5ba2f3b5c69609e55f9d30291fa3d2b45c20e6e23a364f"
+      },
+      "checks": [
+        {
+          "id": "named-test-ran-once",
+          "kind": "stdout_contains",
+          "value": "ℹ tests 1"
+        },
+        {
+          "id": "named-test-passed",
+          "kind": "stdout_contains",
+          "value": "✔ missing terminal trace is inconclusive even when skill not selected"
+        },
+        {
+          "id": "single-selected-test-passed",
+          "kind": "stdout_contains",
+          "value": "ℹ pass 1"
+        },
+        {
+          "id": "no-test-failures",
+          "kind": "stdout_contains",
+          "value": "ℹ fail 0"
+        },
+        {
+          "id": "process-exited-successfully",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "04-agent-local-argv-checks-do-not-require-a-host-tr",
+      "category": "evaluator-regression",
+      "risk": "high",
+      "language": "typescript",
+      "in_place": true,
+      "argv": [
+        "node",
+        "--test",
+        "--test-reporter=spec",
+        "--test-name-pattern=^agent local argv checks do not require a host trace$",
+        "{{craft-eval}}/dist/tests/evaluation.test.js"
+      ],
+      "timeout_s": 60,
+      "expected_behavior": "The named evaluator regression test passes: agent local argv checks do not require a host trace.",
+      "provenance": {
+        "source": "craft-eval/tests/evaluation.test.ts",
+        "source_digest": "sha256:ba905d99156b1c7cbe5ba2f3b5c69609e55f9d30291fa3d2b45c20e6e23a364f"
+      },
+      "checks": [
+        {
+          "id": "named-test-ran-once",
+          "kind": "stdout_contains",
+          "value": "ℹ tests 1"
+        },
+        {
+          "id": "named-test-passed",
+          "kind": "stdout_contains",
+          "value": "✔ agent local argv checks do not require a host trace"
+        },
+        {
+          "id": "single-selected-test-passed",
+          "kind": "stdout_contains",
+          "value": "ℹ pass 1"
+        },
+        {
+          "id": "no-test-failures",
+          "kind": "stdout_contains",
+          "value": "ℹ fail 0"
+        },
+        {
+          "id": "process-exited-successfully",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "05-skill-paired-gain-requires-evaluator-observed-ho",
+      "category": "evaluator-regression",
+      "risk": "high",
+      "language": "typescript",
+      "in_place": true,
+      "argv": [
+        "node",
+        "--test",
+        "--test-reporter=spec",
+        "--test-name-pattern=^skill paired gain requires evaluator-observed host events$",
+        "{{craft-eval}}/dist/tests/evaluation.test.js"
+      ],
+      "timeout_s": 60,
+      "expected_behavior": "The named evaluator regression test passes: skill paired gain requires evaluator-observed host events.",
+      "provenance": {
+        "source": "craft-eval/tests/evaluation.test.ts",
+        "source_digest": "sha256:ba905d99156b1c7cbe5ba2f3b5c69609e55f9d30291fa3d2b45c20e6e23a364f"
+      },
+      "checks": [
+        {
+          "id": "named-test-ran-once",
+          "kind": "stdout_contains",
+          "value": "ℹ tests 1"
+        },
+        {
+          "id": "named-test-passed",
+          "kind": "stdout_contains",
+          "value": "✔ skill paired gain requires evaluator-observed host events"
+        },
+        {
+          "id": "single-selected-test-passed",
+          "kind": "stdout_contains",
+          "value": "ℹ pass 1"
+        },
+        {
+          "id": "no-test-failures",
+          "kind": "stdout_contains",
+          "value": "ℹ fail 0"
+        },
+        {
+          "id": "process-exited-successfully",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "06-plan-and-result-tampering-or-incomplete-work-can",
+      "category": "evaluator-regression",
+      "risk": "high",
+      "language": "typescript",
+      "in_place": true,
+      "argv": [
+        "node",
+        "--test",
+        "--test-reporter=spec",
+        "--test-name-pattern=^plan and result tampering or incomplete work cannot pass$",
+        "{{craft-eval}}/dist/tests/evaluation.test.js"
+      ],
+      "timeout_s": 60,
+      "expected_behavior": "The named evaluator regression test passes: plan and result tampering or incomplete work cannot pass.",
+      "provenance": {
+        "source": "craft-eval/tests/evaluation.test.ts",
+        "source_digest": "sha256:ba905d99156b1c7cbe5ba2f3b5c69609e55f9d30291fa3d2b45c20e6e23a364f"
+      },
+      "checks": [
+        {
+          "id": "named-test-ran-once",
+          "kind": "stdout_contains",
+          "value": "ℹ tests 1"
+        },
+        {
+          "id": "named-test-passed",
+          "kind": "stdout_contains",
+          "value": "✔ plan and result tampering or incomplete work cannot pass"
+        },
+        {
+          "id": "single-selected-test-passed",
+          "kind": "stdout_contains",
+          "value": "ℹ pass 1"
+        },
+        {
+          "id": "no-test-failures",
+          "kind": "stdout_contains",
+          "value": "ℹ fail 0"
+        },
+        {
+          "id": "process-exited-successfully",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "07-suite-validation-rejects-unsafe-or-ambiguous-con",
+      "category": "evaluator-regression",
+      "risk": "high",
+      "language": "typescript",
+      "in_place": true,
+      "argv": [
+        "node",
+        "--test",
+        "--test-reporter=spec",
+        "--test-name-pattern=^suite validation rejects unsafe or ambiguous contracts$",
+        "{{craft-eval}}/dist/tests/evaluation.test.js"
+      ],
+      "timeout_s": 60,
+      "expected_behavior": "The named evaluator regression test passes: suite validation rejects unsafe or ambiguous contracts.",
+      "provenance": {
+        "source": "craft-eval/tests/evaluation.test.ts",
+        "source_digest": "sha256:ba905d99156b1c7cbe5ba2f3b5c69609e55f9d30291fa3d2b45c20e6e23a364f"
+      },
+      "checks": [
+        {
+          "id": "named-test-ran-once",
+          "kind": "stdout_contains",
+          "value": "ℹ tests 1"
+        },
+        {
+          "id": "named-test-passed",
+          "kind": "stdout_contains",
+          "value": "✔ suite validation rejects unsafe or ambiguous contracts"
+        },
+        {
+          "id": "single-selected-test-passed",
+          "kind": "stdout_contains",
+          "value": "ℹ pass 1"
+        },
+        {
+          "id": "no-test-failures",
+          "kind": "stdout_contains",
+          "value": "ℹ fail 0"
+        },
+        {
+          "id": "process-exited-successfully",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "08-runtime-mismatch-and-adapter-errors-are-explicit",
+      "category": "evaluator-regression",
+      "risk": "high",
+      "language": "typescript",
+      "in_place": true,
+      "argv": [
+        "node",
+        "--test",
+        "--test-reporter=spec",
+        "--test-name-pattern=^runtime mismatch and adapter errors are explicit$",
+        "{{craft-eval}}/dist/tests/evaluation.test.js"
+      ],
+      "timeout_s": 60,
+      "expected_behavior": "The named evaluator regression test passes: runtime mismatch and adapter errors are explicit.",
+      "provenance": {
+        "source": "craft-eval/tests/evaluation.test.ts",
+        "source_digest": "sha256:ba905d99156b1c7cbe5ba2f3b5c69609e55f9d30291fa3d2b45c20e6e23a364f"
+      },
+      "checks": [
+        {
+          "id": "named-test-ran-once",
+          "kind": "stdout_contains",
+          "value": "ℹ tests 1"
+        },
+        {
+          "id": "named-test-passed",
+          "kind": "stdout_contains",
+          "value": "✔ runtime mismatch and adapter errors are explicit"
+        },
+        {
+          "id": "single-selected-test-passed",
+          "kind": "stdout_contains",
+          "value": "ℹ pass 1"
+        },
+        {
+          "id": "no-test-failures",
+          "kind": "stdout_contains",
+          "value": "ℹ fail 0"
+        },
+        {
+          "id": "process-exited-successfully",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "09-timeout-and-untrusted-trace-cannot-count-as-succ",
+      "category": "evaluator-regression",
+      "risk": "high",
+      "language": "typescript",
+      "in_place": true,
+      "argv": [
+        "node",
+        "--test",
+        "--test-reporter=spec",
+        "--test-name-pattern=^timeout and untrusted trace cannot count as success$",
+        "{{craft-eval}}/dist/tests/evaluation.test.js"
+      ],
+      "timeout_s": 60,
+      "expected_behavior": "The named evaluator regression test passes: timeout and untrusted trace cannot count as success.",
+      "provenance": {
+        "source": "craft-eval/tests/evaluation.test.ts",
+        "source_digest": "sha256:ba905d99156b1c7cbe5ba2f3b5c69609e55f9d30291fa3d2b45c20e6e23a364f"
+      },
+      "checks": [
+        {
+          "id": "named-test-ran-once",
+          "kind": "stdout_contains",
+          "value": "ℹ tests 1"
+        },
+        {
+          "id": "named-test-passed",
+          "kind": "stdout_contains",
+          "value": "✔ timeout and untrusted trace cannot count as success"
+        },
+        {
+          "id": "single-selected-test-passed",
+          "kind": "stdout_contains",
+          "value": "ℹ pass 1"
+        },
+        {
+          "id": "no-test-failures",
+          "kind": "stdout_contains",
+          "value": "ℹ fail 0"
+        },
+        {
+          "id": "process-exited-successfully",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "10-artifact-links-cannot-read-outside-workspace",
+      "category": "evaluator-regression",
+      "risk": "high",
+      "language": "typescript",
+      "in_place": true,
+      "argv": [
+        "node",
+        "--test",
+        "--test-reporter=spec",
+        "--test-name-pattern=^artifact links cannot read outside workspace$",
+        "{{craft-eval}}/dist/tests/evaluation.test.js"
+      ],
+      "timeout_s": 60,
+      "expected_behavior": "The named evaluator regression test passes: artifact links cannot read outside workspace.",
+      "provenance": {
+        "source": "craft-eval/tests/evaluation.test.ts",
+        "source_digest": "sha256:ba905d99156b1c7cbe5ba2f3b5c69609e55f9d30291fa3d2b45c20e6e23a364f"
+      },
+      "checks": [
+        {
+          "id": "named-test-ran-once",
+          "kind": "stdout_contains",
+          "value": "ℹ tests 1"
+        },
+        {
+          "id": "named-test-passed",
+          "kind": "stdout_contains",
+          "value": "✔ artifact links cannot read outside workspace"
+        },
+        {
+          "id": "single-selected-test-passed",
+          "kind": "stdout_contains",
+          "value": "ℹ pass 1"
+        },
+        {
+          "id": "no-test-failures",
+          "kind": "stdout_contains",
+          "value": "ℹ fail 0"
+        },
+        {
+          "id": "process-exited-successfully",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "11-contract-rejects-all-invalid-case-and-check-shap",
+      "category": "evaluator-regression",
+      "risk": "high",
+      "language": "typescript",
+      "in_place": true,
+      "argv": [
+        "node",
+        "--test",
+        "--test-reporter=spec",
+        "--test-name-pattern=^contract rejects all invalid case and check shapes$",
+        "{{craft-eval}}/dist/tests/evaluation.test.js"
+      ],
+      "timeout_s": 60,
+      "expected_behavior": "The named evaluator regression test passes: contract rejects all invalid case and check shapes.",
+      "provenance": {
+        "source": "craft-eval/tests/evaluation.test.ts",
+        "source_digest": "sha256:ba905d99156b1c7cbe5ba2f3b5c69609e55f9d30291fa3d2b45c20e6e23a364f"
+      },
+      "checks": [
+        {
+          "id": "named-test-ran-once",
+          "kind": "stdout_contains",
+          "value": "ℹ tests 1"
+        },
+        {
+          "id": "named-test-passed",
+          "kind": "stdout_contains",
+          "value": "✔ contract rejects all invalid case and check shapes"
+        },
+        {
+          "id": "single-selected-test-passed",
+          "kind": "stdout_contains",
+          "value": "ℹ pass 1"
+        },
+        {
+          "id": "no-test-failures",
+          "kind": "stdout_contains",
+          "value": "ℹ fail 0"
+        },
+        {
+          "id": "process-exited-successfully",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "12-subject-workspace-trials-and-cli-errors",
+      "category": "evaluator-regression",
+      "risk": "high",
+      "language": "typescript",
+      "in_place": true,
+      "argv": [
+        "node",
+        "--test",
+        "--test-reporter=spec",
+        "--test-name-pattern=^subject workspace trials and cli errors$",
+        "{{craft-eval}}/dist/tests/evaluation.test.js"
+      ],
+      "timeout_s": 60,
+      "expected_behavior": "The named evaluator regression test passes: subject workspace trials and cli errors.",
+      "provenance": {
+        "source": "craft-eval/tests/evaluation.test.ts",
+        "source_digest": "sha256:ba905d99156b1c7cbe5ba2f3b5c69609e55f9d30291fa3d2b45c20e6e23a364f"
+      },
+      "checks": [
+        {
+          "id": "named-test-ran-once",
+          "kind": "stdout_contains",
+          "value": "ℹ tests 1"
+        },
+        {
+          "id": "named-test-passed",
+          "kind": "stdout_contains",
+          "value": "✔ subject workspace trials and cli errors"
+        },
+        {
+          "id": "single-selected-test-passed",
+          "kind": "stdout_contains",
+          "value": "ℹ pass 1"
+        },
+        {
+          "id": "no-test-failures",
+          "kind": "stdout_contains",
+          "value": "ℹ fail 0"
+        },
+        {
+          "id": "process-exited-successfully",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "13-artifact-and-trace-failure-modes",
+      "category": "evaluator-regression",
+      "risk": "high",
+      "language": "typescript",
+      "in_place": true,
+      "argv": [
+        "node",
+        "--test",
+        "--test-reporter=spec",
+        "--test-name-pattern=^artifact and trace failure modes$",
+        "{{craft-eval}}/dist/tests/evaluation.test.js"
+      ],
+      "timeout_s": 60,
+      "expected_behavior": "The named evaluator regression test passes: artifact and trace failure modes.",
+      "provenance": {
+        "source": "craft-eval/tests/evaluation.test.ts",
+        "source_digest": "sha256:ba905d99156b1c7cbe5ba2f3b5c69609e55f9d30291fa3d2b45c20e6e23a364f"
+      },
+      "checks": [
+        {
+          "id": "named-test-ran-once",
+          "kind": "stdout_contains",
+          "value": "ℹ tests 1"
+        },
+        {
+          "id": "named-test-passed",
+          "kind": "stdout_contains",
+          "value": "✔ artifact and trace failure modes"
+        },
+        {
+          "id": "single-selected-test-passed",
+          "kind": "stdout_contains",
+          "value": "ℹ pass 1"
+        },
+        {
+          "id": "no-test-failures",
+          "kind": "stdout_contains",
+          "value": "ℹ fail 0"
+        },
+        {
+          "id": "process-exited-successfully",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "14-comparison-guards-and-pair-directions",
+      "category": "evaluator-regression",
+      "risk": "high",
+      "language": "typescript",
+      "in_place": true,
+      "argv": [
+        "node",
+        "--test",
+        "--test-reporter=spec",
+        "--test-name-pattern=^comparison guards and pair directions$",
+        "{{craft-eval}}/dist/tests/evaluation.test.js"
+      ],
+      "timeout_s": 60,
+      "expected_behavior": "The named evaluator regression test passes: comparison guards and pair directions.",
+      "provenance": {
+        "source": "craft-eval/tests/evaluation.test.ts",
+        "source_digest": "sha256:ba905d99156b1c7cbe5ba2f3b5c69609e55f9d30291fa3d2b45c20e6e23a364f"
+      },
+      "checks": [
+        {
+          "id": "named-test-ran-once",
+          "kind": "stdout_contains",
+          "value": "ℹ tests 1"
+        },
+        {
+          "id": "named-test-passed",
+          "kind": "stdout_contains",
+          "value": "✔ comparison guards and pair directions"
+        },
+        {
+          "id": "single-selected-test-passed",
+          "kind": "stdout_contains",
+          "value": "ℹ pass 1"
+        },
+        {
+          "id": "no-test-failures",
+          "kind": "stdout_contains",
+          "value": "ℹ fail 0"
+        },
+        {
+          "id": "process-exited-successfully",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "15-self-reported-triggers-can-diagnose-but-never-su",
+      "category": "evaluator-regression",
+      "risk": "high",
+      "language": "typescript",
+      "in_place": true,
+      "argv": [
+        "node",
+        "--test",
+        "--test-reporter=spec",
+        "--test-name-pattern=^self-reported triggers can diagnose but never support a gain claim$",
+        "{{craft-eval}}/dist/tests/evaluation.test.js"
+      ],
+      "timeout_s": 60,
+      "expected_behavior": "The named evaluator regression test passes: self-reported triggers can diagnose but never support a gain claim.",
+      "provenance": {
+        "source": "craft-eval/tests/evaluation.test.ts",
+        "source_digest": "sha256:ba905d99156b1c7cbe5ba2f3b5c69609e55f9d30291fa3d2b45c20e6e23a364f"
+      },
+      "checks": [
+        {
+          "id": "named-test-ran-once",
+          "kind": "stdout_contains",
+          "value": "ℹ tests 1"
+        },
+        {
+          "id": "named-test-passed",
+          "kind": "stdout_contains",
+          "value": "✔ self-reported triggers can diagnose but never support a gain claim"
+        },
+        {
+          "id": "single-selected-test-passed",
+          "kind": "stdout_contains",
+          "value": "ℹ pass 1"
+        },
+        {
+          "id": "no-test-failures",
+          "kind": "stdout_contains",
+          "value": "ℹ fail 0"
+        },
+        {
+          "id": "process-exited-successfully",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "16-script-checks-grade-by-exit-code-and-classify-fa",
+      "category": "evaluator-regression",
+      "risk": "high",
+      "language": "typescript",
+      "in_place": true,
+      "argv": [
+        "node",
+        "--test",
+        "--test-reporter=spec",
+        "--test-name-pattern=^script checks grade by exit code and classify failures$",
+        "{{craft-eval}}/dist/tests/evaluation.test.js"
+      ],
+      "timeout_s": 60,
+      "expected_behavior": "The named evaluator regression test passes: script checks grade by exit code and classify failures.",
+      "provenance": {
+        "source": "craft-eval/tests/evaluation.test.ts",
+        "source_digest": "sha256:ba905d99156b1c7cbe5ba2f3b5c69609e55f9d30291fa3d2b45c20e6e23a364f"
+      },
+      "checks": [
+        {
+          "id": "named-test-ran-once",
+          "kind": "stdout_contains",
+          "value": "ℹ tests 1"
+        },
+        {
+          "id": "named-test-passed",
+          "kind": "stdout_contains",
+          "value": "✔ script checks grade by exit code and classify failures"
+        },
+        {
+          "id": "single-selected-test-passed",
+          "kind": "stdout_contains",
+          "value": "ℹ pass 1"
+        },
+        {
+          "id": "no-test-failures",
+          "kind": "stdout_contains",
+          "value": "ℹ fail 0"
+        },
+        {
+          "id": "process-exited-successfully",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "17-development-suite-and-command-entry-points",
+      "category": "evaluator-regression",
+      "risk": "high",
+      "language": "typescript",
+      "in_place": true,
+      "argv": [
+        "node",
+        "--test",
+        "--test-reporter=spec",
+        "--test-name-pattern=^development suite and command entry points$",
+        "{{craft-eval}}/dist/tests/evaluation.test.js"
+      ],
+      "timeout_s": 60,
+      "expected_behavior": "The named evaluator regression test passes: development suite and command entry points.",
+      "provenance": {
+        "source": "craft-eval/tests/evaluation.test.ts",
+        "source_digest": "sha256:ba905d99156b1c7cbe5ba2f3b5c69609e55f9d30291fa3d2b45c20e6e23a364f"
+      },
+      "checks": [
+        {
+          "id": "named-test-ran-once",
+          "kind": "stdout_contains",
+          "value": "ℹ tests 1"
+        },
+        {
+          "id": "named-test-passed",
+          "kind": "stdout_contains",
+          "value": "✔ development suite and command entry points"
+        },
+        {
+          "id": "single-selected-test-passed",
+          "kind": "stdout_contains",
+          "value": "ℹ pass 1"
+        },
+        {
+          "id": "no-test-failures",
+          "kind": "stdout_contains",
+          "value": "ℹ fail 0"
+        },
+        {
+          "id": "process-exited-successfully",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "18-mocked-mcp-servers-serve-tools-and-tool-call-che",
+      "category": "evaluator-regression",
+      "risk": "high",
+      "language": "typescript",
+      "in_place": true,
+      "argv": [
+        "node",
+        "--test",
+        "--test-reporter=spec",
+        "--test-name-pattern=^mocked mcp servers serve tools and tool_call checks grade from evaluator evidence$",
+        "{{craft-eval}}/dist/tests/evaluation.test.js"
+      ],
+      "timeout_s": 60,
+      "expected_behavior": "The named evaluator regression test passes: mocked mcp servers serve tools and tool_call checks grade from evaluator evidence.",
+      "provenance": {
+        "source": "craft-eval/tests/evaluation.test.ts",
+        "source_digest": "sha256:ba905d99156b1c7cbe5ba2f3b5c69609e55f9d30291fa3d2b45c20e6e23a364f"
+      },
+      "checks": [
+        {
+          "id": "named-test-ran-once",
+          "kind": "stdout_contains",
+          "value": "ℹ tests 1"
+        },
+        {
+          "id": "named-test-passed",
+          "kind": "stdout_contains",
+          "value": "✔ mocked mcp servers serve tools and tool_call checks grade from evaluator evidence"
+        },
+        {
+          "id": "single-selected-test-passed",
+          "kind": "stdout_contains",
+          "value": "ℹ pass 1"
+        },
+        {
+          "id": "no-test-failures",
+          "kind": "stdout_contains",
+          "value": "ℹ fail 0"
+        },
+        {
+          "id": "process-exited-successfully",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "19-mcp-contract-validation-rejects-malformed-declar",
+      "category": "evaluator-regression",
+      "risk": "high",
+      "language": "typescript",
+      "in_place": true,
+      "argv": [
+        "node",
+        "--test",
+        "--test-reporter=spec",
+        "--test-name-pattern=^mcp contract validation rejects malformed declarations$",
+        "{{craft-eval}}/dist/tests/evaluation.test.js"
+      ],
+      "timeout_s": 60,
+      "expected_behavior": "The named evaluator regression test passes: mcp contract validation rejects malformed declarations.",
+      "provenance": {
+        "source": "craft-eval/tests/evaluation.test.ts",
+        "source_digest": "sha256:ba905d99156b1c7cbe5ba2f3b5c69609e55f9d30291fa3d2b45c20e6e23a364f"
+      },
+      "checks": [
+        {
+          "id": "named-test-ran-once",
+          "kind": "stdout_contains",
+          "value": "ℹ tests 1"
+        },
+        {
+          "id": "named-test-passed",
+          "kind": "stdout_contains",
+          "value": "✔ mcp contract validation rejects malformed declarations"
+        },
+        {
+          "id": "single-selected-test-passed",
+          "kind": "stdout_contains",
+          "value": "ℹ pass 1"
+        },
+        {
+          "id": "no-test-failures",
+          "kind": "stdout_contains",
+          "value": "ℹ fail 0"
+        },
+        {
+          "id": "process-exited-successfully",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "20-script-checks-accept-an-explicit-interpreter-for",
+      "category": "evaluator-regression",
+      "risk": "high",
+      "language": "typescript",
+      "in_place": true,
+      "argv": [
+        "node",
+        "--test",
+        "--test-reporter=spec",
+        "--test-name-pattern=^script checks accept an explicit interpreter for any language$",
+        "{{craft-eval}}/dist/tests/evaluation.test.js"
+      ],
+      "timeout_s": 60,
+      "expected_behavior": "The named evaluator regression test passes: script checks accept an explicit interpreter for any language.",
+      "provenance": {
+        "source": "craft-eval/tests/evaluation.test.ts",
+        "source_digest": "sha256:ba905d99156b1c7cbe5ba2f3b5c69609e55f9d30291fa3d2b45c20e6e23a364f"
+      },
+      "checks": [
+        {
+          "id": "named-test-ran-once",
+          "kind": "stdout_contains",
+          "value": "ℹ tests 1"
+        },
+        {
+          "id": "named-test-passed",
+          "kind": "stdout_contains",
+          "value": "✔ script checks accept an explicit interpreter for any language"
+        },
+        {
+          "id": "single-selected-test-passed",
+          "kind": "stdout_contains",
+          "value": "ℹ pass 1"
+        },
+        {
+          "id": "no-test-failures",
+          "kind": "stdout_contains",
+          "value": "ℹ fail 0"
+        },
+        {
+          "id": "process-exited-successfully",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "21-server-mode-cases-start-a-service-drive-it-and-t",
+      "category": "evaluator-regression",
+      "risk": "high",
+      "language": "typescript",
+      "in_place": true,
+      "argv": [
+        "node",
+        "--test",
+        "--test-reporter=spec",
+        "--test-name-pattern=^server-mode cases start a service, drive it, and terminate it$",
+        "{{craft-eval}}/dist/tests/evaluation.test.js"
+      ],
+      "timeout_s": 60,
+      "expected_behavior": "The named evaluator regression test passes: server-mode cases start a service, drive it, and terminate it.",
+      "provenance": {
+        "source": "craft-eval/tests/evaluation.test.ts",
+        "source_digest": "sha256:ba905d99156b1c7cbe5ba2f3b5c69609e55f9d30291fa3d2b45c20e6e23a364f"
+      },
+      "checks": [
+        {
+          "id": "named-test-ran-once",
+          "kind": "stdout_contains",
+          "value": "ℹ tests 1"
+        },
+        {
+          "id": "named-test-passed",
+          "kind": "stdout_contains",
+          "value": "✔ server-mode cases start a service, drive it, and terminate it"
+        },
+        {
+          "id": "single-selected-test-passed",
+          "kind": "stdout_contains",
+          "value": "ℹ pass 1"
+        },
+        {
+          "id": "no-test-failures",
+          "kind": "stdout_contains",
+          "value": "ℹ fail 0"
+        },
+        {
+          "id": "process-exited-successfully",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "22-stdout-assertions-work-for-a-bare-print-adapter",
+      "category": "evaluator-regression",
+      "risk": "high",
+      "language": "typescript",
+      "in_place": true,
+      "argv": [
+        "node",
+        "--test",
+        "--test-reporter=spec",
+        "--test-name-pattern=^stdout assertions work for a bare-print adapter$",
+        "{{craft-eval}}/dist/tests/evaluation.test.js"
+      ],
+      "timeout_s": 60,
+      "expected_behavior": "The named evaluator regression test passes: stdout assertions work for a bare-print adapter.",
+      "provenance": {
+        "source": "craft-eval/tests/evaluation.test.ts",
+        "source_digest": "sha256:ba905d99156b1c7cbe5ba2f3b5c69609e55f9d30291fa3d2b45c20e6e23a364f"
+      },
+      "checks": [
+        {
+          "id": "named-test-ran-once",
+          "kind": "stdout_contains",
+          "value": "ℹ tests 1"
+        },
+        {
+          "id": "named-test-passed",
+          "kind": "stdout_contains",
+          "value": "✔ stdout assertions work for a bare-print adapter"
+        },
+        {
+          "id": "single-selected-test-passed",
+          "kind": "stdout_contains",
+          "value": "ℹ pass 1"
+        },
+        {
+          "id": "no-test-failures",
+          "kind": "stdout_contains",
+          "value": "ℹ fail 0"
+        },
+        {
+          "id": "process-exited-successfully",
+          "kind": "exit_code",
+          "equals": 0
+        }
+      ]
+    }
+  ]
+}

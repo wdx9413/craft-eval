@@ -1,0 +1,15 @@
+{
+  "schema": "craft-eval.scenario.v1",
+  "scenario_id": "craft-local-markdown-delivery",
+  "steps": [
+    {
+      "id": "deliver-markdown",
+      "prompt": "Read materials/prices.md. Create deliverables/price-comparison.md with a Markdown comparison table and cite the source file beside each fact. Then create deliverables/task-report.md stating what you executed, what you checked, and any omissions. Do not claim completion until both files are checked.",
+      "timeout_s": 120
+    }
+  ],
+  "final_checks": [
+    { "id": "markdown-delivered", "kind": "file_exists", "path": "deliverables/price-comparison.md" },
+    { "id": "execution-and-omissions-reported", "kind": "script", "path": "checks/verify-delivery.mjs", "interpreter": ["node"] }
+  ]
+}

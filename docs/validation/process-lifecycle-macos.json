@@ -1,0 +1,168 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-10-30T15:51:13.169379+00:00",
+  "platform": {
+    "system": "macOS",
+    "architecture": "arm64",
+    "node": "v24.14.0"
+  },
+  "before": {
+    "tests": 6,
+    "passed": 0,
+    "failed": 6,
+    "behaviors": [
+      "quiet descendant remains live after successful parent exit",
+      "inherited pipes turn normal adapter/script/judge exit into timeout"
+    ]
+  },
+  "after": {
+    "eval_tests": 97,
+    "core_tests": 6,
+    "workbench_tests": 55,
+    "new_real_lifecycle_tests": 13,
+    "new_simulated_buffered_output_test": 1,
+    "checked_behaviors": [
+      "normal exit with inherited and closed pipes",
+      "cancel and timeout for adapter, grading script and judge",
+      "judge output budget rejects flood as inconclusive",
+      "buffered output after settlement ignored",
+      "installed Craft worker and compiled CLI HTTP evaluation complete with evaluator 0.1.3",
+      "controlled report integrity stays verified; no automatic Knowledge admission"
+    ],
+    "normal_exit_cases_ms": {
+      "adapter exit cleans descendants with closed output pipes": 73.5675,
+      "adapter exit cleans descendants with inherited output pipes": 60.678875,
+      "script exit cleans descendants with closed output pipes": 105.170542,
+      "script exit cleans descendants with inherited output pipes": 77.79425,
+      "judge exit cleans descendants with closed output pipes": 85.614708,
+      "judge exit cleans descendants with inherited output pipes": 79.648375
+    },
+    "normal_exit_timing_limit": "Test observations under V8 coverage; not benchmark percentiles."
+  },
+  "coverage": {
+    "scope": "Four new exit callbacks and new judge output-capture block only; not whole-file or whole-goal coverage",
+    "compiled_file": "dist/src/evaluation.js",
+    "regions": [
+      {
+        "start_line": 863,
+        "end_line": 863
+      },
+      {
+        "start_line": 1042,
+        "end_line": 1042
+      },
+      {
+        "start_line": 1089,
+        "end_line": 1089
+      },
+      {
+        "start_line": 1930,
+        "end_line": 1930
+      },
+      {
+        "start_line": 1108,
+        "end_line": 1124
+      }
+    ],
+    "ranges": [
+      {
+        "line": 863,
+        "count": 12
+      },
+      {
+        "line": 1042,
+        "count": 1
+      },
+      {
+        "line": 1089,
+        "count": 7
+      },
+      {
+        "line": 1110,
+        "count": 9
+      },
+      {
+        "line": 1112,
+        "count": 1
+      },
+      {
+        "line": 1115,
+        "count": 2
+      },
+      {
+        "line": 1122,
+        "count": 7
+      },
+      {
+        "line": 1123,
+        "count": 2
+      },
+      {
+        "line": 1930,
+        "count": 232
+      },
+      {
+        "line": 1108,
+        "count": 4
+      },
+      {
+        "line": 1112,
+        "count": 7
+      }
+    ],
+    "all_observed_ranges_hit": true
+  },
+  "package_chain": {
+    "compiled_evaluation_sha256": "c34ef88546196e606810c5615b800d8e8b2bae08ed9d676644d7efe075865fcd",
+    "checks": {
+      "core_installed": true,
+      "workbench_installed": true,
+      "sidecar": true,
+      "eval_archive": true,
+      "core_archive": true,
+      "craft_lock_integrity": true,
+      "craft-workbench_lock_integrity": true
+    }
+  },
+  "logs": [
+    "before.txt",
+    "eval-tests.txt",
+    "core-tests.txt",
+    "workbench-tests.txt",
+    "core-build.txt",
+    "runtime-check.txt",
+    "sidecar.txt",
+    "core-typecheck.txt",
+    "docs-check.txt",
+    "layering-check.txt"
+  ],
+  "limitations": [
+    "macOS evidence only; POSIX lifecycle cases explicitly skip Windows.",
+    "Intentional detached sessions or daemonization escape this process-group boundary; not a security sandbox.",
+    "Evaluator SIGKILL orphan reconciliation and complete crash recovery remain unimplemented/unverified.",
+    "New normal-exit cleanup and judge output branches were checked; whole-goal incremental coverage remains incomplete.",
+    "No actual native desktop, real provider interaction, marketplace publication, registry release or installed plugin upgrade in this phase.",
+    "Core archive remains a local development build 0.12.131; formal version/source release correspondence remains pending."
+  ],
+  "sha256": {
+    "craft-eval/src/evaluation.ts": "e66a1a8db686c1c4ccc42bb6b8d0f95c1e486310a794efc92437d0b2e12b2184",
+    "craft-eval/tests/process-lifecycle.test.ts": "e4aa1bfe23dcd1a9443c5fd610e7ea1958a23ee47616aebc2fe41059bf483b8d",
+    "craft-eval/package.json": "7f982907834e4f31a4dc5d8cedc68b00231bc96432b47a075046c2e50848bade",
+    "craft-eval/package-lock.json": "6a2486b6311f253eb465fe9b6535a625b4f24f3044e06645bd89e5ba776bf5f8",
+    "craft/vendor/craft-eval-0.1.3.tgz": "35961ee97f6681fa1d2a2f5db3d816e85148e18de73f9affce01ccd23970d8c7",
+    "craft/vendor/craft-eval-0.1.3.provenance.json": "71041f8e5b40c4c4a6b12a059e3750bf5278a0b8333350bc2fabe05bcb9f655d",
+    "craft/package.json": "1996607ffd53604e140aad09b85fb42a32e55f11470ceebfa2d102e87ed1c361",
+    "craft/pnpm-lock.yaml": "02c3bb5e0dfbb15ecc228e3182d1c0f338bbe8b1b290bc040e7094dd3c8a0882",
+    "craft/tests/evaluation-process.test.ts": "cb108f81fc9126ddfa38c821d2b262cba29e6153b7add58f6e9aed2a436c9fc1",
+    "craft/tests/workbench-evaluations.test.ts": "e57deb1f9130c527ada67d29f494397739277312190b2e4827f3c358b9230c00",
+    "craft-workbench/tests/runtime-package.test.ts": "d5bc3c5f66d84d642cb6caa033b03807007b75e4532568005c653a09285acc6a",
+    "craft-workbench/pnpm-lock.yaml": "6534b3c13aa843fbb858d75ea1afabdd1bfc77c7e53f1bc04f04169622ced07b",
+    "craft-workbench/vendor/craft-agent-harness-0.12.131.tgz": "90221b1c0ab423b30f9395f484120d10bf79f07eeff093620c70ac2059ce6773"
+  },
+  "additional_checks": [
+    "Craft full typecheck passed",
+    "Layering audit: 541 modules, zero violations",
+    "Docs internal-link audit passed",
+    "Three repositories remain on main; diff checks passed"
+  ]
+}

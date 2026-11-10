@@ -1,0 +1,33 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # `npm test` builds, runs the unit suite, and enforces the two 100%
+      # line/function/branch coverage gates (build-suite, context-audit).
+      - name: Unit tests and 100% coverage gates
+        run: npm test
+      - name: Validate procedure and domain held-out suites
+        run: |
+          node dist/src/cli.js validate examples/procedure-suite.json
+          for domain in coding quant writing; do
+            node dist/src/cli.js validate examples/domain-heldout/$domain/suite.json
+          done
+          node dist/src/cli.js audit examples/domain-heldout/coding/suite.json examples/domain-heldout/quant/suite.json examples/domain-heldout/writing/suite.json
+      - name: Run procedure evolution gate suite
+        run: |
+          node dist/src/cli.js run examples/procedure-suite.json examples/procedure-subject.json examples/runtime.json \
+            --workspace examples/workspace --output /tmp/procedure-runs --workspace-mode isolated --fail-on-failed
+      - name: Domain held-out suites and anti-tautology graders
+        run: node examples/domain-heldout/run-all.mjs

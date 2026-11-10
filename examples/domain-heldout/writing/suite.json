@@ -1,0 +1,37 @@
+{
+  "schema": "craft-eval.eval.v1",
+  "suite_id": "domain-writing-heldout",
+  "subject_kind": "software",
+  "partition": "held_out",
+  "sanitized": true,
+  "approved_by": "domain-heldout-reviewer",
+  "claim": {
+    "statement": "A writing candidate is accepted only when every rubric dimension clears its threshold, with no forbidden claims and a matched audience.",
+    "scope": "writing domain held-out gate",
+    "limitations": ["Stand-in rubric record; a real subject needs a calibrated judge to supply the numbers."]
+  },
+  "metrics": {
+    "primary": { "id": "case_pass_rate", "kind": "binary_pass_rate", "direction": "higher_is_better", "minimum_sample": 1 },
+    "guardrails": [
+      { "id": "writing_gate", "metric": "case_pass_rate", "comparator": "gte", "threshold": 1 }
+    ]
+  },
+  "cases": [
+    {
+      "id": "writing-rubric-green",
+      "argv": ["node", "runner.mjs"],
+      "timeout_s": 10,
+      "expected_behavior": "The candidate emits rubric scores >= 0.8 on all three dimensions, zero forbidden claims and a matched audience.",
+      "provenance": {
+        "source": "examples/domain-heldout/writing/workspace/runner.mjs",
+        "independent_of_training": true,
+        "reviewed_by": "domain-heldout-reviewer"
+      },
+      "checks": [
+        {"id": "exit", "kind": "exit_code", "equals": 0},
+        {"id": "writing-gate", "kind": "script", "path": "grade.mjs", "args": ["outputs/result.json"], "pass_exit_codes": [0]}
+      ],
+      "safety_checks": []
+    }
+  ]
+}

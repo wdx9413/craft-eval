@@ -1,0 +1,9 @@
+[
+  {
+    "id": "list",
+    "tool": "list_directory",
+    "arguments": {
+      "path": "."
+    }
+  }
+]

@@ -1,0 +1,16 @@
+{
+  "schema": "craft-eval.scenario.v1",
+  "scenario_id": "craft-install-lifecycle-synthetic",
+  "steps": [
+    { "id": "configure-model", "prompt": "DEMO_STEP configure-model" },
+    { "id": "research-and-deliver", "prompt": "DEMO_STEP research-and-deliver" },
+    { "id": "protect-user-edit", "prompt": "DEMO_STEP protect-user-edit" },
+    { "id": "restart-and-resume", "prompt": "DEMO_STEP restart-and-resume" },
+    { "id": "append-competitor", "prompt": "DEMO_STEP append-competitor" },
+    { "id": "project-correction", "prompt": "DEMO_STEP project-correction" },
+    { "id": "undo-correction", "prompt": "DEMO_STEP undo-correction" }
+  ],
+  "final_checks": [
+    { "id": "configuration-delivery-edit-recovery-update-and-revocation", "kind": "script", "path": "checks/verify-demo.mjs", "interpreter": ["node"] }
+  ]
+}

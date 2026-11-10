@@ -1,0 +1,31 @@
+{
+  "schema": "craft-eval.eval.v1",
+  "suite_id": "ecommerce-agent",
+  "subject_kind": "agent",
+  "partition": "development",
+  "sanitized": true,
+  "claim": {
+    "statement": "Codex 能正确应用电商优惠券门槛与运费规则计算应付金额",
+    "scope": "单个可确定性判分的订单核价任务；不代表完整电商能力",
+    "limitations": ["仅 1 个用例", "依赖真实 Codex 与网络"]
+  },
+  "metrics": {
+    "primary": {
+      "id": "task_pass",
+      "kind": "binary_pass_rate",
+      "direction": "higher_is_better",
+      "minimum_sample": 1
+    }
+  },
+  "cases": [
+    {
+      "id": "coupon-threshold",
+      "prompt": "你是电商订单核价助手。请计算应付金额并写入 outputs/answer.json（JSON 格式：{\"total\": <number>}）。规则：商品 A 单价 99 元，数量 2；优惠券『满 200 减 30』（仅当商品金额满 200 元可用）；运费 10 元。直接写文件，不要只在终端打印。",
+      "timeout_s": 300,
+      "checks": [
+        {"id": "file", "kind": "file_exists", "path": "outputs/answer.json"},
+        {"id": "total", "kind": "json_equals", "path": "outputs/answer.json", "key": "total", "equals": 208}
+      ]
+    }
+  ]
+}

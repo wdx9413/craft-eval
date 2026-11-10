@@ -1,0 +1,4 @@
+$ node --experimental-strip-types scripts/ci/audit-layering.ts
+(node:[PID]) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+layer audit: 541 modules, 0 violation(s), no import exemptions

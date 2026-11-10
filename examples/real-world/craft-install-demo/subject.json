@@ -1,0 +1,7 @@
+{
+  "kind": "agent",
+  "id": "craft-install-demo-synthetic-only",
+  "version": "1",
+  "env": {},
+  "host": { "kind": "codex", "binary": "node", "args_prefix": ["host.mjs"] }
+}

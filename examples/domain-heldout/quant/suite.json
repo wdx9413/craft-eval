@@ -1,0 +1,37 @@
+{
+  "schema": "craft-eval.eval.v1",
+  "suite_id": "domain-quant-heldout",
+  "subject_kind": "software",
+  "partition": "held_out",
+  "sanitized": true,
+  "approved_by": "domain-heldout-reviewer",
+  "claim": {
+    "statement": "A quant candidate is accepted only on positive out-of-sample net return with bounded drawdown and sufficient trades.",
+    "scope": "quant domain held-out gate",
+    "limitations": ["Stand-in backtest record; a real subject computes it from a frozen out-of-sample panel."]
+  },
+  "metrics": {
+    "primary": { "id": "case_pass_rate", "kind": "binary_pass_rate", "direction": "higher_is_better", "minimum_sample": 1 },
+    "guardrails": [
+      { "id": "quant_gate", "metric": "case_pass_rate", "comparator": "gte", "threshold": 1 }
+    ]
+  },
+  "cases": [
+    {
+      "id": "quant-oos-profit",
+      "argv": ["node", "runner.mjs"],
+      "timeout_s": 10,
+      "expected_behavior": "The candidate emits a positive out-of-sample net return with drawdown <= 0.2 and at least 20 trades.",
+      "provenance": {
+        "source": "examples/domain-heldout/quant/workspace/runner.mjs",
+        "independent_of_training": true,
+        "reviewed_by": "domain-heldout-reviewer"
+      },
+      "checks": [
+        {"id": "exit", "kind": "exit_code", "equals": 0},
+        {"id": "quant-gate", "kind": "script", "path": "grade.mjs", "args": ["outputs/result.json"], "pass_exit_codes": [0]}
+      ],
+      "safety_checks": []
+    }
+  ]
+}

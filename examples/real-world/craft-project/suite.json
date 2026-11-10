@@ -1,0 +1,300 @@
+{
+  "schema": "craft-eval.eval.v1",
+  "suite_id": "craft-project",
+  "subject_kind": "software",
+  "partition": "development",
+  "sanitized": true,
+  "claim": {
+    "statement": "Craft 类型检查、架构/接口/文档审计、CLI smoke、Trace 迁移路由及并发首次启动回归通过",
+    "scope": "单机本地确定性检查；不含真实模型评测与线上环境",
+    "limitations": ["不覆盖全部 365 个单测（耗时过长）", "文档审计只覆盖链接与必需文档"]
+  },
+  "metrics": {
+    "primary": {
+      "id": "task_pass",
+      "kind": "binary_pass_rate",
+      "direction": "higher_is_better",
+      "minimum_sample": 10
+    }
+  },
+  "cases": [
+    {
+      "id": "runtime-artifact-contract",
+      "category": "release",
+      "risk": "critical",
+      "language": "typescript",
+      "argv": ["node", "--experimental-strip-types", "--test", "--test-isolation=none", "--test-name-pattern", "npm package files and the runtime artifact contract stay aligned", "tests/runtime-artifact.test.ts"],
+      "in_place": true,
+      "timeout_s": 90,
+      "expected_behavior": "Craft npm files match the runtime artifact allowlist so Workbench sidecar preparation cannot accept a mismatched package contract.",
+      "provenance": { "source": "craft/tests/runtime-artifact.test.ts" },
+      "checks": [
+        { "id": "artifact-contract-test-exits-zero", "kind": "exit_code", "equals": 0 },
+        { "id": "artifact-contract-test-ran", "kind": "stdout_contains", "value": "npm package files and the runtime artifact contract stay aligned" }
+      ]
+    },
+    {
+      "id": "typecheck",
+      "category": "static",
+      "risk": "high",
+      "language": "typescript",
+      "argv": ["node", "node_modules/typescript/bin/tsc", "--noEmit"],
+      "in_place": true,
+      "timeout_s": 600,
+      "expected_behavior": "The full Craft source type graph has no TypeScript errors.",
+      "provenance": { "source": "craft/package.json:scripts.typecheck" },
+      "checks": [{ "id": "exit", "kind": "exit_code", "equals": 0 }]
+    },
+    {
+      "id": "layering",
+      "category": "architecture",
+      "risk": "high",
+      "language": "typescript",
+      "argv": ["node", "--experimental-strip-types", "scripts/ci/audit-layering.ts"],
+      "in_place": true,
+      "timeout_s": 300,
+      "expected_behavior": "The dependency layering audit finds no violations and no undocumented import exemptions.",
+      "provenance": { "source": "craft/scripts/ci/audit-layering.ts" },
+      "checks": [
+        { "id": "exit", "kind": "exit_code", "equals": 0 },
+        { "id": "layer-audit-ran", "kind": "stdout_contains", "value": "layer audit:" }
+      ]
+    },
+    {
+      "id": "surfaces",
+      "category": "architecture",
+      "risk": "high",
+      "language": "typescript",
+      "argv": ["node", "--experimental-strip-types", "scripts/ci/audit-surfaces.ts"],
+      "in_place": true,
+      "timeout_s": 300,
+      "expected_behavior": "The MCP surface audit confirms tool ownership and declared cross-domain exceptions.",
+      "provenance": { "source": "craft/scripts/ci/audit-surfaces.ts" },
+      "checks": [
+        { "id": "exit", "kind": "exit_code", "equals": 0 },
+        { "id": "surface-audit-ran", "kind": "stdout_contains", "value": "surface audit:" }
+      ]
+    },
+    {
+      "id": "audit-docs",
+      "category": "documentation",
+      "risk": "medium",
+      "language": "markdown",
+      "argv": ["node", "--experimental-strip-types", "scripts/ci/check-doc-links.ts"],
+      "in_place": true,
+      "timeout_s": 300,
+      "expected_behavior": "The required product documentation exists and all indexed internal links resolve.",
+      "provenance": { "source": "craft/scripts/ci/check-doc-links.ts" },
+      "checks": [
+        { "id": "exit", "kind": "exit_code", "equals": 0 },
+        { "id": "document-audit-ran", "kind": "stdout_contains", "value": "doc check:" }
+      ]
+    },
+    {
+      "id": "consistency",
+      "category": "documentation",
+      "risk": "medium",
+      "language": "markdown",
+      "argv": ["node", "--experimental-strip-types", "scripts/ci/check-consistency-falsifiable.ts"],
+      "in_place": true,
+      "timeout_s": 300,
+      "expected_behavior": "The baseline remains consistent and all nine declared mutations are detected.",
+      "provenance": { "source": "craft/scripts/ci/check-consistency-falsifiable.ts" },
+      "checks": [
+        { "id": "exit", "kind": "exit_code", "equals": 0 },
+        { "id": "mutation-audit-ran", "kind": "stdout_contains", "value": "falsifiable on 9/9 mutations" }
+      ]
+    },
+    {
+      "id": "smoke",
+      "category": "runtime",
+      "risk": "medium",
+      "language": "typescript",
+      "argv": ["node", "dist/core/cli.js", "--help"],
+      "in_place": true,
+      "timeout_s": 180,
+      "expected_behavior": "The packaged Craft CLI starts and reports its usage contract.",
+      "provenance": { "source": "craft/package.json:scripts.test:smoke" },
+      "checks": [
+        { "id": "exit", "kind": "exit_code", "equals": 0 },
+        { "id": "usage-is-reported", "kind": "stdout_contains", "value": "Usage:" }
+      ]
+    },
+    {
+      "id": "docs",
+      "category": "documentation",
+      "risk": "low",
+      "language": "markdown",
+      "in_place": true,
+      "timeout_s": 120,
+      "expected_behavior": "Required repository docs and their relative links are present and resolve.",
+      "provenance": { "source": "craft-eval docs_links check over Craft documentation" },
+      "checks": [{
+        "id": "links",
+        "kind": "docs_links",
+        "required": ["README.md", "CONTEXT.md", "DESIGN.md", "GLOSSARY.md", "UX-CONTRACT.md"],
+        "dirs": ["docs"]
+      }]
+    },
+    {
+      "id": "context-receipt-audit-coverage",
+      "category": "static",
+      "risk": "high",
+      "language": "typescript",
+      "argv": [
+        "node", "--test", "--test-isolation=none", "--experimental-test-coverage", "--test-coverage-lines=100", "--test-coverage-functions=100", "--test-coverage-branches=100",
+        "--test-coverage-include=core/workbench-context-audit.ts", "--test-coverage-include=core/interfaces/workbench-context-audit-route.ts",
+        "tests/workbench-context-audit.test.ts", "tests/workbench-context-audit-route.test.ts"
+      ],
+      "in_place": true,
+      "timeout_s": 180,
+      "expected_behavior": "The Context audit persistence and Workbench route matcher meet strict line, function and branch coverage.",
+      "provenance": { "source": "craft/package.json:scripts.test:coverage:workbench-context-audit" },
+      "checks": [
+        { "id": "coverage-exits-zero", "kind": "exit_code", "equals": 0 },
+        { "id": "coverage-reaches-100", "kind": "stdout_contains", "value": "100.00" }
+      ]
+    },
+    {
+      "id": "hook-diagnostics-coverage",
+      "category": "runtime",
+      "risk": "high",
+      "language": "typescript",
+      "argv": [
+        "node", "node_modules/c8/bin/c8.js", "--clean", "--reporter=text", "--include=core/interfaces/codex-hook-runtime-diagnostics.ts",
+        "--include=core/interfaces/hook-runtime-query.ts", "--check-coverage", "--lines", "100", "--branches", "100", "--functions", "100",
+        "node", "--experimental-strip-types", "--test", "--test-isolation=none", "tests/codex-hook-runtime-diagnostics.test.ts"
+      ],
+      "in_place": true,
+      "timeout_s": 180,
+      "expected_behavior": "Hook diagnostics preserve content-free lifecycle records and query recent completion or unmatched-start evidence with strict coverage.",
+      "provenance": { "source": "craft/package.json:scripts.test:coverage:hook-diagnostics" },
+      "checks": [
+        { "id": "coverage-exits-zero", "kind": "exit_code", "equals": 0 },
+        { "id": "coverage-reaches-100", "kind": "stdout_contains", "value": "100 |" }
+      ]
+    },
+    {
+      "id": "hook-diagnostics-workbench-api",
+      "category": "runtime",
+      "risk": "high",
+      "language": "typescript",
+      "argv": [
+        "node", "--experimental-strip-types", "--test", "--test-isolation=none", "--test-name-pattern", "Workbench exposes authenticated bounded Hook diagnostics",
+        "tests/workbench-ui-server.test.ts"
+      ],
+      "in_place": true,
+      "timeout_s": 90,
+      "expected_behavior": "Workbench API requires its token, rejects cross-origin and oversized reads, and returns content-free Hook diagnostic states.",
+      "provenance": { "source": "craft/tests/workbench-ui-server.test.ts" },
+      "checks": [
+        { "id": "api-test-exits-zero", "kind": "exit_code", "equals": 0 },
+        { "id": "api-test-ran", "kind": "stdout_contains", "value": "Workbench exposes authenticated bounded Hook diagnostics" }
+      ]
+    },
+    {
+      "id": "workbench-evaluation-coverage",
+      "category": "static",
+      "risk": "high",
+      "language": "typescript",
+      "argv": [
+        "node",
+    "node_modules/c8/bin/c8.js", "--reporter=text", "--include=core/workbench-evaluations.ts", "--check-coverage", "--lines", "100", "--branches", "100", "--functions", "100",
+        "node", "--test", "--test-isolation=none", "--test-concurrency=1",
+        "tests/workbench-evaluation-concurrency.test.ts", "tests/bundled-knowledge-task-effects.test.ts", "tests/workbench-evaluations.test.ts", "tests/workbench-context-audit.test.ts", "tests/knowledge-task-effects.test.ts", "tests/evaluation-process.test.ts"
+      ],
+      "in_place": true,
+      "timeout_s": 240,
+      "expected_behavior": "Controlled Workbench evaluation and Context audit delegation meet strict line, function and branch coverage.",
+      "provenance": { "source": "craft/tests/coverage-gates.json:workbench-controlled-evaluations" },
+      "checks": [
+        { "id": "coverage-exits-zero", "kind": "exit_code", "equals": 0 },
+        { "id": "coverage-reaches-100", "kind": "stdout_contains", "value": "100" }
+      ]
+    },
+    {
+      "id": "store-concurrent-startup-and-partition-write",
+      "category": "concurrency",
+      "risk": "high",
+      "language": "typescript",
+      "argv": [
+        "node", "--experimental-strip-types", "--test", "--test-isolation=none", "--test-concurrency=1",
+        "--test-name-pattern", "concurrent first opens wait for the shared database WAL initialization|Memory writes retry a partition lock after releasing the publication transaction|Memory partition write retry budget is bounded",
+        "tests/store.test.ts", "tests/memory-partition-store.test.ts"
+      ],
+      "in_place": true,
+      "timeout_s": 90,
+      "expected_behavior": "Concurrent Hosts can open an empty Craft data root; a partition writer conflict rolls back the primary publication and retries safely, or returns a retryable failure without publishing a partial record.",
+      "provenance": { "source": "craft/tests/store.test.ts; craft/tests/memory-partition-store.test.ts" },
+      "checks": [
+        { "id": "startup-race-exits-zero", "kind": "exit_code", "equals": 0 },
+        { "id": "startup-race-case-ran", "kind": "stdout_contains", "value": "concurrent first opens wait for the shared database WAL initialization" },
+        { "id": "partition-retry-case-ran", "kind": "stdout_contains", "value": "Memory writes retry a partition lock after releasing the publication transaction" },
+        { "id": "partition-retry-budget-case-ran", "kind": "stdout_contains", "value": "Memory partition write retry budget is bounded" }
+      ]
+    },
+    {
+      "id": "storage-preflight-concurrent-snapshot",
+      "category": "concurrency",
+      "risk": "high",
+      "language": "typescript",
+      "argv": [
+        "node", "--experimental-strip-types", "--test", "--test-isolation=none", "--test-concurrency=1",
+        "--test-name-pattern", "paged inventory holds one database snapshot while concurrent writers continue|inventory snapshot excludes writes during metadata initialization and while reading a page",
+        "tests/storage-migration-preflight.test.ts"
+      ],
+      "in_place": true,
+      "timeout_s": 90,
+      "expected_behavior": "Storage migration preflight reads one consistent SQLite WAL snapshot across pages while concurrent writers remain unblocked; writes committed during the inventory appear in the next preflight.",
+      "provenance": { "source": "craft/tests/storage-migration-preflight.test.ts" },
+      "checks": [
+        { "id": "snapshot-tests-exit-zero", "kind": "exit_code", "equals": 0 },
+        { "id": "paged-snapshot-ran", "kind": "stdout_contains", "value": "paged inventory holds one database snapshot while concurrent writers continue" },
+        { "id": "initialization-race-ran", "kind": "stdout_contains", "value": "inventory snapshot excludes writes during metadata initialization and while reading a page" }
+      ]
+    },
+    {
+      "id": "store-atomicity-edge-regressions",
+      "category": "concurrency",
+      "risk": "high",
+      "language": "typescript",
+      "argv": [
+        "node", "--experimental-strip-types", "--test", "--test-isolation=none", "--test-concurrency=1",
+        "--test-name-pattern", "project partitions fail closed|records-only Knowledge migration completes|already-removed retired content file|retired-file cleanup errors|transaction begin preserves primitive errors",
+        "tests/knowledge-partition-store.test.ts", "tests/memory-partition-store.test.ts", "tests/store-partition-atomicity.test.ts"
+      ],
+      "in_place": true,
+      "timeout_s": 90,
+      "expected_behavior": "Malformed project identities fail closed without hiding valid aliases; bounded Knowledge completion, retired-file races and Hook transaction retries remain observable.",
+      "provenance": { "source": "craft/tests/coverage-gates.json:store-atomicity; targeted Store edge regressions" },
+      "checks": [
+        { "id": "regression-exits-zero", "kind": "exit_code", "equals": 0 },
+        { "id": "malformed-identity-case-ran", "kind": "stdout_contains", "value": "project partitions fail closed when one real root is bound to different project scopes" },
+        { "id": "knowledge-completion-case-ran", "kind": "stdout_contains", "value": "records-only Knowledge migration completes when the final page has no blocked records" },
+        { "id": "missing-retired-file-case-ran", "kind": "stdout_contains", "value": "legacy Memory migration tolerates an already-removed retired content file" },
+        { "id": "cleanup-error-case-ran", "kind": "stdout_contains", "value": "legacy Memory migration surfaces unexpected retired-file cleanup errors" },
+        { "id": "hook-retry-failure-case-ran", "kind": "stdout_contains", "value": "transaction begin preserves primitive errors and reports a failed Hook retry" }
+      ]
+    },
+    {
+      "id": "trace-migration-routing-race",
+      "category": "concurrency",
+      "risk": "high",
+      "language": "typescript",
+      "argv": [
+        "node", "--experimental-strip-types", "--test", "--test-isolation=none", "--test-concurrency=1",
+        "--test-name-pattern", "Trace writes recheck the legacy route|legacy central Traces keep their existing write path",
+        "tests/trace-shard-store.test.ts"
+      ],
+      "in_place": true,
+      "timeout_s": 120,
+      "expected_behavior": "Legacy Trace writes stay on the primary database, and create/save/update/transaction writes switch to the shard when an offline migration removes the legacy row before the primary write transaction.",
+      "provenance": { "source": "craft/tests/trace-shard-store.test.ts" },
+      "checks": [
+        { "id": "regression-exits-zero", "kind": "exit_code", "equals": 0 },
+        { "id": "race-case-ran", "kind": "stdout_contains", "value": "Trace writes recheck the legacy route" },
+        { "id": "legacy-route-case-ran", "kind": "stdout_contains", "value": "legacy central Traces keep their existing write path" }
+      ]
+    }
+  ]
+}

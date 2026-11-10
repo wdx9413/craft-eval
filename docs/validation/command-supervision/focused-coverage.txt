@@ -1,0 +1,45 @@
+✔ guardian launches once, preserves nonzero exit and clears only its owned child (1.005958ms)
+✔ guardian cannot launch after losing its owner, including before module initialization (0.091792ms)
+✔ guardian relays launch errors, tolerates a lost error channel and retains signal exits (0.402333ms)
+✔ process-tree termination handles POSIX, Windows taskkill fallback and an already exited owner (0.43975ms)
+✔ managed command IPC never uses a stale PID and preserves startup and error details (3.561958ms)
+✔ guardian preserves stdin and command environment without preloading target NODE_OPTIONS itself (93.670959ms)
+✔ missing managed command retains its original spawn error (40.691833ms)
+✔ a command terminating by signal is never converted to a successful exit (72.4075ms)
+✔ a failed guardian launch never masquerades as a command exit (3.76175ms)
+✔ judge output already buffered after its limit is ignored without a second settlement (20.731333ms)
+✔ adapter exit cleans descendants with closed output pipes (103.711542ms)
+✔ adapter cancel cleans descendants with closed output pipes (84.801625ms)
+✔ adapter timeout cleans descendants with closed output pipes (1526.503791ms)
+✔ adapter exit cleans descendants with inherited output pipes (75.413917ms)
+✔ script exit cleans descendants with closed output pipes (138.852959ms)
+✔ script cancel cleans descendants with closed output pipes (132.59875ms)
+✔ script timeout cleans descendants with closed output pipes (1078.035208ms)
+✔ script exit cleans descendants with inherited output pipes (149.605417ms)
+✔ judge exit cleans descendants with closed output pipes (141.885875ms)
+✔ judge cancel cleans descendants with closed output pipes (131.29775ms)
+✔ judge timeout cleans descendants with closed output pipes (1089.365333ms)
+✔ judge output_limit cleans descendants with closed output pipes (136.5095ms)
+✔ judge exit cleans descendants with inherited output pipes (139.001042ms)
+✔ killing the evaluator does not leave its active command or descendant alive (200.17625ms)
+ℹ tests 24
+ℹ suites 0
+ℹ pass 24
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5029.043833
+ℹ start of coverage report
+ℹ ----------------------------------------------------------------------------
+ℹ file                        | line % | branch % | funcs % | uncovered lines
+ℹ ----------------------------------------------------------------------------
+ℹ dist                        |        |          |         | 
+ℹ  src                        |        |          |         | 
+ℹ   command-guardian-entry.js | 100.00 |   100.00 |  100.00 | 
+ℹ   command-guardian.js       | 100.00 |   100.00 |  100.00 | 
+ℹ   command-process.js        | 100.00 |   100.00 |  100.00 | 
+ℹ ----------------------------------------------------------------------------
+ℹ all files                   | 100.00 |   100.00 |  100.00 | 
+ℹ ----------------------------------------------------------------------------
+ℹ end of coverage report

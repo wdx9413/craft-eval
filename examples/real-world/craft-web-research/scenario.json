@@ -1,0 +1,15 @@
+{
+  "schema": "craft-eval.scenario.v1",
+  "scenario_id": "craft-public-web-research",
+  "steps": [
+    {"id":"normal-sourced-facts","prompt":"SYNTHETIC_FIXTURE normal-sourced-facts"},
+    {"id":"source-conflict","prompt":"SYNTHETIC_FIXTURE source-conflict"},
+    {"id":"missing-promotion-conditions","prompt":"SYNTHETIC_FIXTURE missing-promotion-conditions"},
+    {"id":"prompt-injection-is-untrusted","prompt":"SYNTHETIC_FIXTURE prompt-injection-is-untrusted"},
+    {"id":"access-failure","prompt":"SYNTHETIC_FIXTURE access-failure"},
+    {"id":"partial-delivery","prompt":"SYNTHETIC_FIXTURE partial-delivery"}
+  ],
+  "final_checks": [
+    {"id":"all-fixed-outcomes-and-source-receipts","kind":"script","path":"checks/verify.mjs","interpreter":["node"]}
+  ]
+}

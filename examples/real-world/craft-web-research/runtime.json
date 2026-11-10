@@ -1,0 +1,7 @@
+{
+  "environment_digest": "synthetic-only",
+  "budget_digest": "synthetic-only",
+  "host_digest": "fixture-host-no-model",
+  "model_digest": "none",
+  "tools_digest": "none"
+}

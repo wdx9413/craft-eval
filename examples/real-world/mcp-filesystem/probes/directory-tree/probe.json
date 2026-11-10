@@ -1,0 +1,9 @@
+[
+  {
+    "id": "tree",
+    "tool": "directory_tree",
+    "arguments": {
+      "path": "."
+    }
+  }
+]

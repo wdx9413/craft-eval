@@ -1,0 +1,119 @@
+✖ adapter completion cleans descendants with closed output pipes (1593.116791ms)
+✖ adapter completion cleans descendants with inherited output pipes (1547.795417ms)
+✖ script completion cleans descendants with closed output pipes (1631.477458ms)
+✖ script completion cleans descendants with inherited output pipes (1076.828333ms)
+✖ judge completion cleans descendants with closed output pipes (1599.539667ms)
+✖ judge completion cleans descendants with inherited output pipes (1059.362292ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 0
+ℹ fail 6
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8559.086542
+
+✖ failing tests:
+
+test at dist/tests/process-lifecycle.test.js:29:9
+✖ adapter completion cleans descendants with closed output pipes (1593.116791ms)
+  AssertionError [ERR_ASSERTION]: completed evaluation left its descendant running
+  
+  true !== false
+  
+      at untilStopped (file://[WORKSPACE]/craft-eval/dist/tests/process-lifecycle.test.js:25:12)
+      at async TestContext.<anonymous> (file://[WORKSPACE]/craft-eval/dist/tests/process-lifecycle.test.js:53:17)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:297:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual'
+  }
+
+test at dist/tests/process-lifecycle.test.js:29:9
+✖ adapter completion cleans descendants with inherited output pipes (1547.795417ms)
+  AssertionError [ERR_ASSERTION]: {"case_id":"one","checks":[{"evidence":{"exit_code":null,"kind":"exit_code"},"id":"exit","passed":null,"reason":"timer_expired"}],"cost_units":null,"duration_ms":1505,"exit_code":null,"gateway_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","host":null,"input_receipt":null,"issue":"timeout","safety_checks":[],"safety_verdict":null,"stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","stdout_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","task_run_id":"6f3af5844e7a4d7894c932bb1442f4b0","task_verdict":"inconclusive","trace_complete":false,"trace_sha256":null,"trial":1,"trigger":null,"verdict":"inconclusive","workspace_snapshot":{"bytes":450,"digest":"sha256:bac385ef3fe3ce1dd614919445a6e3596777949188e1ad4cb0cfce42dad280ea","files":2}}
+  + actual - expected
+  
+  + 'inconclusive'
+  - 'passed'
+  
+      at TestContext.<anonymous> (file://[WORKSPACE]/craft-eval/dist/tests/process-lifecycle.test.js:54:24)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'inconclusive',
+    expected: 'passed',
+    operator: 'strictEqual'
+  }
+
+test at dist/tests/process-lifecycle.test.js:29:9
+✖ script completion cleans descendants with closed output pipes (1631.477458ms)
+  AssertionError [ERR_ASSERTION]: completed evaluation left its descendant running
+  
+  true !== false
+  
+      at untilStopped (file://[WORKSPACE]/craft-eval/dist/tests/process-lifecycle.test.js:25:12)
+      at async TestContext.<anonymous> (file://[WORKSPACE]/craft-eval/dist/tests/process-lifecycle.test.js:53:17)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual'
+  }
+
+test at dist/tests/process-lifecycle.test.js:29:9
+✖ script completion cleans descendants with inherited output pipes (1076.828333ms)
+  AssertionError [ERR_ASSERTION]: {"case_id":"one","checks":[{"evidence":{"exit_code":null,"issue":"timeout","kind":"script","path":"background.mjs"},"id":"grade","passed":false,"reason":"script_error"}],"cost_units":null,"duration_ms":37,"exit_code":0,"gateway_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","host":null,"input_receipt":null,"issue":null,"safety_checks":[],"safety_verdict":null,"stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","stdout_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","task_run_id":"f5784fed4e59482aad3eb162ad760506","task_verdict":"failed","trace_complete":false,"trace_sha256":null,"trial":1,"trigger":null,"verdict":"failed","workspace_snapshot":{"bytes":450,"digest":"sha256:62b4fd7d7cbea865494ea43062403098c2bf95d4d6de78e86b1446b6be71124e","files":2}}
+  
+  'failed' !== 'passed'
+  
+      at TestContext.<anonymous> (file://[WORKSPACE]/craft-eval/dist/tests/process-lifecycle.test.js:54:24)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'failed',
+    expected: 'passed',
+    operator: 'strictEqual'
+  }
+
+test at dist/tests/process-lifecycle.test.js:29:9
+✖ judge completion cleans descendants with closed output pipes (1599.539667ms)
+  AssertionError [ERR_ASSERTION]: completed evaluation left its descendant running
+  
+  true !== false
+  
+      at untilStopped (file://[WORKSPACE]/craft-eval/dist/tests/process-lifecycle.test.js:25:12)
+      at async TestContext.<anonymous> (file://[WORKSPACE]/craft-eval/dist/tests/process-lifecycle.test.js:53:17)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual'
+  }
+
+test at dist/tests/process-lifecycle.test.js:29:9
+✖ judge completion cleans descendants with inherited output pipes (1059.362292ms)
+  AssertionError [ERR_ASSERTION]: {"case_id":"one","checks":[{"evidence":{"answer":"answer.txt","exit_code":null,"issue":"timeout","kind":"model_graded"},"id":"grade","passed":null,"reason":"judge_error"}],"cost_units":null,"duration_ms":32,"exit_code":0,"gateway_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","host":null,"input_receipt":null,"issue":null,"safety_checks":[],"safety_verdict":null,"stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","stdout_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","task_run_id":"60f12e7ac287438a9573f831e1520270","task_verdict":"inconclusive","trace_complete":false,"trace_sha256":null,"trial":1,"trigger":null,"verdict":"inconclusive","workspace_snapshot":{"bytes":489,"digest":"sha256:199dd501a91ff02433c54c35c9a06ee69ded2f1c6babdaaae822f494625c3288","files":2}}
+  + actual - expected
+  
+  + 'inconclusive'
+  - 'passed'
+  
+      at TestContext.<anonymous> (file://[WORKSPACE]/craft-eval/dist/tests/process-lifecycle.test.js:54:24)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'inconclusive',
+    expected: 'passed',
+    operator: 'strictEqual'
+  }

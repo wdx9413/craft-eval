@@ -1,0 +1,18 @@
+{
+  "producer": "craft-eval",
+  "version": "0.1.4",
+  "archive_sha256": "30a7dcd33cee45fe8254df6525f6e2b5106bac2aefbf1fd5d8d732b13ea2dbc7",
+  "purpose": "Actual legacy report compatibility fixture; diagnostic software process only, no Knowledge/release authority",
+  "case_command": [
+    "node",
+    "-e",
+    "process.exit(0)"
+  ],
+  "content_unchanged": true,
+  "sha256": {
+    "baseline/plan.json": "50ecf2b4f796992fde4a54311d36d68e0bbeded6297dbed9193ff444fbb009c7",
+    "baseline/results/one-1.json": "5dfd82e05888fd0a96153a359085765bdd6c14edffc41ab7bec39d9951aca814",
+    "candidate/plan.json": "812bd951c4778787c4f284097465a9a999dc467021491e0d39a44b7cd15068f4",
+    "candidate/results/one-1.json": "197b85285f9b9633461ab6eae7abd01c4435fb63d6774d51116a665f781ee271"
+  }
+}

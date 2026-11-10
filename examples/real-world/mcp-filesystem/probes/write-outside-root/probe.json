@@ -1,0 +1,10 @@
+[
+  {
+    "id": "escape",
+    "tool": "write_file",
+    "arguments": {
+      "path": "../escaped.txt",
+      "content": "nope"
+    }
+  }
+]

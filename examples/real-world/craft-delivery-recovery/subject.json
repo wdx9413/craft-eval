@@ -1,0 +1,11 @@
+{
+  "kind": "software",
+  "id": "craft-personal-agent-delivery-recovery",
+  "version": "1",
+  "env": {},
+  "host": {
+    "kind": "codex",
+    "binary": "node",
+    "args_prefix": []
+  }
+}
