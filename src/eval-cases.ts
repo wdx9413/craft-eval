@@ -562,11 +562,154 @@ const DOMAIN_ISOLATION_CASES: GradedCase[] = [
   },
 ];
 
+/**
+ * Plugin-contribution cases.
+ *
+ * A host manifest's Workbench/Mod declarations must be validated, bounded and
+ * imported as drafts only. Graded from store bytes: page counts, Mod status and
+ * whether an unapproved plugin rule can reach a Worker overlay.
+ */
+const PLUGIN_CONTRIBUTION_CASES: GradedCase[] = [
+  {
+    case: defineEvalCase({
+      id: "plugin_contribution.workbench_page_imported", axis: "plugin_contribution", evidence: "kernel", partition: "held_out",
+      sanitized: true, approved_by: SUITE_REVIEWER,
+      description: "A manifest Workbench block becomes a validated page contribution, so host UI is not silently dropped.",
+    }),
+    check: { kind: "equals", expected: "1" },
+  },
+  {
+    case: defineEvalCase({
+      id: "plugin_contribution.mod_is_draft_only", axis: "plugin_contribution", evidence: "kernel", partition: "held_out",
+      sanitized: true, approved_by: SUITE_REVIEWER,
+      description: "A plugin-declared Mod is imported as draft and never auto-activated, so third-party rules cannot bypass approval.",
+    }),
+    check: { kind: "equals", expected: "draft:false" },
+  },
+  {
+    case: defineEvalCase({
+      id: "plugin_contribution.unapproved_mod_not_injected", axis: "plugin_contribution", evidence: "kernel", partition: "held_out",
+      sanitized: true, approved_by: SUITE_REVIEWER,
+      description: "An unapproved plugin Mod does not appear in the Worker overlay even when its plugin is mounted.",
+    }),
+    check: { kind: "equals", expected: "false" },
+  },
+];
+
+/**
+ * Pilot-boundary cases.
+ *
+ * The navigator is Craft-only. Graded from the error code and the resulting
+ * provider, never from a model's opinion about its own scope.
+ */
+const PILOT_BOUNDARY_CASES: GradedCase[] = [
+  {
+    case: defineEvalCase({
+      id: "pilot_boundary.external_cli_refused", axis: "pilot_boundary", evidence: "kernel", partition: "held_out",
+      sanitized: true, approved_by: SUITE_REVIEWER,
+      description: "The navigator refuses a Codex/Claude/DSH executor with a stable policy code instead of dispatching it.",
+    }),
+    check: { kind: "equals", expected: "PILOT_CRAFT_ONLY" },
+  },
+  {
+    case: defineEvalCase({
+      id: "pilot_boundary.craft_accepted", axis: "pilot_boundary", evidence: "kernel", partition: "held_out",
+      sanitized: true, approved_by: SUITE_REVIEWER,
+      description: "The navigator normalizes craft-internal to craft and accepts it, so the allowed path is not over-blocked.",
+    }),
+    check: { kind: "equals", expected: "craft" },
+  },
+];
+
+/**
+ * External-sync cases.
+ *
+ * Local records stay authoritative; the mirror is bounded and never writes
+ * outside its root. Graded from the file system and the returned status.
+ */
+const EXTERNAL_SYNC_CASES: GradedCase[] = [
+  {
+    case: defineEvalCase({
+      id: "external_sync.out_of_root_key_refused", axis: "external_sync", evidence: "kernel", partition: "held_out",
+      sanitized: true, approved_by: SUITE_REVIEWER,
+      description: "A remote index key outside the sync root is refused, so a tampered mirror cannot write arbitrary files.",
+    }),
+    check: { kind: "equals", expected: "true" },
+  },
+  {
+    case: defineEvalCase({
+      id: "external_sync.local_wins_overwrites", axis: "external_sync", evidence: "kernel", partition: "held_out",
+      sanitized: true, approved_by: SUITE_REVIEWER,
+      description: "Under local_wins a differing remote copy is replaced by the local record, keeping local authority.",
+    }),
+    check: { kind: "equals", expected: "local new" },
+  },
+  {
+    case: defineEvalCase({
+      id: "external_sync.remote_wins_skips", axis: "external_sync", evidence: "kernel", partition: "held_out",
+      sanitized: true, approved_by: SUITE_REVIEWER,
+      description: "Under remote_wins the local copy does not overwrite the remote, so the configured policy is honoured.",
+    }),
+    check: { kind: "equals", expected: "0" },
+  },
+];
+
+/**
+ * Runtime-dependency cases.
+ *
+ * Craft defaults to models configured for itself; host-managed auth is opt-in.
+ * Graded from the resolved provider list.
+ */
+const RUNTIME_DEPENDENCY_CASES: GradedCase[] = [
+  {
+    case: defineEvalCase({
+      id: "runtime_dependency.no_implicit_host_auth", axis: "runtime_dependency", evidence: "kernel", partition: "held_out",
+      sanitized: true, approved_by: SUITE_REVIEWER,
+      description: "By default a codex-cli host-managed provider is not injected into the model list.",
+    }),
+    check: { kind: "equals", expected: "false" },
+  },
+  {
+    case: defineEvalCase({
+      id: "runtime_dependency.explicit_opt_in_restores", axis: "runtime_dependency", evidence: "kernel", partition: "held_out",
+      sanitized: true, approved_by: SUITE_REVIEWER,
+      description: "Explicitly enabling hostManagedAuthProvider restores it, so the switch is real and not a dead flag.",
+    }),
+    check: { kind: "equals", expected: "true" },
+  },
+];
+
+/**
+ * Message-source cases.
+ *
+ * Pull-only ingestion: cross-restart dedup and no outbound action. Graded from
+ * the inbox count and the stored record.
+ */
+const MESSAGE_SOURCE_CASES: GradedCase[] = [
+  {
+    case: defineEvalCase({
+      id: "message_source.pull_dedups_across_restart", axis: "message_source", evidence: "kernel", partition: "held_out",
+      sanitized: true, approved_by: SUITE_REVIEWER,
+      description: "Re-polling the same drop directory after a restart ingests nothing new, so a message is not duplicated.",
+    }),
+    check: { kind: "equals", expected: "1:0" },
+  },
+  {
+    case: defineEvalCase({
+      id: "message_source.never_sends_outbound", axis: "message_source", evidence: "kernel", partition: "held_out",
+      sanitized: true, approved_by: SUITE_REVIEWER,
+      description: "The pull source only reads; no outbound fetch is issued, so remote messaging stays explicitly opt-in.",
+    }),
+    check: { kind: "equals", expected: "0" },
+  },
+];
+
 /** Every graded case, in a stable order. */
 export function evalCases(): GradedCase[] {
   return [...MEMORY_CASES, ...KNOWLEDGE_CASES, ...WORKFLOW_CASES, ...DATASEC_CASES, ...GOVERNANCE_CASES, ...END_TO_END_CASES,
     ...EXPERIENCE_DEDUP_CASES, ...KNOWLEDGE_LINEAGE_CASES, ...EVAL_GOVERNANCE_CASES, ...CONTEXT_SUPPLY_CASES, ...PROACTIVE_CASES,
-    ...LIFECYCLE_CASES, ...DOMAIN_ISOLATION_CASES];
+    ...LIFECYCLE_CASES, ...DOMAIN_ISOLATION_CASES, ...PLUGIN_CONTRIBUTION_CASES, ...PILOT_BOUNDARY_CASES,
+    ...EXTERNAL_SYNC_CASES, ...RUNTIME_DEPENDENCY_CASES, ...MESSAGE_SOURCE_CASES];
 }
 
 /**

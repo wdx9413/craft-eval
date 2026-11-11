@@ -29,7 +29,7 @@ import { digestJson } from "./digest.ts";
  */
 
 /** The sub-capability a case measures. */
-export const CAPABILITY_AXES = ["memory", "knowledge", "workflow", "datasec", "experience_dedup", "knowledge_lineage", "eval_governance", "governance", "end_to_end", "context_supply", "proactive_restraint", "lifecycle", "domain_isolation"] as const;
+export const CAPABILITY_AXES = ["memory", "knowledge", "workflow", "datasec", "experience_dedup", "knowledge_lineage", "eval_governance", "governance", "end_to_end", "context_supply", "proactive_restraint", "lifecycle", "domain_isolation", "plugin_contribution", "pilot_boundary", "external_sync", "runtime_dependency", "message_source"] as const;
 export type CapabilityAxis = typeof CAPABILITY_AXES[number];
 
 /**
@@ -108,6 +108,11 @@ export const AXIS_LEDGER: Record<CapabilityAxis, Ledger> = {
   // Domain isolation measures whether a self-evolved procedure stays inside
   // the domain its held-out suite evaluated. Deterministic kernel evidence.
   domain_isolation: "capability",
+  plugin_contribution: "capability",
+  pilot_boundary: "capability",
+  external_sync: "capability",
+  runtime_dependency: "capability",
+  message_source: "capability",
 };
 
 /**

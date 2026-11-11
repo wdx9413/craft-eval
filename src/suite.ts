@@ -748,6 +748,30 @@ try {
   domainStore.close();
 }
 
+// ---------------------------------------- host-integrated axes (standalone)
+// These axes measure Craft's service-level behaviour (plugin contribution,
+// pilot boundary, external sync, runtime dependency, message source). The
+// standalone evaluator runs against CraftServiceShim, so it cannot observe
+// them honestly; they are reported inconclusive rather than passed by a
+// structurally-true assertion. Run `craft/capability/craft-eval/suite.ts`
+// against a real CraftService to observe them.
+for (const caseId of [
+  "plugin_contribution.workbench_page_imported",
+  "plugin_contribution.mod_is_draft_only",
+  "plugin_contribution.unapproved_mod_not_injected",
+  "pilot_boundary.external_cli_refused",
+  "pilot_boundary.craft_accepted",
+  "external_sync.out_of_root_key_refused",
+  "external_sync.local_wins_overwrites",
+  "external_sync.remote_wins_skips",
+  "runtime_dependency.no_implicit_host_auth",
+  "runtime_dependency.explicit_opt_in_restores",
+  "message_source.pull_dedups_across_restart",
+  "message_source.never_sends_outbound",
+]) {
+  if (inScope(caseId)) unobserved(caseId, "requires a real CraftService; the standalone evaluator uses CraftServiceShim");
+}
+
 // ----------------------------------------------------------------- report
 store.close();
 rmSync(root, { recursive: true, force: true });
