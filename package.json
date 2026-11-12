@@ -68,5 +68,17 @@
   "devDependencies": {
     "@types/node": "^26.6.5",
     "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "craft-common-base": "0.20.4",
+    "craft-common-store-local": "0.20.4"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wdx9413/craft-eval.git"
+  },
+  "homepage": "https://github.com/wdx9413/craft-eval#readme",
+  "bugs": {
+    "url": "https://github.com/wdx9413/craft-eval/issues"
   }
 }
