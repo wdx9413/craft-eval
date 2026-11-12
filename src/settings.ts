@@ -2,7 +2,7 @@ import { access, readFile } from "node:fs/promises";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { dirname, isAbsolute, resolve } from "node:path";
-import { atomicPrivateJson, craftPaths, ensureLayout, type CraftPaths } from '../../craft-common/packages/craft-common-store-local/src/paths.ts';
+import { atomicPrivateJson, craftPaths, ensureLayout } from 'craft-common-store-local';
 
 export type ModelProtocol = "openai-compatible" | "anthropic";
 

@@ -16,7 +16,7 @@
  * surfaced so a shrinking denominator cannot hide a regression.
  */
 import { LEDGERS } from "./eval-suite.ts";
-import type { JsonObject } from '../../craft-common/packages/craft-common-store-local/src/store.ts';
+import type { JsonObject } from 'craft-common-store-local/';
 
 export interface RunReport {
   schema: string;

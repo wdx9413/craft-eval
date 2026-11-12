@@ -124,7 +124,7 @@ export function routeModel(request: RoutingRequest): RoutingDecision {
   const start = TIER_ORDER.indexOf(request.tier);
   if (start === -1) throw new Error(`Unsupported model tier: ${String(request.tier)}`);
   for (let index = start; index < TIER_ORDER.length; index += 1) {
-    const tier = TIER_ORDER[index];
+    const tier = TIER_ORDER[index]!;
     const declared = request.models[tier];
     if (typeof declared === "string" && declared.trim()) {
       return { tier, model: declared.trim(), downgraded: tier !== request.tier,

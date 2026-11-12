@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { JsonObject } from '../../craft-common/packages/craft-common-store-local/src/store.ts';
+import type { JsonObject } from 'craft-common-store-local/';
 import { text } from "./validation.ts";
 
 /**

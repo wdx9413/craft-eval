@@ -1,9 +1,9 @@
-import type { JsonObject } from '../../craft-common/packages/craft-common-store-local/src/store.ts';
+import type { JsonObject } from 'craft-common-store-local/';
 import { normalizeModelPricing, type CraftModelConfig, type ModelProtocol, type ModelPricing } from "./settings.ts";
 export type { ModelPricing } from "./settings.ts";
-import { text } from '../../craft-common/packages/craft-common-base/src/validation.ts';
+import { text } from 'craft-common-base/';
 import { stableDigest } from "./digest.ts";
-import { DEFAULT_RULES, Sanitizer } from '../../craft-capability/capability/craft-datasec/rules.ts';
+import { DEFAULT_RULES, Sanitizer } from '@craft/capability-datasec/rules';
 import { sanitizeModelEgressRequest } from "./model-egress-security.ts";
 import { setTimeout as delay } from "node:timers/promises";
 
@@ -215,7 +215,7 @@ export function credentialStatus(spec: ModelProviderSpec, env: NodeJS.ProcessEnv
 export function selectModel(spec: ModelProviderSpec, tier: ModelTier): { tier: ModelTier; model: string; downgraded: boolean } {
   if (!TIER_ORDER.includes(tier)) throw new Error(`Unsupported model tier: ${String(tier)}`);
   for (let index = TIER_ORDER.indexOf(tier); index < TIER_ORDER.length; index += 1) {
-    const candidate = TIER_ORDER[index]; const model = spec.models[candidate];
+    const candidate = TIER_ORDER[index]!; const model = spec.models[candidate];
     if (model) return { tier: candidate, model, downgraded: candidate !== tier };
   }
   throw new Error(`Provider ${spec.provider} declares no usable model tier`);

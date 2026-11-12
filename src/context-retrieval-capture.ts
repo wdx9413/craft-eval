@@ -1,5 +1,4 @@
-import { createHash } from "node:crypto";
-import type { JsonObject } from '../../craft-common/packages/craft-common-store-local/src/store.ts';
+import type { JsonObject } from 'craft-common-store-local/';
 import { text } from "./validation.ts";
 import { digestJson } from "./digest.ts";
 import { compact, compactWithPromotion } from "./compaction.ts";
@@ -149,7 +148,7 @@ export class ReversibleContext {
 // Gap 2: BM25 with identifier awareness
 // ---------------------------------------------------------------------------
 
-export { Bm25Index } from "../../craft-common/packages/craft-common-base/src/bm25.ts";
+export { Bm25Index } from "craft-common-base/bm25";
 
 /**
  * Reciprocal-rank fusion of several ranked lists.
