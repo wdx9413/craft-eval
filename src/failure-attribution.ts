@@ -1,4 +1,4 @@
-import type { JsonObject } from 'craft-common-store-local/';
+import type { JsonObject } from 'craft-common-store-local';
 
 /**
  * G3: failure attribution.

@@ -1,1 +1,1 @@
-export * from 'craft-common-base/';
+export * from 'craft-common-base';

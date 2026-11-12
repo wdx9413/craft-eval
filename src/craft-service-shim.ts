@@ -1,5 +1,5 @@
 import type { CraftService } from "./craft-service-interface.ts";
-import type { CraftStore } from 'craft-common-store-local/';
+import type { CraftStore } from 'craft-common-store-local';
 
 type JsonObject = Record<string, unknown>;
 

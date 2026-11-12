@@ -1,7 +1,7 @@
-import type { JsonObject } from 'craft-common-store-local/';
+import type { JsonObject } from 'craft-common-store-local';
 import { normalizeModelPricing, type CraftModelConfig, type ModelProtocol, type ModelPricing } from "./settings.ts";
 export type { ModelPricing } from "./settings.ts";
-import { text } from 'craft-common-base/';
+import { text } from 'craft-common-base';
 import { stableDigest } from "./digest.ts";
 import { DEFAULT_RULES, Sanitizer } from '@craft/capability-datasec/rules';
 import { sanitizeModelEgressRequest } from "./model-egress-security.ts";

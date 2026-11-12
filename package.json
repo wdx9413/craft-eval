@@ -13,6 +13,38 @@
       "types": "./dist/src/index.d.ts",
       "import": "./dist/src/index.js"
     },
+    "./suite": {
+      "types": "./dist/src/suite.d.ts",
+      "import": "./dist/src/suite.js"
+    },
+    "./compare-run-reports": {
+      "types": "./dist/src/compare-run-reports.d.ts",
+      "import": "./dist/src/compare-run-reports.js"
+    },
+    "./paired-value-runs": {
+      "types": "./dist/src/paired-value-runs.d.ts",
+      "import": "./dist/src/paired-value-runs.js"
+    },
+    "./model": {
+      "types": "./dist/src/model.d.ts",
+      "import": "./dist/src/model.js"
+    },
+    "./run": {
+      "types": "./dist/src/run.d.ts",
+      "import": "./dist/src/run.js"
+    },
+    "./recurrence": {
+      "types": "./dist/src/recurrence.d.ts",
+      "import": "./dist/src/recurrence.js"
+    },
+    "./compare": {
+      "types": "./dist/src/compare.d.ts",
+      "import": "./dist/src/compare.js"
+    },
+    "./abstraction": {
+      "types": "./dist/src/abstraction.d.ts",
+      "import": "./dist/src/abstraction.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [

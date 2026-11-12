@@ -1,4 +1,4 @@
-import type { JsonObject } from 'craft-common-store-local/';
+import type { JsonObject } from 'craft-common-store-local';
 import { defineEvalCase, defineEvalSuite } from "./eval-suite.ts";
 
 /**

@@ -1,4 +1,4 @@
-import type { CraftStore } from 'craft-common-store-local/';
+import type { CraftStore } from 'craft-common-store-local';
 
 type JsonObject = Record<string, unknown>;
 

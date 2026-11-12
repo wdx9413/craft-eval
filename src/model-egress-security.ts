@@ -1,4 +1,4 @@
-import type { JsonObject } from 'craft-common-store-local/';
+import type { JsonObject } from 'craft-common-store-local';
 import { DEFAULT_RULES, Sanitizer } from '@craft/capability-datasec/rules';
 
 export interface EgressProviderBinding { base_url: string; chat_path: string }
