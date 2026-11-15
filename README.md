@@ -99,6 +99,8 @@ node dist/src/cli.js scenario scenario.json examples/agent-subject.json examples
 
 `craft-eval` 是**独立证据执行器**，不是发证、路由或发布系统。它负责固定被测版本、Suite、Runtime 和重复次数，执行确定性检查，输出可复核结果；上层仍保留“是否上线”的决策权。评测设计按七个环节闭环：
 
+> 想要"从当前能力走到理想态"的分阶段计划，见 [理想态路线图](docs/roadmap-to-ideal-state.md)；当前代码事实基线见 [现状基线](docs/baseline-status.md)；与 craft 主仓的职责边界见 [职责边界](docs/ownership-boundary.md)；具体操作见 [运行手册](docs/runbook.md)。
+
 1. **评测对象与主张**：明确评的是长链路复杂系统、单软件、Agent、MCP 还是 Skill，以及结论允许覆盖的范围。
 2. **评测标准与指标**：一个主指标加若干 Guardrail，任务、安全、时延、成本分开报告，不合成单一总分。
 3. **高质量评测集**：用例要有来源、所有者、难度、风险、期望行为、独立性和过期时间；开发集与留出集不得复用。

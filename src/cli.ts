@@ -68,7 +68,15 @@ function parse(argv: string[]): { command: string; positional: string[]; options
         options.workspace_source = value;
         index += 1;
       } else if (name === 'keep-traces') {
-        options.keep_traces = true;
+        // Bare flag keeps the legacy "always" meaning; a following value selects
+        // one of the three retention modes.
+        const next = rest[index + 1];
+        if (next === 'never' || next === 'on-failure' || next === 'always') {
+          options.keep_traces = next;
+          index += 1;
+        } else {
+          options.keep_traces = true;
+        }
       } else if (name === 'workspace' || name === 'output' || name === 'resume-after') {
         const value = rest[index + 1];
         if (value === undefined) {
@@ -152,7 +160,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
         workspace_mode: options.workspace_mode === undefined ? 'isolated' : (options.workspace_mode as 'isolated' | 'shared'),
         fail_fast: options.fail_fast === true,
         workspace_source: options.workspace_source === undefined ? undefined : String(options.workspace_source),
-        keep_traces: options.keep_traces === true,
+        keep_traces: options.keep_traces === undefined ? 'never' : (options.keep_traces as boolean | 'never' | 'on-failure' | 'always'),
         max_output_bytes: options['max-output-bytes'] === undefined ? undefined : Number(options['max-output-bytes']),
       });
       const report = await reportRun(path);
@@ -209,6 +217,13 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     } else if (command === 'calibrate') {
       requireArgs(positional, 1, USAGE);
       result = await calibrateJudge(positional[0]!, { timeout_ms: options['timeout-ms'] === undefined ? undefined : Number(options['timeout-ms']), max_output_bytes: options['max-output-bytes'] === undefined ? undefined : Number(options['max-output-bytes']) });
+      // A declared bar that was missed is a failing gate, but the report is still
+      // printed first so the numbers can be inspected. No declared bar (`null`)
+      // stays informational and keeps exit code 0.
+      if ((result as { passed?: boolean | null }).passed === false) {
+        process.stdout.write(JSON.stringify(result) + '\n');
+        return 1;
+      }
     } else if (command === 'scenario') {
       requireArgs(positional, 1, USAGE);
       if (options.workspace === undefined || options.output === undefined) {

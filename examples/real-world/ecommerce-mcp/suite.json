@@ -1,0 +1,303 @@
+{
+  "schema": "craft-eval.eval.v1",
+  "suite_id": "ecommerce-mcp",
+  "subject_kind": "software",
+  "partition": "development",
+  "sanitized": true,
+  "version": "1.0.0",
+  "claim": {
+    "statement": "离线电商 MCP 的商品查询、优惠券门槛、库存与下单幂等规则按业务定义工作",
+    "scope": "单进程 stdio MCP，单 SKU，规则集有限",
+    "limitations": [
+      "不覆盖支付、物流与多租户",
+      "库存并发未覆盖"
+    ]
+  },
+  "metrics": {
+    "primary": {
+      "id": "task_pass",
+      "kind": "binary_pass_rate",
+      "direction": "higher_is_better",
+      "minimum_sample": 7
+    }
+  },
+  "business": {
+    "invariants": [
+      {
+        "id": "inv-coupon-threshold",
+        "statement": "优惠券仅在商品金额达到门槛时生效",
+        "positive_cases": [
+          "coupon-threshold-200",
+          "coupon-threshold-201"
+        ],
+        "negative_cases": [
+          "coupon-threshold-199"
+        ]
+      },
+      {
+        "id": "inv-stock-non-negative",
+        "statement": "库存不足时下单必须失败，且不得扣减库存",
+        "positive_cases": [
+          "order-create"
+        ],
+        "negative_cases": [
+          "order-out-of-stock"
+        ]
+      }
+    ],
+    "transitions": [
+      {
+        "id": "t-order-created",
+        "entity": "order",
+        "from": null,
+        "to": "created",
+        "allowed": true,
+        "cases": [
+          "order-create"
+        ]
+      },
+      {
+        "id": "t-order-rejected",
+        "entity": "order",
+        "from": null,
+        "to": "rejected",
+        "allowed": false,
+        "cases": [
+          "order-out-of-stock"
+        ]
+      }
+    ],
+    "rules": [
+      {
+        "id": "rule-coupon",
+        "statement": "满 200 减 30",
+        "parameter": "cart_amount",
+        "boundaries": [
+          {
+            "value": 120,
+            "cases": [
+              "coupon-threshold-199"
+            ]
+          },
+          {
+            "value": 240,
+            "cases": [
+              "coupon-threshold-200"
+            ]
+          },
+          {
+            "value": 360,
+            "cases": [
+              "coupon-threshold-201"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "cases": [
+    {
+      "id": "product-query",
+      "category": "catalog",
+      "risk": "low",
+      "language": "javascript",
+      "argv": [
+        "node",
+        "driver.mjs",
+        "--case",
+        "product-query"
+      ],
+      "timeout_s": 30,
+      "provenance": {
+        "source": "examples/real-world/ecommerce-mcp"
+      },
+      "checks": [
+        {
+          "id": "obs-product-query",
+          "kind": "file_exists",
+          "path": "outputs/observations.json"
+        },
+        {
+          "id": "grade-product-query",
+          "kind": "script",
+          "path": "grade.mjs"
+        }
+      ],
+      "expected_behavior": "业务规则 product-query 按定义生效"
+    },
+    {
+      "id": "coupon-threshold-199",
+      "category": "pricing",
+      "risk": "high",
+      "language": "javascript",
+      "argv": [
+        "node",
+        "driver.mjs",
+        "--case",
+        "coupon-threshold-199"
+      ],
+      "timeout_s": 30,
+      "provenance": {
+        "source": "examples/real-world/ecommerce-mcp"
+      },
+      "checks": [
+        {
+          "id": "obs-coupon-threshold-199",
+          "kind": "file_exists",
+          "path": "outputs/observations.json"
+        },
+        {
+          "id": "grade-coupon-threshold-199",
+          "kind": "script",
+          "path": "grade.mjs"
+        }
+      ],
+      "expected_behavior": "业务规则 coupon-threshold-199 按定义生效"
+    },
+    {
+      "id": "coupon-threshold-200",
+      "category": "pricing",
+      "risk": "high",
+      "language": "javascript",
+      "argv": [
+        "node",
+        "driver.mjs",
+        "--case",
+        "coupon-threshold-200"
+      ],
+      "timeout_s": 30,
+      "provenance": {
+        "source": "examples/real-world/ecommerce-mcp"
+      },
+      "checks": [
+        {
+          "id": "obs-coupon-threshold-200",
+          "kind": "file_exists",
+          "path": "outputs/observations.json"
+        },
+        {
+          "id": "grade-coupon-threshold-200",
+          "kind": "script",
+          "path": "grade.mjs"
+        }
+      ],
+      "expected_behavior": "业务规则 coupon-threshold-200 按定义生效"
+    },
+    {
+      "id": "coupon-threshold-201",
+      "category": "pricing",
+      "risk": "high",
+      "language": "javascript",
+      "argv": [
+        "node",
+        "driver.mjs",
+        "--case",
+        "coupon-threshold-201"
+      ],
+      "timeout_s": 30,
+      "provenance": {
+        "source": "examples/real-world/ecommerce-mcp"
+      },
+      "checks": [
+        {
+          "id": "obs-coupon-threshold-201",
+          "kind": "file_exists",
+          "path": "outputs/observations.json"
+        },
+        {
+          "id": "grade-coupon-threshold-201",
+          "kind": "script",
+          "path": "grade.mjs"
+        }
+      ],
+      "expected_behavior": "业务规则 coupon-threshold-201 按定义生效"
+    },
+    {
+      "id": "order-create",
+      "category": "order",
+      "risk": "high",
+      "language": "javascript",
+      "argv": [
+        "node",
+        "driver.mjs",
+        "--case",
+        "order-create"
+      ],
+      "timeout_s": 30,
+      "provenance": {
+        "source": "examples/real-world/ecommerce-mcp"
+      },
+      "checks": [
+        {
+          "id": "obs-order-create",
+          "kind": "file_exists",
+          "path": "outputs/observations.json"
+        },
+        {
+          "id": "grade-order-create",
+          "kind": "script",
+          "path": "grade.mjs"
+        }
+      ],
+      "expected_behavior": "业务规则 order-create 按定义生效"
+    },
+    {
+      "id": "order-out-of-stock",
+      "category": "order",
+      "risk": "critical",
+      "language": "javascript",
+      "argv": [
+        "node",
+        "driver.mjs",
+        "--case",
+        "order-out-of-stock"
+      ],
+      "timeout_s": 30,
+      "provenance": {
+        "source": "examples/real-world/ecommerce-mcp"
+      },
+      "checks": [
+        {
+          "id": "obs-order-out-of-stock",
+          "kind": "file_exists",
+          "path": "outputs/observations.json"
+        },
+        {
+          "id": "grade-order-out-of-stock",
+          "kind": "script",
+          "path": "grade.mjs"
+        }
+      ],
+      "expected_behavior": "业务规则 order-out-of-stock 按定义生效"
+    },
+    {
+      "id": "order-idempotent",
+      "category": "order",
+      "risk": "high",
+      "language": "javascript",
+      "argv": [
+        "node",
+        "driver.mjs",
+        "--case",
+        "order-idempotent"
+      ],
+      "timeout_s": 30,
+      "provenance": {
+        "source": "examples/real-world/ecommerce-mcp"
+      },
+      "checks": [
+        {
+          "id": "obs-order-idempotent",
+          "kind": "file_exists",
+          "path": "outputs/observations.json"
+        },
+        {
+          "id": "grade-order-idempotent",
+          "kind": "script",
+          "path": "grade.mjs"
+        }
+      ],
+      "expected_behavior": "业务规则 order-idempotent 按定义生效"
+    }
+  ]
+}

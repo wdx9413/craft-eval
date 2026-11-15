@@ -16,6 +16,7 @@ export interface GoldSample {
   /** Path (relative to the manifest) to the answer the judge must score. */
   answer: string;
   /** Known-correct verdict the judge should reach. */
+  /** Known-correct verdict the judge should reach. */
   expected: 'passed' | 'failed';
   threshold?: number;
 }
@@ -29,6 +30,10 @@ export interface CalibrationManifest {
   dir?: string;
   /** Number of repeated scorings used to measure self-consistency. */
   repeats?: number;
+  /** Optional gate: accuracy must reach this value (0..1). */
+  minimum_accuracy?: number;
+  /** Optional gate: self-consistency must reach this value (0..1). */
+  minimum_consistency?: number;
   samples: GoldSample[];
 }
 
@@ -48,6 +53,16 @@ export interface CalibrationReport {
   accuracy: number | null;
   consistency: number | null;
   repeats: number;
+  /**
+   * Gate outcome. `true`/`false` only when every declared gate was measurable;
+   * `null` means "no gate decision" — either no minimum was declared, or a
+   * declared minimum could not be compared because the metric was unmeasured.
+   */
+  passed: boolean | null;
+  /** The applied accuracy gate, absent when none was declared. */
+  minimum_accuracy?: number;
+  /** The applied consistency gate, absent when none was declared. */
+  minimum_consistency?: number;
   per_sample: SampleResult[];
 }
 
@@ -60,6 +75,38 @@ export interface CalibrationOptions {
 }
 
 type ScoreOutcome = { score: number; error: null } | { score: null; error: string };
+
+function validateMinimum(value: unknown, name: string): number | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1) {
+    throw new Error(`calibration ${name} must be a number within 0..1`);
+  }
+  return value;
+}
+
+/**
+ * Combine declared gates into one outcome. Each declared gate contributes
+ * either a satisfied/unsatisfied vote or an "unmeasured" vote; any failing vote
+ * wins, and unmeasured votes make the whole decision undecidable.
+ */
+function gateOutcome(
+  accuracy: number | null,
+  minimumAccuracy: number | undefined,
+  consistency: number | null,
+  minimumConsistency: number | undefined,
+): boolean | null {
+  if (minimumAccuracy === undefined && minimumConsistency === undefined) return null;
+  const votes = [
+    { minimum: minimumAccuracy, measured: accuracy },
+    { minimum: minimumConsistency, measured: consistency },
+  ];
+  for (const { minimum, measured } of votes) {
+    if (minimum === undefined) continue;
+    if (measured === null) return null;
+    if (measured < minimum) return false;
+  }
+  return true;
+}
 
 async function scoreOnce(
   manifest: CalibrationManifest,
@@ -111,6 +158,8 @@ export async function calibrateJudge(manifestPath: string, options: CalibrationO
   }
   const repeats = manifest.repeats ?? 3;
   if (!Number.isSafeInteger(repeats) || repeats < 1) throw new Error('calibration repeats must be a positive safe integer');
+  const minimumAccuracy = validateMinimum(manifest.minimum_accuracy, 'minimum_accuracy');
+  const minimumConsistency = validateMinimum(manifest.minimum_consistency, 'minimum_consistency');
   const base = resolve(manifestPath, '..');
   // Resolve `dir` relative to the manifest so configs stay machine-independent.
   const resolved: CalibrationManifest = {
@@ -149,15 +198,21 @@ export async function calibrateJudge(manifestPath: string, options: CalibrationO
   }
   const scored = perSample.filter((item) => item.correct !== null);
   const consistent = perSample.filter((item): item is SampleResult & { agreement: number } => item.agreement !== null);
-  return {
+  const accuracy = scored.length === 0 ? null : scored.filter((item) => item.correct === true).length / scored.length;
+  const consistency =
+    consistent.length === 0
+      ? null
+      : consistent.reduce((sum, item) => sum + item.agreement, 0) / consistent.length;
+  const report: CalibrationReport = {
     schema: 'craft-eval.calibration.v1',
     samples: perSample.length,
-    accuracy: scored.length === 0 ? null : scored.filter((item) => item.correct === true).length / scored.length,
-    consistency:
-      consistent.length === 0
-        ? null
-        : consistent.reduce((sum, item) => sum + item.agreement, 0) / consistent.length,
+    accuracy,
+    consistency,
     repeats,
+    passed: gateOutcome(accuracy, minimumAccuracy, consistency, minimumConsistency),
     per_sample: perSample,
   };
+  if (minimumAccuracy !== undefined) report.minimum_accuracy = minimumAccuracy;
+  if (minimumConsistency !== undefined) report.minimum_consistency = minimumConsistency;
+  return report;
 }

@@ -62,6 +62,12 @@ export interface Comparison {
   improvements: string[];
   newCases: string[];
   removedCases: string[];
+  /** Per-judge agreement rate across paired runs (model_graded checks only). */
+  judge_agreements?: Array<{
+    judge: string;
+    agreement: number | null;
+    cases: number;
+  }>;
 }
 
 /** Fields that must match for two runs to be comparable at all. */

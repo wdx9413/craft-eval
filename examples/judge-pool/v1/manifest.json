@@ -1,0 +1,21 @@
+{
+  "schema": "craft-eval.calibration.v1",
+  "description": "Calibration manifest for the v1 business gold set. Points at samples.json and applies the default gates; samples.json is the single source of truth for the gold set.",
+  "dir": ".",
+  "command": ["node", "judge.mjs"],
+  "repeats": 3,
+  "minimum_accuracy": 0.9,
+  "minimum_consistency": 1,
+  "samples": [
+    { "id": "p01-coupon-aggregate", "answer": "answers/p01-coupon-aggregate.txt", "expected": "passed" },
+    { "id": "n01-coupon-wrong-threshold", "answer": "answers/n01-coupon-wrong-threshold.txt", "expected": "failed" },
+    { "id": "p02-refund-policy", "answer": "answers/p02-refund-policy.txt", "expected": "passed" },
+    { "id": "n02-refund-wrong-window", "answer": "answers/n02-refund-wrong-window.txt", "expected": "failed" },
+    { "id": "p03-stock-shortage", "answer": "answers/p03-stock-shortage.txt", "expected": "passed" },
+    { "id": "n03-stock-oversell", "answer": "answers/n03-stock-oversell.txt", "expected": "failed" },
+    { "id": "b01-empty-output", "answer": "answers/b01-empty-output.txt", "expected": "failed" },
+    { "id": "b02-oversized-output", "answer": "answers/b02-oversized-output.txt", "expected": "failed" },
+    { "id": "b03-malformed-json", "answer": "answers/b03-malformed-json.txt", "expected": "failed" },
+    { "id": "b04-nonanswer-remark", "answer": "answers/b04-nonanswer-remark.txt", "expected": "failed" }
+  ]
+}

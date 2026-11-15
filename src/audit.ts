@@ -9,6 +9,7 @@ import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 
 import { digest, loadSuite, SUPPORTED_SUBJECT_KINDS, type Case, type Suite } from './evaluation.js';
+import { suiteLineage, type SuiteLineage } from './suite-diff.js';
 
 export type AuditSeverity = 'error' | 'warning' | 'info';
 export type AuditStatus = 'passed' | 'warnings' | 'failed';
@@ -44,6 +45,7 @@ export interface SuiteAudit {
   }>;
   cases: CaseAudit[];
   findings: AuditFinding[];
+  suite_lineage: SuiteLineage;
 }
 
 export interface AuditSummary {
@@ -109,21 +111,95 @@ function groupBy<T>(values: T[], key: (value: T) => string | null): Map<string, 
   return result;
 }
 
-export function auditSuites(suites: Suite[]): SuiteAudit {
+export interface AuditOptions {
+  /** Jaccard threshold for near-duplicate prompts; defaults to 0.9. */
+  near_duplicate_threshold?: number;
+}
+
+/** Character shingles over normalised text; short prompts are excluded upstream. */
+function shingles(text: string, size = 5): Set<string> {
+  const result = new Set<string>();
+  for (let index = 0; index + size <= text.length; index += 1) {
+    result.add(text.slice(index, index + size));
+  }
+  return result;
+}
+
+function jaccard(left: Set<string>, right: Set<string>): number {
+  if (left.size === 0 || right.size === 0) return 0;
+  let intersection = 0;
+  for (const item of left) if (right.has(item)) intersection += 1;
+  return intersection / (left.size + right.size - intersection);
+}
+
+/** Near-duplicate detection needs enough text for a shingle comparison to mean anything. */
+const MIN_NEAR_DUPLICATE_LENGTH = 64;
+
+export function auditSuites(suites: Suite[], options: AuditOptions = {}): SuiteAudit {
   if (suites.length === 0) {
     throw new Error('audit requires at least one suite');
   }
   const findings: AuditFinding[] = [];
   const cases: CaseAudit[] = [];
   const suiteIds = new Set<string>();
+  const lineage = suiteLineage(suites);
+  // Every digest some suite names as a parent, for undirected cycle detection.
+  const declaredParents = new Set<string>();
+  for (const entry of lineage.suites) {
+    if (entry.parent_digest !== null) {
+      declaredParents.add(entry.parent_digest);
+    }
+  }
 
-  for (const suite of suites) {
+  for (const [index, suite] of suites.entries()) {
+    const entry = lineage.suites[index];
     if (suiteIds.has(suite.suite_id)) {
       findings.push(
         finding('duplicate_suite_id', 'error', `suite ID is repeated: ${suite.suite_id}`, [suite.suite_id]),
       );
     }
     suiteIds.add(suite.suite_id);
+    // Lineage findings only look at well-formed declarations; a malformed value
+    // is treated as absent rather than guessed at (loadSuite does not check it).
+    const ownDigest = entry?.digest ?? null;
+    const parentDigest: string | null = entry?.parent_digest ?? null;
+    if (parentDigest !== null) {
+      const parentSuiteId = lineage.suites.find((item) => item.digest === parentDigest)?.suite_id;
+      // Two suites pointing at each other hide the parent from a digest index, so
+      // the cycle check runs before the unresolved check.
+      const mutualParent =
+        parentSuiteId !== undefined && parentSuiteId !== suite.suite_id
+        && ownDigest !== null && declaredParents.has(ownDigest);
+      if (parentDigest === ownDigest) {
+        // Self-reference is a versioning mistake, not a cycle between suites.
+        findings.push(
+          finding(
+            'suite_version_unchanged',
+            'warning',
+            'suite declares itself as parent: version declared but content is unchanged',
+            [suite.suite_id],
+          ),
+        );
+      } else if (mutualParent) {
+        findings.push(
+          finding(
+            'suite_parent_cycle',
+            'error',
+            `suite and ${parentSuiteId} are each other's parent`,
+            [suite.suite_id, parentSuiteId],
+          ),
+        );
+      } else if (parentSuiteId === undefined) {
+        findings.push(
+          finding(
+            'suite_parent_unresolved',
+            'warning',
+            `suite declares parent ${parentDigest.slice(0, 19)} but no such suite is in this audit`,
+            [suite.suite_id],
+          ),
+        );
+      }
+    }
     if (suite.partition === 'held_out') {
       if (suite.approved_by === undefined) {
         findings.push(
@@ -491,6 +567,66 @@ export function auditSuites(suites: Suite[]): SuiteAudit {
     );
   }
 
+  // Near-duplicates: a reworded copy of the same task is not an independent
+  // sample. Only prompts long enough for shingles to be meaningful are compared.
+  const nearThreshold = options.near_duplicate_threshold ?? 0.9;
+  if (typeof nearThreshold !== 'number' || !Number.isFinite(nearThreshold) || nearThreshold <= 0 || nearThreshold > 1) {
+    throw new Error('near_duplicate_threshold must be within 0..1');
+  }
+  const promptEntries = suites.flatMap((suite) => suite.cases
+    .filter((item) => item.prompt !== undefined && normalizedText(item.prompt).length >= MIN_NEAR_DUPLICATE_LENGTH)
+    .map((item) => ({
+      suite_id: suite.suite_id,
+      case_id: item.id,
+      prompt: normalizedText(item.prompt as string),
+      shingles: shingles(normalizedText(item.prompt as string)),
+    })));
+  for (let left = 0; left < promptEntries.length; left += 1) {
+    for (let right = left + 1; right < promptEntries.length; right += 1) {
+      const a = promptEntries[left]!;
+      const b = promptEntries[right]!;
+      if (a.shingles.size === 0 || b.shingles.size === 0) continue;
+      const similarity = jaccard(a.shingles, b.shingles);
+      if (similarity >= nearThreshold) {
+        findings.push(
+          finding(
+            'near_duplicate_prompt',
+            'warning',
+            `prompts are ${(similarity * 100).toFixed(1)}% similar (threshold ${nearThreshold})`,
+            [a.suite_id, b.suite_id],
+            [a.case_id, b.case_id],
+          ),
+        );
+      }
+    }
+  }
+
+  // Shared provenance across partitions: the same source feeding both a
+  // development and a held-out case means the held-out set is not independent,
+  // and `sanitized: true` does not change that.
+  const sourcePartitions = new Map<string, { development: Set<string>; held_out: Set<string> }>();
+  for (const suite of suites) {
+    for (const item of suite.cases) {
+      const source = item.provenance?.source;
+      if (source === undefined) continue;
+      const bucket = sourcePartitions.get(source) ?? { development: new Set(), held_out: new Set() };
+      bucket[suite.partition].add(item.id);
+      sourcePartitions.set(source, bucket);
+    }
+  }
+  for (const [source, bucket] of sourcePartitions) {
+    if (bucket.development.size === 0 || bucket.held_out.size === 0) continue;
+    findings.push(
+      finding(
+        'shared_source_cross_partition',
+        'warning',
+        `source '${source}' feeds both development and held-out cases`,
+        [...new Set(suites.map((suite) => suite.suite_id))],
+        [...bucket.development, ...bucket.held_out].sort(),
+      ),
+    );
+  }
+
   const severity = findings.some((item) => item.severity === 'error')
     ? 'failed'
     : findings.some((item) => item.severity === 'warning')
@@ -509,6 +645,7 @@ export function auditSuites(suites: Suite[]): SuiteAudit {
       expires_at: suite.expires_at ?? null,
     })),
     cases,
+    suite_lineage: lineage,
     findings: findings.sort((a, b) => a.code.localeCompare(b.code) || a.case_ids.join(',').localeCompare(b.case_ids.join(','))),
   };
 }
@@ -569,6 +706,7 @@ export async function auditSuiteFiles(paths: string[]): Promise<SuiteAudit> {
       suites: [],
       cases: [],
       findings: duplicateFindings,
+      suite_lineage: { schema: 'craft-eval.suite-lineage.v1', suites: [] },
     };
   }
   const suites = await Promise.all(paths.map((path) => loadSuite(path)));
@@ -588,6 +726,10 @@ export interface SuiteCoverage {
     positives: number;
     negatives: number;
     undeclared: number;
+    /** Business-model derived coverage; absent when the suite declares no model. */
+    by_business_invariant?: Record<string, { positive: number; negative: number; covered: boolean }>;
+    by_business_transition?: Record<string, { cases: number; covered: boolean }>;
+    by_business_rule?: Record<string, { boundaries: Array<{ value: number; cases: number }>; covered: boolean }>;
   }>;
   gaps: string[];
 }
@@ -616,6 +758,10 @@ export function coverageSuites(suites: Suite[]): SuiteCoverage {
       ...(item.checks ?? []),
       ...(item.safety_checks ?? []),
     ].map((check) => check.kind));
+    const knownCases = new Set(suite.cases.map((item) => item.id));
+    const invariants = suite.business?.invariants;
+    const transitions = suite.business?.transitions;
+    const rules = suite.business?.rules;
     return {
       suite_id: suite.suite_id,
       cases: suite.cases.length,
@@ -629,6 +775,30 @@ export function coverageSuites(suites: Suite[]): SuiteCoverage {
       undeclared: suite.cases.filter(
         (item) => item.category === undefined && item.risk === undefined && item.difficulty === undefined,
       ).length,
+      ...(invariants === undefined ? {} : {
+        by_business_invariant: Object.fromEntries(invariants.map((invariant) => {
+          const positive = invariant.positive_cases.filter((id) => knownCases.has(id)).length;
+          const negative = invariant.negative_cases.filter((id) => knownCases.has(id)).length;
+          return [invariant.id, { positive, negative, covered: positive > 0 && negative > 0 }];
+        })),
+      }),
+      ...(transitions === undefined ? {} : {
+        by_business_transition: Object.fromEntries(transitions.map((transition) => {
+          const cases = transition.cases.filter((id) => knownCases.has(id)).length;
+          return [transition.id, { cases, covered: cases > 0 }];
+        })),
+      }),
+      ...(rules === undefined ? {} : {
+        by_business_rule: Object.fromEntries(rules.map((rule) => ({
+          [rule.id]: {
+            boundaries: rule.boundaries.map((boundary) => ({
+              value: boundary.value,
+              cases: boundary.cases.filter((id) => knownCases.has(id)).length,
+            })),
+            covered: rule.boundaries.every((boundary) => boundary.cases.some((id) => knownCases.has(id))),
+          },
+        })).map((entry) => Object.entries(entry)[0]!)),
+      }),
     };
   });
   const gaps: string[] = [];
@@ -641,6 +811,18 @@ export function coverageSuites(suites: Suite[]): SuiteCoverage {
     }
     if (suite.undeclared > 0) {
       gaps.push(`${suite.suite_id}: ${suite.undeclared} case(s) have no category/risk/difficulty`);
+    }
+    for (const [id, invariant] of Object.entries(suite.by_business_invariant ?? {})) {
+      if (invariant.positive === 0) gaps.push(`${suite.suite_id}: invariant ${id} has no positive case`);
+      if (invariant.negative === 0) gaps.push(`${suite.suite_id}: invariant ${id} has no negative case`);
+    }
+    for (const [id, transition] of Object.entries(suite.by_business_transition ?? {})) {
+      if (!transition.covered) gaps.push(`${suite.suite_id}: transition ${id} has no case`);
+    }
+    for (const [id, rule] of Object.entries(suite.by_business_rule ?? {})) {
+      for (const boundary of rule.boundaries) {
+        if (boundary.cases === 0) gaps.push(`${suite.suite_id}: rule ${id} boundary ${boundary.value} has no case`);
+      }
     }
   }
   return { schema: 'craft-eval.coverage.v1', suites: suitesOut, gaps };

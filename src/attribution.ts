@@ -22,6 +22,8 @@ export type FailureCategory =
   | 'task_output_invalid'
   | 'safety_violation'
   | 'external_dependency_missing'
+  | 'flaky'
+  | 'judge_disagreement'
   | 'unknown';
 
 export interface FailureAttribution {
@@ -213,9 +215,38 @@ export function attributeRun(report: RunReport): AttributionReport {
   const failures = report.results
     .map((item) => attribute(item))
     .filter((item): item is FailureAttribution => item !== null);
+  // Instability is a property of the case across trials, so it is attributed
+  // once per flaky case rather than once per failing trial.
+  for (const flaky of report.flaky_cases ?? []) {
+    failures.push({
+      case_id: flaky.case_id,
+      trial: 0,
+      verdict: 'inconclusive',
+      category: 'flaky',
+      stage: 'execution',
+      first_failed_check: null,
+      evidence: { verdicts: flaky.verdicts, trials: flaky.trials },
+    });
+  }
+  // Judge disagreement is reported per (case, trial) because the same trial can
+  // pass under one perspective and fail under another.
+  for (const disagreement of report.judge_disagreements ?? []) {
+    failures.push({
+      case_id: disagreement.case_id,
+      trial: disagreement.trial,
+      verdict: 'failed',
+      category: 'judge_disagreement',
+      stage: 'task_check',
+      first_failed_check: null,
+      evidence: {
+        passing_judges: disagreement.passing_judges,
+        failing_judges: disagreement.failing_judges,
+      },
+    });
+  }
   const clusters = new Map<FailureCategory, string[]>();
   for (const item of failures) {
-    const key = `${item.case_id}#${item.trial}`;
+    const key = item.category === 'flaky' ? item.case_id : `${item.case_id}#${item.trial}`;
     const current = clusters.get(item.category) ?? [];
     current.push(key);
     clusters.set(item.category, current);

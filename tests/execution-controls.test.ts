@@ -44,7 +44,7 @@ test('comparisons bind actual execution controls and keep legacy reports readabl
     const baseline = await runSuite(...paths), candidate = await runSuite(...paths);
     const leftPath = join(baseline, 'plan.json'), rightPath = join(candidate, 'plan.json');
     const left = JSON.parse(await readFile(leftPath, 'utf8')), right = JSON.parse(await readFile(rightPath, 'utf8'));
-    const expected = { schema: 'craft-eval.execution-controls.v1', max_output_bytes: 8 * 1024 * 1024, parallelism: 1, workspace_mode: 'isolated', fail_fast: false, keep_traces: false };
+    const expected = { schema: 'craft-eval.execution-controls.v1', max_output_bytes: 8 * 1024 * 1024, parallelism: 1, workspace_mode: 'isolated', fail_fast: false, keep_traces: 'never' };
     assert.deepEqual(left.execution_controls, expected); await assert.doesNotReject(compareRuns(baseline, candidate));
     const numeric = await runSuite(...paths, 2);
     assert.equal((await reportRun(numeric)).expected, 2);
@@ -58,12 +58,17 @@ test('comparisons bind actual execution controls and keep legacy reports readabl
     assert.equal(JSON.parse(await readFile(join(immutable, 'plan.json'), 'utf8')).execution_controls.max_output_bytes, 128);
     const different = await runSuite(...paths, { max_output_bytes: 128, parallelism: 2, keep_traces: true });
     const changed = JSON.parse(await readFile(join(different, 'plan.json'), 'utf8'));
-    assert.deepEqual(changed.execution_controls, { ...expected, max_output_bytes: 128, parallelism: 2, keep_traces: true });
+    assert.deepEqual(changed.execution_controls, { ...expected, max_output_bytes: 128, parallelism: 2, keep_traces: 'always' });
     await assert.rejects(compareRuns(baseline, different), /execution controls/);
+    // `on-failure` is a distinct control value, so a run that switches to it is
+    // no longer comparable to one that kept every trace.
+    const failureOnly = await runSuite(...paths, { keep_traces: 'on-failure' });
+    assert.equal(JSON.parse(await readFile(join(failureOnly, 'plan.json'), 'utf8')).execution_controls.keep_traces, 'on-failure');
+    await assert.rejects(compareRuns(different, failureOnly), /execution controls/);
     const shared = await runSuite(...paths, { workspace_mode: 'shared', parallelism: 4, fail_fast: true });
     assert.deepEqual(JSON.parse(await readFile(join(shared, 'plan.json'), 'utf8')).execution_controls, { ...expected, workspace_mode: 'shared', parallelism: 1, fail_fast: true });
     await assert.rejects(compareRuns(baseline, shared), /execution controls/);
-    const invalid = [undefined, null, [], {}, { ...expected, schema: 'unknown' }, { ...expected, max_output_bytes: 1.5 }, { ...expected, max_output_bytes: 0 }, { ...expected, parallelism: 1.5 }, { ...expected, parallelism: 0 }, { ...expected, parallelism: 9 }, { ...expected, workspace_mode: 'unknown' }, { ...expected, fail_fast: 'false' }, { ...expected, keep_traces: 'false' }];
+    const invalid = [undefined, null, [], {}, { ...expected, schema: 'unknown' }, { ...expected, max_output_bytes: 1.5 }, { ...expected, max_output_bytes: 0 }, { ...expected, parallelism: 1.5 }, { ...expected, parallelism: 0 }, { ...expected, parallelism: 9 }, { ...expected, workspace_mode: 'unknown' }, { ...expected, fail_fast: 'false' }, { ...expected, keep_traces: 'false' }, { ...expected, keep_traces: 'sometimes' }];
     for (const execution_controls of invalid) {
       await writeFile(leftPath, JSON.stringify({ ...left, execution_controls }));
       await assert.rejects(compareRuns(baseline, candidate), /execution controls/);

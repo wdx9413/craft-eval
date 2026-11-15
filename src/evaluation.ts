@@ -8,6 +8,7 @@
 
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { spawnManagedCommand, stopManagedCommand as killTree, evaluationNodeBinary as nodeBinary } from './command-process.js';
+import { calibrateJudge, type CalibrationReport } from './calibration.js';
 import { runBoundedCommand } from './bounded-command.js';
 import type { ChildProcess } from 'node:child_process';
 import { spawnSync } from 'node:child_process';
@@ -148,6 +149,13 @@ export interface Case extends CaseMetadata {
    * require 1 and ignore this field.
    */
   threshold?: number;
+  /** Aggregation for checks that carry a `judge`; defaults to `all_required` when judges exist. */
+  judge_policy?: JudgePolicy;
+  /** Optional calibration gate applied before a judge's verdict may fail the case. */
+  judge_calibration?: JudgeCalibration;
+  /** Intervals this case must observe, checked over the full run rather than a single trial. */
+  max_duration_ms?: number;
+  min_duration_ms?: number;
   [key: string]: unknown;
 }
 
@@ -167,6 +175,10 @@ export interface Suite extends SuiteMetadata {
   approved_by?: string;
   cases: Case[];
   business?: BusinessModel;
+  /** Semantic version of this case set; used for lineage reporting. */
+  version?: string;
+  /** Digest of the previous version of this suite. */
+  parent_digest?: string;
   [key: string]: unknown;
 }
 
@@ -229,6 +241,25 @@ export type Runtime = Record<(typeof RUNTIME_KEYS)[number], string>;
 export type Verdict = 'passed' | 'failed' | 'inconclusive' | 'invalid' | 'missing' | 'not_applicable';
 /** Outcome of one check group; `missing` only appears for an unrecorded case. */
 export type CaseVerdict = 'passed' | 'failed' | 'inconclusive' | 'missing' | 'not_applicable';
+
+/**
+ * How per-judge verdicts combine into a case result. Only checks carrying a
+ * `judge` take part; deterministic checks keep the case `threshold` semantics.
+ */
+export type JudgePolicy =
+  | { mode: 'all_required' }
+  | { mode: 'any' }
+  | { mode: 'weighted'; min_score: number };
+
+/** A judge must clear this calibration bar before its verdicts may fail a case. */
+export interface JudgeCalibration {
+  manifest: string;
+  minimum_accuracy?: number;
+  minimum_consistency?: number;
+}
+
+/** Evidence retention: `never` keeps hashes only, `on-failure` keeps non-passing cases. */
+export type KeepTraces = 'never' | 'on-failure' | 'always';
 
 export interface CaseRequirement {
   /** Commands that must exist on PATH. */
@@ -318,7 +349,12 @@ export type CheckReason =
   | 'tool_errored'
   | 'stdout_missing'
   | 'stdout_present'
-  | 'judge_error';
+  | 'judge_error'
+  /** The judge's own calibration gate was not met, so its verdict is withheld. */
+  | 'judge_uncalibrated';
+
+/** Why a case could not be re-scored from captured evidence. */
+export type RescoreSkipReason = 'no_captures' | 'not_applicable' | 'missing_case';
 
 export interface CheckResult {
   id: string;
@@ -372,6 +408,11 @@ export interface CaseResult {
   workspace_snapshot?: { digest: string; files: number; bytes: number } | null;
   /** Bytes submitted by this evaluator; not a claim of model comprehension or effectiveness. */
   input_receipt?: import('./task-context.js').TaskInputReceipt | null;
+  /**
+   * Set by re-scoring when the case could not be recomputed. The original
+   * verdict is preserved, never silently presented as a fresh conclusion.
+   */
+  rescore_skipped?: RescoreSkipReason;
 }
 
 interface TraceEvent {
@@ -451,6 +492,120 @@ function expandSubjects(value: string): string {
 
 function isPlainInteger(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value);
+}
+
+/**
+ * A case is flaky when repeated trials both passed and did not. One trial can
+ * never be flaky: there is nothing to disagree with.
+ */
+export function findFlakyCases(
+  results: CaseResult[],
+  trials: number,
+): Array<{ case_id: string; trials: number; verdicts: Record<string, number> }> {
+  if (trials < 2) {
+    return [];
+  }
+  const byCase = new Map<string, Record<string, number>>();
+  for (const result of results) {
+    const verdicts = byCase.get(result.case_id) ?? {};
+    verdicts[result.verdict] = (verdicts[result.verdict] ?? 0) + 1;
+    byCase.set(result.case_id, verdicts);
+  }
+  const flaky: Array<{ case_id: string; trials: number; verdicts: Record<string, number> }> = [];
+  for (const [caseId, verdicts] of byCase) {
+    const observed = Object.values(verdicts).reduce((sum, value) => sum + value, 0);
+    const passed = verdicts.passed ?? 0;
+    if (observed >= 2 && passed > 0 && passed < observed) {
+      flaky.push({ case_id: caseId, trials: observed, verdicts });
+    }
+  }
+  return flaky.sort((a, b) => a.case_id.localeCompare(b.case_id));
+}
+
+/**
+ * Judge tallies and disagreements are derived from the recorded checks, so a
+ * reader can see which perspective objected instead of only that the case failed.
+ */
+export function summarizeJudges(results: CaseResult[]): {
+  by_judge: NonNullable<RunReport['by_judge']>;
+  judge_disagreements: NonNullable<RunReport['judge_disagreements']>;
+} {
+  const byJudge: NonNullable<RunReport['by_judge']> = {};
+  const disagreements: NonNullable<RunReport['judge_disagreements']> = [];
+  for (const result of results) {
+    const judged = [...result.checks, ...result.safety_checks].filter((item) => item.judge !== undefined);
+    const passing: string[] = [];
+    const failing: string[] = [];
+    for (const check of judged) {
+      const name = check.judge as string;
+      const bucket = byJudge[name] ?? { observed: 0, passed: 0, failed: 0, inconclusive: 0, cases: [] };
+      bucket.observed += 1;
+      if (check.passed === true) bucket.passed += 1;
+      else if (check.passed === false) bucket.failed += 1;
+      else bucket.inconclusive += 1;
+      if (check.passed !== true && !bucket.cases.includes(result.case_id)) bucket.cases.push(result.case_id);
+      if (check.passed === true) passing.push(name);
+      if (check.passed === false) failing.push(name);
+      byJudge[name] = bucket;
+    }
+    if (passing.length > 0 && failing.length > 0) {
+      disagreements.push({
+        case_id: result.case_id,
+        trial: result.trial,
+        passing_judges: [...new Set(passing)].sort(),
+        failing_judges: [...new Set(failing)].sort(),
+      });
+    }
+  }
+  for (const bucket of Object.values(byJudge)) bucket.cases.sort();
+  return {
+    by_judge: byJudge,
+    judge_disagreements: disagreements.sort(
+      (a, b) => a.case_id.localeCompare(b.case_id) || a.trial - b.trial,
+    ),
+  };
+}
+
+function validateJudgePolicy(value: unknown, name: string): void {
+  if (value === undefined) {
+    return;
+  }
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`${name} must be an object`);
+  }
+  const policy = value as Record<string, unknown>;
+  const mode = policy.mode;
+  if (mode === 'all_required' || mode === 'any') {
+    if (Object.keys(policy).some((key) => key !== 'mode')) {
+      throw new Error(`${name} with mode ${String(mode)} accepts no other fields`);
+    }
+    return;
+  }
+  if (mode === 'weighted') {
+    if (Object.keys(policy).some((key) => key !== 'mode' && key !== 'min_score')) {
+      throw new Error(`${name} contains unsupported fields`);
+    }
+    const minScore = policy.min_score;
+    if (typeof minScore !== 'number' || !Number.isFinite(minScore) || minScore < 0 || minScore > 1) {
+      throw new Error(`${name}.min_score must be within 0..1`);
+    }
+    return;
+  }
+  throw new Error(`${name}.mode must be all_required, any or weighted`);
+}
+
+/** Legacy booleans keep their old meaning; the string form adds `on-failure`. */
+function normalizeKeepTraces(value: unknown): KeepTraces {
+  if (value === true) {
+    return 'always';
+  }
+  if (value === false || value === undefined) {
+    return 'never';
+  }
+  if (value === 'never' || value === 'on-failure' || value === 'always') {
+    return value;
+  }
+  throw new Error('keep_traces must be never, on-failure, always or a boolean');
 }
 
 function checkList(value: unknown, name: string): Check[] {
@@ -773,6 +928,33 @@ export async function loadSuite(path: string): Promise<Suite> {
     if (item.threshold !== undefined && safety.length > 0) {
       // Safety stays all-or-nothing regardless of the task assert-set threshold.
       void safety;
+    }
+    validateJudgePolicy(item.judge_policy, `case ${caseId} judge_policy`);
+    if (item.judge_calibration !== undefined) {
+      const calibration = item.judge_calibration;
+      if (calibration === null || typeof calibration !== 'object' || Array.isArray(calibration)) {
+        throw new Error(`case ${caseId} judge_calibration must be an object`);
+      }
+      relativePath(calibration.manifest, `case ${caseId} judge_calibration.manifest`);
+      for (const key of ['minimum_accuracy', 'minimum_consistency'] as const) {
+        const value = calibration[key];
+        if (value !== undefined && (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1)) {
+          throw new Error(`case ${caseId} judge_calibration.${key} must be within 0..1`);
+        }
+      }
+    }
+    for (const key of ['max_duration_ms', 'min_duration_ms'] as const) {
+      const value = item[key];
+      if (value !== undefined && (typeof value !== 'number' || !Number.isFinite(value) || value < 0)) {
+        throw new Error(`case ${caseId} ${key} must be a non-negative number`);
+      }
+    }
+    if (
+      item.max_duration_ms !== undefined &&
+      item.min_duration_ms !== undefined &&
+      item.min_duration_ms > item.max_duration_ms
+    ) {
+      throw new Error(`case ${caseId} min_duration_ms cannot exceed max_duration_ms`);
     }
     for (const entry of [...checks, ...safety]) {
       if (entry.kind === 'tool_call' && !(mcpServers ?? []).some((server) => server.name === entry.server)) {
@@ -1614,6 +1796,61 @@ async function runJudge(
   });
 }
 
+/**
+ * Resolve a case-level calibration gate before any check runs, so one declared
+ * gate costs one calibration run regardless of how many checks reference it.
+ */
+interface JudgeGateOutcome {
+  calibrated: boolean;
+  calibration: {
+    manifest: string;
+    accuracy: number | null;
+    consistency: number | null;
+    minimum_accuracy?: number;
+    minimum_consistency?: number;
+    error?: string;
+  };
+}
+
+async function evaluateJudgeGate(
+  gate: JudgeCalibration,
+  workspace: string,
+): Promise<JudgeGateOutcome> {
+  const manifestPath = expandSubjects(join(workspace, gate.manifest));
+  let report: CalibrationReport;
+  try {
+    report = await calibrateJudge(manifestPath);
+  } catch (error) {
+    return {
+      calibrated: false,
+      calibration: {
+        manifest: gate.manifest,
+        accuracy: null,
+        consistency: null,
+        minimum_accuracy: gate.minimum_accuracy,
+        minimum_consistency: gate.minimum_consistency,
+        error: (error as Error).message,
+      },
+    };
+  }
+  // A missing measurement with a declared bar is a miss, not a pass: the gate
+  // cannot be satisfied by "we never got around to measuring".
+  const missed =
+    (gate.minimum_accuracy !== undefined && report.accuracy === null)
+    || (gate.minimum_consistency !== undefined && report.consistency === null)
+    || report.passed === false;
+  return {
+    calibrated: !missed,
+    calibration: {
+      manifest: gate.manifest,
+      accuracy: report.accuracy,
+      consistency: report.consistency,
+      minimum_accuracy: gate.minimum_accuracy,
+      minimum_consistency: gate.minimum_consistency,
+    },
+  };
+}
+
 async function check(
   item: Check,
   sandbox: string,
@@ -1625,6 +1862,7 @@ async function check(
   capturedStdout: Buffer,
   outputDir?: string,
   caseEnv?: Record<string, string>,
+  judgeGate?: JudgeGateOutcome | null,
 ): Promise<CheckResult> {
   const kind = item.kind;
   const evidence: { kind: string; [key: string]: unknown } = { kind };
@@ -1723,6 +1961,15 @@ async function check(
     evidence.length = text.length;
     evidence.value = item.value;
   } else if (kind === 'model_graded') {
+    // A judge that missed its own calibration bar is not evidence: record why
+    // and withhold the verdict instead of turning it into a case failure.
+    if (judgeGate !== undefined && judgeGate !== null && !judgeGate.calibrated) {
+      passed = null;
+      reason = 'judge_uncalibrated';
+      evidence.calibration = judgeGate.calibration;
+      evidence.path = item.answer;
+      return { id: item.id, passed, reason, evidence, ...(item.judge === undefined ? {} : { judge: item.judge }) };
+    }
     const answerPath = await artifact(sandbox, relativePath(item.answer, 'model_graded.answer'), outputDir).catch(() => null);
     if (answerPath === null) {
       passed = false;
@@ -1740,6 +1987,7 @@ async function check(
         judgeEnv,
       );
       evidence.exit_code = outcome.exitCode;
+      if (judgeGate !== undefined && judgeGate !== null) evidence.calibration = judgeGate.calibration;
       if (outcome.stderr !== '') evidence.judge_stderr_tail = outcome.stderr;
       if (outcome.issue !== null) {
         passed = null;
@@ -1893,6 +2141,76 @@ function verdictOf(results: CheckResult[], threshold = 1): CaseVerdict {
   return 'passed';
 }
 
+/**
+ * Split checks into deterministic and judge-graded groups. A `judge` tag moves a
+ * check into the judge group; everything else keeps the threshold semantics.
+ */
+function partitionByJudge(results: CheckResult[]): { deterministic: CheckResult[]; judged: CheckResult[] } {
+  return {
+    deterministic: results.filter((item) => item.judge === undefined),
+    judged: results.filter((item) => item.judge !== undefined),
+  };
+}
+
+/**
+ * Combine judge-group verdicts. Every judge failure stays a failure unless the
+ * judge was never allowed to fail (a null verdict means "not judged at all").
+ */
+function judgeVerdict(judged: CheckResult[], policy: JudgePolicy): CaseVerdict {
+  if (judged.length === 0) {
+    return 'passed';
+  }
+  const passed = judged.filter((item) => item.passed === true);
+  const failed = judged.filter((item) => item.passed === false);
+  const undecided = judged.filter((item) => item.passed === null);
+  if (policy.mode === 'any') {
+    if (passed.length > 0) {
+      return 'passed';
+    }
+    return failed.length > 0 && undecided.length === 0 ? 'failed' : 'inconclusive';
+  }
+  if (policy.mode === 'weighted') {
+    if (undecided.length > 0) {
+      return 'inconclusive';
+    }
+    const total = judged.reduce((sum, item) => sum + (item.weight ?? 1), 0);
+    if (total === 0) {
+      return 'inconclusive';
+    }
+    const achieved = passed.reduce((sum, item) => sum + (item.weight ?? 1), 0);
+    return achieved / total >= policy.min_score ? 'passed' : 'failed';
+  }
+  if (failed.length > 0) {
+    return 'failed';
+  }
+  return undecided.length > 0 ? 'inconclusive' : 'passed';
+}
+
+/** Judge groups never downgrade a case to failed when the run never got a verdict. */
+function combineTaskVerdict(deterministic: CaseVerdict, judged: CaseVerdict): CaseVerdict {
+  if (deterministic === 'failed' || judged === 'failed') {
+    return 'failed';
+  }
+  if (deterministic === 'not_applicable' || judged === 'not_applicable') {
+    return 'not_applicable';
+  }
+  if (deterministic === 'missing' || judged === 'missing') {
+    return 'missing';
+  }
+  if (deterministic === 'inconclusive' || judged === 'inconclusive') {
+    return 'inconclusive';
+  }
+  return 'passed';
+}
+
+/** Apply the case judge policy; without a policy every judge must pass. */
+function verdictWithJudgePolicy(results: CheckResult[], item: Case): CaseVerdict {
+  const { deterministic, judged } = partitionByJudge(results);
+  const policy = item.judge_policy ?? { mode: 'all_required' as const };
+  const deterministicVerdict = deterministic.length === 0 ? 'passed' : verdictOf(deterministic, item.threshold ?? 1);
+  return combineTaskVerdict(deterministicVerdict, judgeVerdict(judged, policy));
+}
+
 const ENV_KEEP = ['PATH', 'LANG', 'LC_ALL'];
 
 /** Return a short unmet-requirement tag, or null when the case can run. */
@@ -1979,7 +2297,7 @@ async function oneCase(
   runId: string,
   trial: number,
   sharedSandbox?: string,
-  keepTraces = false,
+  keepTraces: KeepTraces = 'never',
   runDir?: string,
 ): Promise<CaseResult> {
   const unmet = await unmetRequirement(item.requires, workspace);
@@ -2010,7 +2328,7 @@ async function oneCase(
   const root = await mkdtemp(join(tmpdir(), 'craft-eval-case-'));
   // Capture paths recorded here so the finally block can copy them out even when
   // a check throws. They are null unless --keep-traces is requested.
-  const captures: Record<string, string> = keepTraces && runDir !== undefined
+  const captures: Record<string, string> = keepTraces !== 'never' && runDir !== undefined
     ? {
         stdout: join(root, 'stdout'),
         stderr: join(root, 'stderr'),
@@ -2018,6 +2336,8 @@ async function oneCase(
         'gateway-trace': join(root, 'gateway-trace.jsonl'),
       }
     : {};
+  // `on-failure` decides at export time, so the verdict is recorded as we build it.
+  let finalVerdict: Verdict | null = null;
   // Set once the sandbox output directory is known; finally copies it out when
   // --keep-traces is on, so graders and artifacts can be reviewed after the run.
   let artifactsDir: string | null = null;
@@ -2162,12 +2482,16 @@ async function oneCase(
     const events = parsedHost === null ? hostEvents : effectiveGateway;
     const terminalTrace = parsedHost === null ? hostTerminal : terminalGateway;
     const mcpCalls = mcp === null ? [] : await readMcpCalls(mcp.configPath);
+  // A declared calibration gate is resolved once per case, not per check.
+  const judgeGate = item.judge_calibration === undefined
+    ? null
+    : await evaluateJudgeGate(item.judge_calibration, workspace);
     const taskChecks = await Promise.all(
       (item.checks ?? []).map((entry) =>
         check(entry, sandbox, exitCode, events, terminalTrace, timeoutSeconds, mcpCalls, capturedStdout, outputOverride, {
           CRAFT_EVAL_CASE_ID: item.id,
           CRAFT_EVAL_TRIAL: String(trial),
-        }),
+        }, judgeGate),
       ),
     );
     const safetyChecks = await Promise.all(
@@ -2175,7 +2499,7 @@ async function oneCase(
         check(entry, sandbox, exitCode, events, terminalTrace, timeoutSeconds, mcpCalls, capturedStdout, outputOverride, {
           CRAFT_EVAL_CASE_ID: item.id,
           CRAFT_EVAL_TRIAL: String(trial),
-        }),
+        }, judgeGate),
       ),
     );
     const trigger =
@@ -2190,7 +2514,7 @@ async function oneCase(
             terminalGateway && (parsedHost === null || hostCanObserveSkill),
             gatewayOwned && hostCanObserveSkill,
           );
-    const taskVerdict = verdictOf(taskChecks, item.threshold ?? 1);
+    const taskVerdict = verdictWithJudgePolicy(taskChecks, item);
     const safetyVerdict = verdictOf(safetyChecks);
     const verdict = decideVerdict(
       taskVerdict,
@@ -2202,6 +2526,7 @@ async function oneCase(
       terminalTrace,
     );
     const cost = readCost(events);
+    finalVerdict = verdict;
     return {
       case_id: item.id,
       trial,
@@ -2226,9 +2551,13 @@ async function oneCase(
       input_receipt: taskInput?.receipt ?? null,
     };
   } finally {
-    // With --keep-traces, copy the raw capture files into the run directory before
-    // the temp tree is removed, so failures can be diagnosed from the run output.
-    if (keepTraces && runDir !== undefined) {
+    // Copy captures before the temp tree is removed. `on-failure` only exports
+    // cases that did not pass; a case abandoned before a verdict is kept too,
+    // because an interrupted run is exactly when evidence matters most.
+    const retain =
+      keepTraces === 'always'
+      || (keepTraces === 'on-failure' && (finalVerdict === null || finalVerdict !== 'passed'));
+    if (retain && runDir !== undefined) {
       const target = join(runDir, 'captures', `${item.id}-${trial}`);
       try {
         await mkdir(target, { recursive: true });
@@ -2703,10 +3032,11 @@ export interface RunOptions {
   workspace_source?: string;
   /**
    * Keep per-case stdout, stderr and host/gateway traces under
-   * `<run_dir>/captures/<case_id>-<trial>/` for debugging. By default these are
-   * dropped after hashing so a run only carries evidence digests, not raw output.
+   * `<run_dir>/captures/<case_id>-<trial>/` for debugging. `never` (default)
+   * keeps only digests, `on-failure` keeps non-passing cases, `always` keeps
+   * every case. The legacy boolean maps to `always` / `never`.
    */
-  keep_traces?: boolean;
+  keep_traces?: boolean | KeepTraces;
 }
 
 /** Isolate controls between simultaneous runs; legacy numeric options remain supported. */
@@ -2741,7 +3071,7 @@ async function runSuiteInternal(
   const failFast = typeof options === 'number' ? false : (options.fail_fast ?? false);
   const workspaceSnapshots = typeof options === 'number' ? {} : (options.workspace_snapshots ?? {});
   const workspaceSource = typeof options === 'number' ? undefined : options.workspace_source;
-  const keepTraces = typeof options === 'number' ? false : (options.keep_traces ?? false);
+  const keepTraces = normalizeKeepTraces(typeof options === 'number' ? undefined : options.keep_traces);
   const suite = await loadSuite(suitePath);
   const subject = await loadSubject(subjectPath, suite.subject_kind);
   const runtime = await loadRuntime(runtimePath);
@@ -2934,7 +3264,8 @@ interface ExecutionControls {
   parallelism: number;
   workspace_mode: 'isolated' | 'shared';
   fail_fast: boolean;
-  keep_traces: boolean;
+  /** Legacy plans recorded a boolean; new plans record the three-value form. */
+  keep_traces: boolean | KeepTraces;
 }
 function validExecutionControls(value: unknown): value is ExecutionControls {
   const item = record(value);
@@ -2942,7 +3273,9 @@ function validExecutionControls(value: unknown): value is ExecutionControls {
     && Number.isSafeInteger(item.max_output_bytes) && Number(item.max_output_bytes) > 0
     && Number.isInteger(item.parallelism) && Number(item.parallelism) >= 1 && Number(item.parallelism) <= 8
     && (item.workspace_mode === 'isolated' || item.workspace_mode === 'shared')
-    && typeof item.fail_fast === 'boolean' && typeof item.keep_traces === 'boolean';
+    && typeof item.fail_fast === 'boolean'
+    && (typeof item.keep_traces === 'boolean'
+      || item.keep_traces === 'never' || item.keep_traces === 'on-failure' || item.keep_traces === 'always');
 }
 
 function missingResult(caseId: string, trial: number): CaseResult {
@@ -3018,6 +3351,25 @@ export interface RunReport {
   invalid: number;
   missing: number;
   not_applicable?: number;
+  /** Cases a re-score could not recompute, with the original verdict preserved. */
+  rescore_skipped?: Array<{ case_id: string; trial: number; reason: RescoreSkipReason; verdict: Verdict }>;
+  /**
+   * Cases whose repeated trials disagree. Only computed when `trials > 1`: a
+   * single trial cannot distinguish instability from a stable result.
+   */
+  flaky_cases?: Array<{ case_id: string; trials: number; verdicts: Record<string, number> }>;
+  /** Per-judge tallies. Empty when no case used a judge. */
+  by_judge?: Record<
+    string,
+    { observed: number; passed: number; failed: number; inconclusive: number; cases: string[] }
+  >;
+  /** Cases where judge verdicts disagreed within the same trial. */
+  judge_disagreements?: Array<{
+    case_id: string;
+    trial: number;
+    passing_judges: string[];
+    failing_judges: string[];
+  }>;
   by_language?: Record<
     string,
     { expected: number; passed: number; failed: number; not_applicable: number }
@@ -3078,6 +3430,28 @@ export async function reportRun(path: string, on_plan_digest?: (event: { run_id:
     invalid,
     missing,
     not_applicable: notApplicable,
+    ...(results.some((item) => item.rescore_skipped !== undefined)
+      ? {
+          rescore_skipped: results
+            .filter((item) => item.rescore_skipped !== undefined)
+            .map((item) => ({
+              case_id: item.case_id,
+              trial: item.trial,
+              reason: item.rescore_skipped!,
+              verdict: item.verdict,
+            })),
+        }
+      : {}),
+    ...(() => {
+      const flaky = findFlakyCases(results, plan.trials);
+      return flaky.length > 0 ? { flaky_cases: flaky } : {};
+    })(),
+    ...(() => {
+      const judges = summarizeJudges(results);
+      return Object.keys(judges.by_judge).length === 0
+        ? {}
+        : { by_judge: judges.by_judge, judge_disagreements: judges.judge_disagreements };
+    })(),
     by_language: byLanguage,
     status: missing === 0 && inconclusive === 0 && invalid === 0 ? 'complete' : 'incomplete',
     results,
@@ -3126,10 +3500,20 @@ export async function rescoreScripts(
     // Re-scoring must never turn a skipped (not_applicable) case into a verdict:
     // it has no captured outputs, so rerunning its script would fabricate a fail.
     if (result.verdict === 'missing' || result.verdict === 'not_applicable' || caseDef === undefined) {
-      await atomicJson(target, result);
+      await atomicJson(target, {
+        ...result,
+        rescore_skipped: caseDef === undefined ? 'missing_case'
+          : result.verdict === 'not_applicable' ? 'not_applicable' : 'missing_case',
+      } satisfies CaseResult);
       continue;
     }
     const captured = join(sourceRoot, 'captures', `${result.case_id}-${result.trial}`);
+    // Without captured evidence the script would grade an empty sandbox and
+    // produce a confident-looking wrong answer. Say so instead.
+    if (!existsSync(captured)) {
+      await atomicJson(target, { ...result, rescore_skipped: 'no_captures' } satisfies CaseResult);
+      continue;
+    }
     const sandbox = await mkdtemp(join(tmpdir(), 'craft-eval-rescore-'));
     try {
       await workspaceCopy(workspaceRoot, sandbox);
@@ -3153,7 +3537,7 @@ export async function rescoreScripts(
         );
       const taskChecks = await runScripts(caseDef.checks ?? [], result.checks);
       const safetyChecks = await runScripts(caseDef.safety_checks ?? [], result.safety_checks);
-      const taskVerdict = verdictOf(taskChecks);
+      const taskVerdict = verdictWithJudgePolicy(taskChecks, caseDef);
       const safetyVerdict = verdictOf(safetyChecks);
       const requiresTrace = plan.subject.kind === 'agent' && caseDef.prompt !== undefined;
       await atomicJson(target, {
@@ -3212,6 +3596,13 @@ export interface Comparison {
   gateway_observed_triggers: boolean;
   unobserved_triggers: number;
   excluded_duplicate_case_ids: string[];
+  /** Cases excluded from pairing because their repeated trials disagreed. */
+  flaky_excluded: string[];
+  /**
+   * Per-judge agreement across the two runs. `null` means no case had a verdict
+   * from that judge on both sides, which is not the same as perfect agreement.
+   */
+  judge_agreements: Array<{ judge: string; agreement: number | null; cases: number }>;
   result_integrity: 'unverified' | 'verified_against_supplied_digests';
   diagnostic_skill_gain: boolean;
   skill_gain_supported: boolean;
@@ -3276,6 +3667,12 @@ export async function compareRuns(baselinePath: string, candidatePath: string, e
     sourceCases.set(source, ids);
   }
   for (const ids of sourceCases.values()) if (ids.length > 1) for (const id of ids) duplicateCases.add(id);
+  // Unstable cases cannot support a paired claim: the same case would flip
+  // between runs for reasons the suite cannot attribute.
+  const flakyIds = new Set([
+    ...findFlakyCases(baseline.results, left.trials),
+    ...findFlakyCases(candidate.results, right.trials),
+  ].map((item) => item.case_id));
   // Both runs list results in suite-case order repeated per trial, so index i of
   // either run is the same (case, trial) pair as index i of the other.
   const casesInOrder: Case[] = [];
@@ -3292,6 +3689,10 @@ export async function compareRuns(baselinePath: string, candidatePath: string, e
       continue;
     }
     if (duplicateCases.has(item.id)) continue;
+    if (flakyIds.has(item.id)) {
+      unmeasured += 1;
+      continue;
+    }
     if (!item.checks || item.checks.length === 0) {
       continue;
     }
@@ -3347,6 +3748,7 @@ export async function compareRuns(baselinePath: string, candidatePath: string, e
     negative >= 1 &&
     complete &&
     independent &&
+    flakyIds.size === 0 &&
     gatewayObserved &&
     unobservedTriggers === 0 &&
     triggerFailures === 0 &&
@@ -3382,6 +3784,40 @@ export async function compareRuns(baselinePath: string, candidatePath: string, e
   });
   const guardrailFailure = guardrails.some((item, index) => item.status === 'failed'
     || (item.status === 'not_evaluated' && left.suite.metrics?.guardrails?.[index]?.required === true));
+  // Judge agreement compares the same (case, trial) under both runs; a judge
+  // that only appears on one side contributes nothing rather than a free point.
+  const judgeAgreement = (() => {
+    const tallies = new Map<string, { same: number; total: number }>();
+    for (let index = 0; index < casesInOrder.length; index += 1) {
+      const a = baseline.results[index];
+      const b = candidate.results[index];
+      if (a === undefined || b === undefined) continue;
+      const leftJudges = new Map(
+        [...a.checks, ...a.safety_checks]
+          .filter((item) => item.judge !== undefined && item.passed !== null)
+          .map((item) => [item.judge as string, item.passed]),
+      );
+      const rightJudges = new Map(
+        [...b.checks, ...b.safety_checks]
+          .filter((item) => item.judge !== undefined && item.passed !== null)
+          .map((item) => [item.judge as string, item.passed]),
+      );
+      for (const [judge, leftVerdict] of leftJudges) {
+        if (!rightJudges.has(judge)) continue;
+        const bucket = tallies.get(judge) ?? { same: 0, total: 0 };
+        bucket.total += 1;
+        if (rightJudges.get(judge) === leftVerdict) bucket.same += 1;
+        tallies.set(judge, bucket);
+      }
+    }
+    return [...tallies.entries()]
+      .map(([judge, bucket]) => ({
+        judge,
+        agreement: bucket.total === 0 ? null : bucket.same / bucket.total,
+        cases: bucket.total,
+      }))
+      .sort((x, y) => x.judge.localeCompare(y.judge));
+  })();
   return {
     status: complete ? 'comparable' : 'inconclusive',
     subject_kind: subjectKind,
@@ -3400,6 +3836,8 @@ export async function compareRuns(baselinePath: string, candidatePath: string, e
     gateway_observed_triggers: gatewayObserved,
     unobserved_triggers: unobservedTriggers,
     excluded_duplicate_case_ids: [...duplicateCases].sort(),
+    flaky_excluded: [...flakyIds].sort(),
+    judge_agreements: judgeAgreement,
     result_integrity: expected === undefined ? 'unverified' : 'verified_against_supplied_digests',
     diagnostic_skill_gain: gain && !guardrailFailure,
     // Digest agreement alone does not establish the caller's authority or evidence provenance.

@@ -1,0 +1,112 @@
+{
+  "schema": "craft-eval.eval.v1",
+  "suite_id": "gated-output",
+  "subject_kind": "software",
+  "partition": "development",
+  "sanitized": true,
+  "claim": {
+    "statement": "model_graded checks grade open-ended answers deterministically via a judge command; this suite verifies positive, negative, and ambiguous cases without a real model.",
+    "scope": "单一模型判断通路的端到端验证；不覆盖多 judge 聚合或业务领域知识",
+    "limitations": ["用假设 judge（规则式）而非真实模型；不覆盖多 judge 聚合"]
+  },
+  "metrics": {
+    "primary": {
+      "id": "task_pass",
+      "kind": "binary_pass_rate",
+      "direction": "higher_is_better",
+      "minimum_sample": 5
+    }
+  },
+  "cases": [
+    {
+      "id": "numeric-pass",
+      "argv": ["node", "-e", "console.log(17 * 23)"],
+      "timeout_s": 10,
+      "checks": [
+        {"id": "exit", "kind": "exit_code", "equals": 0},
+        {
+          "id": "graded",
+          "kind": "model_graded",
+          "command": ["node", "judge.mjs"],
+          "answer": "outputs/answer.txt",
+          "rubric": "eq:391",
+          "threshold": 1,
+          "judge": "gated-judge",
+          "weight": 1
+        }
+      ]
+    },
+    {
+      "id": "numeric-fail-wrong-answer",
+      "argv": ["node", "-e", "console.log(390)"],
+      "timeout_s": 10,
+      "checks": [
+        {"id": "exit", "kind": "exit_code", "equals": 0},
+        {
+          "id": "graded",
+          "kind": "model_graded",
+          "command": ["node", "judge.mjs"],
+          "answer": "outputs/answer.txt",
+          "rubric": "eq:391",
+          "threshold": 1,
+          "judge": "gated-judge",
+          "weight": 1
+        }
+      ]
+    },
+    {
+      "id": "string-pass",
+      "argv": ["node", "-e", "console.log('tfarc')"],
+      "timeout_s": 10,
+      "checks": [
+        {"id": "exit", "kind": "exit_code", "equals": 0},
+        {
+          "id": "graded",
+          "kind": "model_graded",
+          "command": ["node", "judge.mjs"],
+          "answer": "outputs/answer.txt",
+          "rubric": "expect:tfarc",
+          "threshold": 1,
+          "judge": "gated-judge",
+          "weight": 1
+        }
+      ]
+    },
+    {
+      "id": "string-fail-wrong-answer",
+      "argv": ["node", "-e", "console.log('craft')"],
+      "timeout_s": 10,
+      "checks": [
+        {"id": "exit", "kind": "exit_code", "equals": 0},
+        {
+          "id": "graded",
+          "kind": "model_graded",
+          "command": ["node", "judge.mjs"],
+          "answer": "outputs/answer.txt",
+          "rubric": "expect:tfarc",
+          "threshold": 1,
+          "judge": "gated-judge",
+          "weight": 1
+        }
+      ]
+    },
+    {
+      "id": "json-pass",
+      "argv": ["node", "-e", "console.log('{\"ok\":true}')"],
+      "timeout_s": 10,
+      "checks": [
+        {"id": "exit", "kind": "exit_code", "equals": 0},
+        {
+          "id": "graded",
+          "kind": "model_graded",
+          "command": ["node", "judge.mjs"],
+          "answer": "outputs/answer.txt",
+          "rubric": "expect:{\"ok\":true}",
+          "threshold": 1,
+          "judge": "gated-judge",
+          "weight": 1
+        }
+      ]
+    }
+  ]
+}
