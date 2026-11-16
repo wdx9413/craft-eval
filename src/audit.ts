@@ -657,7 +657,10 @@ export function auditSuites(suites: Suite[], options: AuditOptions = {}): SuiteA
  * JSON first so that duplicate IDs become a structured finding instead of only
  * an exception; all other invalid shapes still fail closed.
  */
-export async function auditSuiteFiles(paths: string[]): Promise<SuiteAudit> {
+export async function auditSuiteFiles(
+  paths: string[],
+  options: AuditOptions = {},
+): Promise<SuiteAudit> {
   if (paths.length === 0) {
     throw new Error('audit requires at least one suite path');
   }
@@ -710,7 +713,7 @@ export async function auditSuiteFiles(paths: string[]): Promise<SuiteAudit> {
     };
   }
   const suites = await Promise.all(paths.map((path) => loadSuite(path)));
-  return auditSuites(suites);
+  return auditSuites(suites, options);
 }
 
 export interface SuiteCoverage {

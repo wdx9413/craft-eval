@@ -1,0 +1,5 @@
+{
+  "action": "clarify",
+  "question": "请提供收货城市，用于计算运费与时效。",
+  "asked_for": "delivery_city"
+}

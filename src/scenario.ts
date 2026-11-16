@@ -69,6 +69,8 @@ export interface ScenarioRunOptions {
   workspace: string;
   output: string;
   resumeAfter?: string;
+  /** Evidence retention forwarded to the underlying run; defaults to `never`. */
+  keep_traces?: boolean | 'never' | 'on-failure' | 'always';
   /** Optional injected runner for tests or an external scheduler. */
   run?: typeof runSuite;
 }
@@ -401,6 +403,7 @@ export async function runScenario(
     workspace_mode: 'shared',
     fail_fast: true,
     workspace_snapshots: workspaceSnapshots,
+    ...(options.keep_traces === undefined ? {} : { keep_traces: options.keep_traces }),
     ...(workspaceSource === undefined ? {} : { workspace_source: workspaceSource }),
   };
   const runner = options.run ?? runSuite;

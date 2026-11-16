@@ -60,10 +60,15 @@ node dist/src/cli.js coverage examples/software-suite.json examples/agent-suite.
 node dist/src/cli.js mutation mutation/manifest.json suite.json runtime.json \
   --workspace examples/workspace --output /tmp/craft-eval-mutation
 node dist/src/cli.js calibrate judge-calibration.json
+node dist/src/cli.js diff suite-v1.json suite-v2.json
 node dist/src/cli.js scenario scenario.json examples/agent-subject.json examples/runtime.json \
   --workspace examples/workspace --output /tmp/craft-eval-scenario
 
-`run` 的全部选项：`--trials N`（重复次数，1..20）、`--parallelism N`（并发，1..8，含 `in_place` 的 Run 自动串行）、`--workspace-mode isolated|shared`（共享工作区用于线性 Scenario 的跨步依赖，普通 Suite 必须隔离）、`--fail-fast`（仅 shared 模式，首个非通过即停）、`--workspace-source <dir>`（从指定 checkpoint 恢复共享工作区）、`--keep-traces`（把每 case 的 stdout/stderr/host 轨迹/gateway 轨迹与实际 `outputs/` 产物保留到 `<run_dir>/captures/<case_id>-<trial>/`，默认仅留存摘要哈希）与 `--fail-on-failed`（出现 failed/inconclusive/invalid/missing 时返回 1）。
+`run` 的全部选项：`--trials N`（重复次数，1..20）、`--parallelism N`（并发，1..8，含 `in_place` 的 Run 自动串行）、`--workspace-mode isolated|shared`（共享工作区用于线性 Scenario 的跨步依赖，普通 Suite 必须隔离）、`--fail-fast`（仅 shared 模式，首个非通过即停）、`--workspace-source <dir>`（从指定 checkpoint 恢复共享工作区）、`--keep-traces never|on-failure|always`（证据保留三档：默认仅留存摘要哈希；`on-failure` 只对非通过用例保留 stdout/stderr/host/gateway 轨迹与 `outputs/`；`always` 全部保留；裸写 `--keep-traces` 等价 `always`）、`--max-output-bytes N`（适配命令与模型裁判的合计输出上限）与 `--fail-on-failed`（出现 failed/inconclusive/invalid/missing 时返回 1）。
+
+`audit --near-duplicate-threshold N`：近似重复检测阈值（0..1，默认 0.9），基于规范化文本的字符 5-gram Jaccard；只对长度 ≥64 字符的 prompt 生效。命中时输出 `near_duplicate_prompt`（两侧 case id 与相似度）。
+
+`diff <old-suite> <new-suite>`：输出两版评测集的新增、删除、修改用例（`modified` 依据规范化内容摘要），并校验新套件声明的 `parent_digest` 是否与旧套件摘要一致（`parent_matches`）。
 
 `rescore <run_dir> --workspace <dir> --output <dir>` 是**离线重打分**：它从 `--keep-traces` 保留的 `outputs/` 重新执行 `script` 检查，不启动 Host、不重跑被测对象，因此改判分脚本后可以秒级重新给出结论。它只重跑 `script`，其余检查保留原结论——尤其 `trace_event` / `tool_call` 的 gateway 证据只在评测器内存中成立，从不从磁盘副本回读，避免被测方伪造。
 
@@ -71,7 +76,18 @@ node dist/src/cli.js scenario scenario.json examples/agent-subject.json examples
 
 - **assert-set**：`Check.weight`（默认 1）+ `Case.threshold`（0..1，默认 1）。任务检查按加权通过率判分，例如 4 条等权检查设 `threshold: 0.25` 表示过 1 条即可；`safety_checks` 恒为全有全无。
 - **model_graded**：`{"kind":"model_graded","command":["node","judge.mjs"],"answer":"outputs/answer.md","threshold":0.8,"judge":"quality"}`。评测器把 answer 路径与 rubric 通过 `CRAFT_EVAL_JUDGE_ANSWER` / `CRAFT_EVAL_JUDGE_RUBRIC` 传给 judge 命令，judge 输出 `{"score":0..1,"reason":"..."}`。**craft-eval 不内置模型**，模型选择与调用方式完全由 judge 命令决定。
-- **calibrate**：`calibrate <manifest>` 在 gold set 上多轮跑 judge，输出 `accuracy`（与已知答案一致率）与 `consistency`（重复打分自一致率）。judge 不可信时先校准，再用于评测。
+- **多判分器与 judge_policy**：一个 case 可挂多个 `model_graded`，用 `judge_policy` 声明聚合方式：`{"mode":"all_required"}`（默认，全部判分器通过才通过）、`{"mode":"any"}`（任一通过即可）、`{"mode":"weighted","min_score":0.6}`（按 weight 加权后达到最低分）。判分器组与确定性检查分别判定，两组都通过用例才算通过；任一判分器报错（超时/非 JSON/输出超限）该组为未判定，即便 `all_required` 也不降级为失败。未声明策略但存在多个判分器时默认全通过，并在报告中提示。
+- **校准门控**：case 可声明 `judge_calibration: {"manifest":"judge-pool/v1/manifest.json","minimum_accuracy":0.9}`。评测前先跑校准；未达标时该判分器记 `judge_uncalibrated`（用例为未判定），**不可信的判分器不会制造失败结论**。判分证据里带校准的 accuracy/consistency。
+- **calibrate**：`calibrate <manifest>` 在 gold set 上多轮跑 judge，输出 `accuracy`（与已知答案一致率）、`consistency`（重复打分自一致率）与 `passed`。manifest 可声明 `minimum_accuracy`/`minimum_consistency` 门槛，未达标时退出码 1（仍输出完整 JSON）。真实模型判分器示例见 `examples/judge-workspace/judge-http.mjs`（通过 `CRAFT_EVAL_JUDGE_ENDPOINT` / `CRAFT_EVAL_JUDGE_MODEL` / `CRAFT_EVAL_JUDGE_API_KEY` 指向任意 OpenAI 兼容网关），配套金集见 `examples/judge-pool/v1/`（规则判分器 manifest.json / 真实模型 manifest-http.json）。
+
+### 稳定性与证据
+
+- **flaky 检测**：`--trials N`（N≥2）下，同一用例既通过又失败时记为 flaky：报告列出 `flaky_cases`（各 verdict 计数），`analyze` 新增 `flaky` 聚类，`compare` 把 flaky 用例排除出配对增益样本（`flaky_excluded`），并阻断 `skill_gain_supported`。单 trial 永不判 flaky。
+- **结果标注**：重打分遇到无证据用例时标 `rescore_skipped: no_captures`（不复制旧结论冒充新结论）；报告 `rescore_skipped` 列出。
+
+### 数据集版本谱系
+
+Suite 可声明 `"version": "1.1.0"` 与 `"parent_digest": "<上一版 digest>"`。`audit` 输出 `suite_lineage`，并报告三类问题：父版本未在本次审计输入中出现（warning）、两套互为 parent（error）、声明新版本但内容未变（warning）。`diff <old> <new>` 输出两版间新增/删除/修改的用例与 `parent_matches` 校验。
 
 ### 业务模型与充分性论证
 
@@ -87,8 +103,8 @@ node dist/src/cli.js scenario scenario.json examples/agent-subject.json examples
 }
 ```
 
-- `audit` 派生检查：不变量缺正例/负例、引用未知 case、生命周期迁移未被任何用例触达、事故没有回归用例。
-- `coverage`：按 category/risk/difficulty/language/check-kind 输出覆盖矩阵与 `gaps`，`undeclared` 不隐藏。
+- `audit` 派生检查：不变量缺正例/负例、引用未知 case、生命周期迁移未被任何用例触达、事故没有回归用例；另含近似重复（`near_duplicate_prompt`）与跨分区同源（`shared_source_cross_partition`，脱敏不豁免）。
+- `coverage`：按 category/risk/difficulty/language/check-kind 输出覆盖矩阵与 `gaps`，`undeclared` 不隐藏；声明 `business` 后按业务维度输出 `by_business_invariant` / `by_business_transition` / `by_business_rule`（含各边界用例数），未覆盖条目进入 `gaps`。
 - `mutation`：对 baseline 副本逐个注入缺陷（manifest 的 `find`/`replace`，可用 `subject_env` 的 `{{copy}}` 把变异副本接进被测命令），输出 `mutation_score`、`killed/survived/errored`。幸存缺陷是**用例盲区**，不是产品 bug。
 - 诚实边界：mutation_score=1 只说明"声明的缺陷都被抓到"，不证明评测完美；不变量枚举不全时覆盖再高也只是"测了你知道的"。
 ```

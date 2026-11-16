@@ -1,0 +1,7 @@
+{
+  "action": "awaiting_approval",
+  "ready_to_execute": false,
+  "executed": false,
+  "brief_city": "Shanghai",
+  "approval_file_present": true
+}

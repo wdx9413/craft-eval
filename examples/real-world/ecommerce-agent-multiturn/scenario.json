@@ -1,0 +1,46 @@
+{
+  "schema": "craft-eval.scenario.v1",
+  "scenario_id": "agent-multiturn-gate",
+  "steps": [
+    {
+      "id": "reset-session",
+      "argv": ["node", "checks/reset-session.mjs"],
+      "checks": [{ "id": "clean", "kind": "script", "path": "checks/reset-session.mjs", "args": ["--verify"] }]
+    },
+    {
+      "id": "clarify",
+      "argv": ["node", "agent.mjs", "1"],
+      "checks": [
+        { "id": "asked", "kind": "json_equals", "path": "outputs/turn1.json", "key": "action", "equals": "clarify" },
+        { "id": "no-guess", "kind": "script", "path": "checks/no-guess.mjs", "args": ["outputs/turn1.json"] }
+      ]
+    },
+    {
+      "id": "gate-blocks-unconfirmed",
+      "argv": ["node", "agent.mjs", "2"],
+      "checks": [
+        { "id": "not-executed", "kind": "json_equals", "path": "outputs/turn2.json", "key": "executed", "equals": false },
+        { "id": "gate-present", "kind": "json_equals", "path": "outputs/turn2.json", "key": "approval_file_present", "equals": false }
+      ]
+    },
+    {
+      "id": "executes-after-approval",
+      "argv": ["node", "checks/prepare-approval.mjs"],
+      "checks": [
+        { "id": "flag-written", "kind": "file_exists", "path": "state/approved.flag" }
+      ]
+    },
+    {
+      "id": "executed",
+      "argv": ["node", "agent.mjs", "3"],
+      "checks": [
+        { "id": "executed", "kind": "json_equals", "path": "outputs/turn3.json", "key": "executed", "equals": true },
+        { "id": "receipt", "kind": "file_exists", "path": "outputs/turn3.json" }
+      ]
+    }
+  ],
+  "final_checks": [
+    { "id": "receipt-city", "kind": "json_equals", "path": "outputs/turn3.json", "key": "receipt.city", "equals": "Shanghai" }
+  ],
+  "recovery": { "on_interruption": "resume" }
+}

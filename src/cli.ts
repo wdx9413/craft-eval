@@ -7,6 +7,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
 import { auditSuiteFiles, coverageSuiteFiles } from './audit.js';
+import { diffSuites } from './suite-diff.js';
 import { attributeRun } from './attribution.js';
 import { compareRuns, loadSuite, reportRun, rescoreScripts, runSuite } from './evaluation.js';
 import { runExperiment } from './experiment.js';
@@ -77,6 +78,15 @@ function parse(argv: string[]): { command: string; positional: string[]; options
         } else {
           options.keep_traces = true;
         }
+      } else if (name === 'near-duplicate-threshold') {
+        const value = rest[index + 1];
+        if (value === undefined) throw new Error('--near-duplicate-threshold requires a value');
+        const parsed = Number(value);
+        if (!Number.isFinite(parsed) || parsed <= 0 || parsed > 1) {
+          throw new Error('--near-duplicate-threshold must be within 0..1');
+        }
+        options.near_duplicate_threshold = parsed;
+        index += 1;
       } else if (name === 'workspace' || name === 'output' || name === 'resume-after') {
         const value = rest[index + 1];
         if (value === undefined) {
@@ -101,6 +111,7 @@ const USAGE = `usage: craft-eval <command> [options]
 commands:
   validate <suite>
   audit <suite> [suite...]
+  diff <old-suite> <new-suite>
   coverage <suite> [suite...]
   run <suite> <subject> <runtime> --workspace <dir> --output <dir> [--trials N] [--parallelism N] [--workspace-mode isolated|shared] [--fail-fast] [--workspace-source <dir>] [--keep-traces] [--max-output-bytes N] [--fail-on-failed]
   report <run_dir>
@@ -140,12 +151,18 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
       return (result as { status: string }).status === 'passed' ? 0 : 1;
     } else if (command === 'audit') {
       requireArgs(positional, 1, USAGE);
-      const audit = await auditSuiteFiles(positional);
+      const audit = await auditSuiteFiles(positional, {
+        near_duplicate_threshold: options.near_duplicate_threshold === undefined ? undefined : Number(options.near_duplicate_threshold),
+      });
       result = audit;
       if (audit.status === 'failed') {
         process.stdout.write(JSON.stringify(result) + '\n');
         return 1;
       }
+    } else if (command === 'diff') {
+      requireArgs(positional, 2, USAGE);
+      const [oldSuite, newSuite] = await Promise.all([loadSuite(positional[0]!), loadSuite(positional[1]!)]);
+      result = diffSuites(oldSuite, newSuite);
     } else if (command === 'coverage') {
       requireArgs(positional, 1, USAGE);
       result = await coverageSuiteFiles(positional);
@@ -263,6 +280,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
           output,
           resumeAfter:
             options['resume-after'] === undefined ? undefined : String(options['resume-after']),
+          keep_traces: options.keep_traces === undefined ? undefined : (options.keep_traces as boolean | 'never' | 'on-failure' | 'always'),
         });
       }
     } else {

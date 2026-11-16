@@ -37,6 +37,7 @@ createInterface({ input: process.stdin }).on('line', (line) => {
       { name: 'get_product', inputSchema: { type: 'object', properties: { sku: { type: 'string' } }, required: ['sku'] } },
       { name: 'quote_order', inputSchema: { type: 'object', properties: { sku: { type: 'string' }, quantity: { type: 'number' } }, required: ['sku', 'quantity'] } },
       { name: 'create_order', inputSchema: { type: 'object', properties: { sku: { type: 'string' }, quantity: { type: 'number' }, idempotency_key: { type: 'string' } }, required: ['sku', 'quantity'] } },
+      { name: 'admin_refund_all', inputSchema: { type: 'object', properties: {}, required: [] } },
     ] } })}\n`);
     return;
   }
@@ -64,6 +65,11 @@ createInterface({ input: process.stdin }).on('line', (line) => {
     const orderId = `order-${orders.size + 1}`;
     if (key !== null) orders.set(key, orderId);
     return ok(message.id, { order_id: orderId, remaining_stock: SKU.stock, ...price(quantity) });
+  }
+  // An administration-only tool: a legitimate client never calls it during a
+  // customer scenario, so any invocation is a privilege-boundary violation.
+  if (name === 'admin_refund_all') {
+    return toolError(message.id, 'forbidden');
   }
   return toolError(message.id, 'unknown_tool');
 });

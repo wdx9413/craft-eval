@@ -1,0 +1,21 @@
+{
+  "schema": "craft-eval.calibration.v1",
+  "description": "Same gold set graded by a real model through an OpenAI-compatible gateway. The rubric names the business rule per sample; scores come from the model, never from string matching.",
+  "dir": ".",
+  "command": ["node", "../../judge-workspace/judge-http.mjs"],
+  "repeats": 2,
+  "minimum_accuracy": 0.8,
+  "minimum_consistency": 0.8,
+  "samples": [
+    { "id": "p01-coupon-aggregate", "answer": "answers/p01-coupon-aggregate.txt", "expected": "passed", "threshold": 1, "rubric": "The answer reports a coupon discount of 30 applied to a cart subtotal of 240 (threshold met), giving a payable total of 210. A cart of 120 without the discount is not acceptable here." },
+    { "id": "n01-coupon-wrong-threshold", "answer": "answers/n01-coupon-wrong-threshold.txt", "expected": "failed", "threshold": 1, "rubric": "The answer must NOT treat a cart subtotal of 120 as eligible for the coupon; any answer that applies a discount to this cart fails. An answer that explicitly rejects or flags the wrong threshold also passes this rubric." },
+    { "id": "p02-refund-policy", "answer": "answers/p02-refund-policy.txt", "expected": "passed", "threshold": 1, "rubric": "The answer correctly states the refund window and that out-of-window requests must be rejected." },
+    { "id": "n02-refund-wrong-window", "answer": "answers/n02-refund-wrong-window.txt", "expected": "failed", "threshold": 1, "rubric": "The answer states a refund window different from the correct one, or accepts an out-of-window request. An answer that flags the wrong window also passes this rubric." },
+    { "id": "p03-stock-shortage", "answer": "answers/p03-stock-shortage.txt", "expected": "passed", "threshold": 1, "rubric": "The answer correctly reports that the requested quantity exceeds stock and that the order must be rejected." },
+    { "id": "n03-stock-oversell", "answer": "answers/n03-stock-oversell.txt", "expected": "failed", "threshold": 1, "rubric": "The answer accepts an order exceeding available stock. An answer that flags the oversell also passes this rubric." },
+    { "id": "b01-empty-output", "answer": "answers/b01-empty-output.txt", "expected": "failed", "threshold": 1, "rubric": "The answer is empty and contains no business content; it must score 0." },
+    { "id": "b02-oversized-output", "answer": "answers/b02-oversized-output.txt", "expected": "failed", "threshold": 1, "rubric": "The answer is a giant dump that does not answer the business question; it must score 0." },
+    { "id": "b03-malformed-json", "answer": "answers/b03-malformed-json.txt", "expected": "failed", "threshold": 1, "rubric": "The answer is malformed JSON instead of the requested structured result; it must score 0." },
+    { "id": "b04-nonanswer-remark", "answer": "answers/b04-nonanswer-remark.txt", "expected": "failed", "threshold": 1, "rubric": "The answer is a non-answer remark that does not address the business question; it must score 0." }
+  ]
+}
