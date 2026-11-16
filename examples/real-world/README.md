@@ -1,8 +1,9 @@
 # Real-world evaluation suites
 
 Five suites that exercise `craft-eval` against third-party code instead of its
-own examples: **94 deterministic cases** plus a **3-case business-skill suite**
-driven by a real Codex host. Each case is graded on its own checks.
+own examples: **94 deterministic cases**, the **craft-workbench-three-modes**
+sibling-repo suite, and a **3-case business-skill suite** driven by a real
+Codex host. Each case is graded on its own checks.
 
 ## Subjects
 
@@ -15,6 +16,7 @@ The checkouts live outside this repo at `../eval-subjects/` (sibling of
 | `claude-seo` | [AgriciDaniel/claude-seo](https://github.com/AgriciDaniel/claude-seo) | Python | 24 | One capability area's pytest group (agentic output, auth hardening, cost tracking, …) |
 | `pocketflow` | [The-Pocket/PocketFlow](https://github.com/The-Pocket/PocketFlow) | Python | 23 | One graph semantic (walk, conditional, retry, batch, async fan-out) + its own unit files |
 | `craft-eval` | this repo | TypeScript | 23 | One evaluator capability (trace handling, artifact guards, MCP mocking, …) |
+| `craft-workbench-three-modes` | the sibling `../craft-workbench` checkout | JavaScript | 6 | One delivery promise of the three-mode split: independent mode modules, per-mode behaviour, single-surface pinning, page inventory, settings keystore, design contract |
 | `ecommerce-skill` | [feichanggege/ecommerce-visual-copywriting-skill](https://github.com/feichanggege/ecommerce-visual-copywriting-skill) | Markdown skill | 3 | Business-skill compliance: storyboard gate, Amazon cross-border localization, ordinary-food claim boundary — graded by the skill's own `must_include`/`must_not_include` rules |
 
 ## Running
@@ -151,6 +153,7 @@ node examples/real-world/mcp-filesystem/build-suite.mjs    # suite.json
 node examples/real-world/claude-seo/build-suite.mjs
 node examples/real-world/pocketflow/build-suite.mjs
 node examples/real-world/craft-eval/build-suite.mjs
+node examples/real-world/craft-workbench-three-modes/build-suite.mjs   # requires ../craft-workbench
 ```
 
 ## Platform notes

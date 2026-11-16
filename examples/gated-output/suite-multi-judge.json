@@ -1,0 +1,101 @@
+{
+  "schema": "craft-eval.eval.v1",
+  "suite_id": "gated-output-multi-judge",
+  "subject_kind": "software",
+  "partition": "development",
+  "sanitized": true,
+  "claim": {
+    "statement": "One open-ended answer can be graded by several independent judges and aggregated with a declared policy; the run report exposes every judge and any disagreement.",
+    "scope": "Offline rule-based judges proving the multi-judge execution and reporting path.",
+    "limitations": ["Judges are deterministic stubs, not models.", "Only the all_required policy is exercised here; the other policies have dedicated tests."]
+  },
+  "cases": [
+    {
+      "id": "compliant-answer",
+      "argv": ["node", "-e", "const fs=require('node:fs');fs.mkdirSync('outputs',{recursive:true});fs.writeFileSync('outputs/answer.txt','tfarc 391');"],
+      "timeout_s": 30,
+      "judge_policy": { "mode": "all_required" },
+      "checks": [
+        { "id": "exit", "kind": "exit_code", "equals": 0 },
+        {
+          "id": "accuracy",
+          "kind": "model_graded",
+          "command": ["node", "{{craft-eval}}/examples/gated-output/judge.mjs"],
+          "answer": "outputs/answer.txt",
+          "rubric": "eq:391",
+          "threshold": 1,
+          "judge": "accuracy",
+          "weight": 1
+        },
+        {
+          "id": "brand",
+          "kind": "model_graded",
+          "command": ["node", "{{craft-eval}}/examples/gated-output/judge.mjs"],
+          "answer": "outputs/answer.txt",
+          "rubric": "expect:tfarc",
+          "threshold": 1,
+          "judge": "brand",
+          "weight": 1
+        }
+      ]
+    },
+    {
+      "id": "wrong-answer-both-reject",
+      "argv": ["node", "-e", "const fs=require('node:fs');fs.mkdirSync('outputs',{recursive:true});fs.writeFileSync('outputs/answer.txt','craft 390');"],
+      "timeout_s": 30,
+      "judge_policy": { "mode": "all_required" },
+      "checks": [
+        { "id": "exit", "kind": "exit_code", "equals": 0 },
+        {
+          "id": "accuracy",
+          "kind": "model_graded",
+          "command": ["node", "{{craft-eval}}/examples/gated-output/judge.mjs"],
+          "answer": "outputs/answer.txt",
+          "rubric": "eq:391",
+          "threshold": 1,
+          "judge": "accuracy",
+          "weight": 1
+        },
+        {
+          "id": "brand",
+          "kind": "model_graded",
+          "command": ["node", "{{craft-eval}}/examples/gated-output/judge.mjs"],
+          "answer": "outputs/answer.txt",
+          "rubric": "expect:tfarc",
+          "threshold": 1,
+          "judge": "brand",
+          "weight": 1
+        }
+      ]
+    },
+    {
+      "id": "split-verdict-any-passthrough",
+      "argv": ["node", "-e", "const fs=require('node:fs');fs.mkdirSync('outputs',{recursive:true});fs.writeFileSync('outputs/answer.txt','tfarc 390');"],
+      "timeout_s": 30,
+      "judge_policy": { "mode": "any" },
+      "checks": [
+        { "id": "exit", "kind": "exit_code", "equals": 0 },
+        {
+          "id": "accuracy",
+          "kind": "model_graded",
+          "command": ["node", "{{craft-eval}}/examples/gated-output/judge.mjs"],
+          "answer": "outputs/answer.txt",
+          "rubric": "eq:391",
+          "threshold": 1,
+          "judge": "accuracy",
+          "weight": 1
+        },
+        {
+          "id": "brand",
+          "kind": "model_graded",
+          "command": ["node", "{{craft-eval}}/examples/gated-output/judge.mjs"],
+          "answer": "outputs/answer.txt",
+          "rubric": "expect:tfarc",
+          "threshold": 1,
+          "judge": "brand",
+          "weight": 1
+        }
+      ]
+    }
+  ]
+}

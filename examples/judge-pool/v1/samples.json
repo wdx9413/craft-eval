@@ -1,13 +1,15 @@
 {
   "schema": "craft-eval.judge-gold-set.v1",
   "version": "v1",
-  "description": "Business gold set for calibrating model-graded judges. Six positive/negative pairs across ecommerce pricing, refund and stock rules, plus four boundaries (empty, oversized, malformed, non-answer).",
+  "description": "Business gold set for calibrating model-graded judges. Six positive/negative pairs across ecommerce pricing, refund and stock rules, plus four boundaries (empty, oversized, malformed, non-answer). Each rubric states the correct business behaviour; the label says which side of that behaviour the answer is on, so a positive and its negative are graded by the same requirement.",
   "samples": [
     {
       "id": "p01-coupon-aggregate",
       "answer": "answers/p01-coupon-aggregate.txt",
       "expected": "passed",
       "kind": "positive",
+      "threshold": 1,
+      "rubric": "The answer applies the coupon rule 满199减20 / 满299减40 to the cart subtotal it quotes: a subtotal of 208 gets the 199 threshold met and pays 188 after the 20 discount. An answer that applies a discount to a subtotal below the threshold it states, or whose payable total does not equal subtotal minus the discount actually applied, fails.",
       "provenance": { "source": "hand-authored:craft-eval/docs/business-coverage-methodology.md#boundary-equivalence", "added": "2026-11-16" }
     },
     {
@@ -15,6 +17,8 @@
       "answer": "answers/n01-coupon-wrong-threshold.txt",
       "expected": "failed",
       "kind": "negative",
+      "threshold": 1,
+      "rubric": "The answer applies the coupon rule 满199减20 / 满299减40 to the cart subtotal it quotes: a subtotal of 208 gets the 199 threshold met and pays 188 after the 20 discount. An answer that applies a discount to a subtotal below the threshold it states, or whose payable total does not equal subtotal minus the discount actually applied, fails.",
       "provenance": { "source": "hand-authored:derived from p01 by breaking the 199 threshold", "added": "2026-11-16" }
     },
     {
@@ -22,6 +26,8 @@
       "answer": "answers/p02-refund-policy.txt",
       "expected": "passed",
       "kind": "positive",
+      "threshold": 1,
+      "rubric": "The answer applies the 7-day no-reason return rule to the timeline it quotes: a request made on day 3 after receipt falls inside the window and must be refunded. An answer that rejects an in-window request, accepts an out-of-window one, or states the wrong window length fails.",
       "provenance": { "source": "hand-authored:craft-eval/docs/business-coverage-methodology.md#lifecycle", "added": "2026-11-16" }
     },
     {
@@ -29,6 +35,8 @@
       "answer": "answers/n02-refund-wrong-window.txt",
       "expected": "failed",
       "kind": "negative",
+      "threshold": 1,
+      "rubric": "The answer applies the 7-day no-reason return rule to the timeline it quotes: a request made on day 3 after receipt falls inside the window and must be refunded. An answer that rejects an in-window request, accepts an out-of-window one, or states the wrong window length fails.",
       "provenance": { "source": "hand-authored:derived from p02 by misreading the 7-day window", "added": "2026-11-16" }
     },
     {
@@ -36,6 +44,8 @@
       "answer": "answers/p03-stock-shortage.txt",
       "expected": "passed",
       "kind": "positive",
+      "threshold": 1,
+      "rubric": "The answer applies the no-oversell rule to the quantities it quotes: with 10 requested and only 6 in stock the order cannot be shipped in full, so it must be partially fulfilled or rejected. An answer that ships all 10 anyway, or promises a later top-up while still shipping the full quantity, fails.",
       "provenance": { "source": "hand-authored:craft-eval/docs/business-coverage-methodology.md#invariants", "added": "2026-11-16" }
     },
     {
@@ -43,6 +53,8 @@
       "answer": "answers/n03-stock-oversell.txt",
       "expected": "failed",
       "kind": "negative",
+      "threshold": 1,
+      "rubric": "The answer applies the no-oversell rule to the quantities it quotes: with 10 requested and only 6 in stock the order cannot be shipped in full, so it must be partially fulfilled or rejected. An answer that ships all 10 anyway, or promises a later top-up while still shipping the full quantity, fails.",
       "provenance": { "source": "hand-authored:derived from p03 by violating the no-oversell invariant", "added": "2026-11-16" }
     },
     {
@@ -51,6 +63,8 @@
       "expected": "failed",
       "kind": "boundary",
       "boundary": "empty",
+      "threshold": 1,
+      "rubric": "The answer states a usable business conclusion: a payable amount, a refund decision or a stock outcome. An answer that is empty or contains no business conclusion fails.",
       "provenance": { "source": "hand-authored:format boundary", "added": "2026-11-16" }
     },
     {
@@ -59,6 +73,8 @@
       "expected": "failed",
       "kind": "boundary",
       "boundary": "oversized",
+      "threshold": 1,
+      "rubric": "The answer states a usable business conclusion: a payable amount, a refund decision or a stock outcome. An answer that is a giant repeated dump rather than a business conclusion fails.",
       "provenance": { "source": "hand-authored:generated by repeating a refund sentence 700 times", "added": "2026-11-16" }
     },
     {
@@ -67,6 +83,8 @@
       "expected": "failed",
       "kind": "boundary",
       "boundary": "malformed",
+      "threshold": 1,
+      "rubric": "The answer must be one well-formed, usable business conclusion: a payable amount, a refund decision or a stock outcome. An answer whose payload is broken or malformed — for example JSON that does not parse — fails, even when it mentions a business number.",
       "provenance": { "source": "hand-authored:format boundary", "added": "2026-11-16" }
     },
     {
@@ -75,6 +93,8 @@
       "expected": "failed",
       "kind": "boundary",
       "boundary": "no-claim",
+      "threshold": 1,
+      "rubric": "The answer states a usable business conclusion: a payable amount, a refund decision or a stock outcome. An answer that only remarks that a human should review it, without any conclusion, fails.",
       "provenance": { "source": "hand-authored:an output that declines to answer must not score as a pass", "added": "2026-11-16" }
     }
   ]

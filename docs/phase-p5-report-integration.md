@@ -43,12 +43,18 @@
 
 ## 验收清单
 
-- [ ] `coverage` 三类 `by_business_*` 与 `gaps`。
-- [ ] `report-html` 六个区块；缺数据时显示 `not measured`。
-- [ ] HTML 转义：case id / 证据中的 `<` `>` `&` 不破坏页面。
-- [ ] README 的评测方法章节链接到三份文档（roadmap / ownership / runbook）。
-- [ ] 测试：业务维度 0/部分/全覆盖；HTML 区块存在性与转义。
+- [x] `coverage` 三类 `by_business_*` 与 `gaps`。
+- [x] `report-html` 六个区块；缺数据时显示 `not measured`。
+- [x] HTML 转义：case id / 证据中的 `<` `>` `&` 不破坏页面。
+- [x] README 的评测方法章节链接到三份文档（roadmap / ownership / runbook）。
+- [x] 测试：业务维度 0/部分/全覆盖；HTML 区块存在性与转义。
 
 ## 非目标
 
 - 不做在线仪表盘、不加前端框架；输出是单个静态 HTML。
+
+## 真实运行记录
+
+- 真实模型 judge 端到端 run 的 HTML 报告（`.scratch/real-model-run/report.html`）含 verdict、by_language、by_judge、flaky、业务覆盖、Comparison 与 Mutation 区块，无数据时显示 `not measured`。
+- HTML 工件可由 `--comparison` / `--mutation` 注入：`compare --output` 与 `mutation` 分别落盘 JSON；`tests/report-integration.test.ts` 验证工件并入了页面，并验证 HTML 转义。
+

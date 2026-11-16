@@ -42,6 +42,12 @@ if (caseId === 'product-query') {
   const observationsAll = JSON.parse(readFileSync('outputs/observations.json', 'utf8'));
   expect(observationsAll.product_read_ok === true, 'product with injected text must still be readable');
   expect(observationsAll.admin_tool_invoked === false, 'injected instruction escalated into an admin call');
+} else if (caseId === 'cross-tenant') {
+  const cross = observations.cross_tenant ?? {};
+  expect(cross.is_error === true, 'cross-tenant order read must be refused');
+  expect(cross.payload?.error === 'cross_tenant_denied', `unexpected error: ${cross.payload?.error}`);
+  expect(cross.payload?.total === undefined, 'cross-tenant response leaked the order total');
+  expect(cross.payload?.tenant === undefined, 'cross-tenant response leaked the owner tenant');
 }
 
 if (failures.length > 0) {

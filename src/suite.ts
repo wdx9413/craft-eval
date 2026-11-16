@@ -533,6 +533,29 @@ if (inScope("knowledge_lineage.unchallenged_root_does_not_claim_invalidation")) 
     `${String(impact.root_challenged)}/${String(impact.needs_reevaluation)}`, "false/false");
 } catch (error) { unobserved("knowledge_lineage.unchallenged_root_does_not_claim_invalidation", (error as Error).message); }
 
+if (inScope("knowledge_lineage.typed_relation_flags_incompatible_concepts")) try {
+  // concept_kind is non-identity metadata on a Knowledge claim. A `contradicts`
+  // edge between a fact and a term violates the shared relation-type constraint
+  // and must be reported; a fact/fact edge must not. The report is read-only.
+  const ev = service.evidenceRecord({ evidence_id: "eval-typed-lineage-evidence", source_type: "program", claim: "typed lineage fixture", confidence: "confirmed" });
+  const node = (id: string): Json => ({ kind: "knowledge_claim", id });
+  for (const id of ["eval-typed-fact", "eval-typed-term", "eval-typed-fact-2"]) {
+    const kind = id === "eval-typed-term" ? "term" : "fact";
+    const content = kind === "term" ? "CQRS separates reads from writes" : `Fact fixture ${id}`;
+    service.knowledgeClaimSave({ claim_id: id, kind, content, scope: "global", evidence_ids: [ev.id] });
+  }
+  service.relationSave({ relation_id: "eval-typed-bad", source: node("eval-typed-fact"), target: node("eval-typed-term"), relation: "contradicts", confidence: "confirmed", evidence_ids: [ev.id] });
+  service.relationSave({ relation_id: "eval-typed-good", source: node("eval-typed-fact"), target: node("eval-typed-fact-2"), relation: "contradicts", confidence: "confirmed", evidence_ids: [ev.id] });
+  const relationsBefore = (service.store.list("knowledge_relation", 100_000, (item) => String(item.id).startsWith("eval-typed-"), false) as Json[]).length;
+  const impact = service.knowledgeLineageImpact({ node: node("eval-typed-fact") });
+  const issues = (impact.type_issues ?? []) as Json[];
+  const badFlagged = issues.some((issue) => issue.relation_id === "eval-typed-bad");
+  const goodFlagged = issues.some((issue) => issue.relation_id === "eval-typed-good");
+  const relationsAfter = (service.store.list("knowledge_relation", 100_000, (item) => String(item.id).startsWith("eval-typed-"), false) as Json[]).length;
+  equals("knowledge_lineage.typed_relation_flags_incompatible_concepts",
+    `${badFlagged ? 1 : 0}/${goodFlagged ? 1 : 0}/${relationsBefore === relationsAfter ? "hold" : "mutated"}`, "1/0/hold");
+} catch (error) { unobserved("knowledge_lineage.typed_relation_flags_incompatible_concepts", (error as Error).message); }
+
 // --------------------------------------------- evaluation governance
 // Synthetic v1 reports are enough to hold out the *comparator's* contract;
 // running the whole suite again inside the suite would double every cost.

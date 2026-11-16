@@ -65,6 +65,13 @@ export interface Check {
   weight?: number;
   /** Optional judge name, used for per-judge reporting. */
   judge?: string;
+  /**
+   * Environment variable names to forward to the judge command, read from the
+   * evaluator process at run time. Only model_graded checks use this. It lets
+   * a real-model judge reach its gateway without the credential ever being
+   * written into the suite file.
+   */
+  judge_env?: string[];
   [key: string]: unknown;
 }
 
@@ -692,6 +699,17 @@ function checkList(value: unknown, name: string): Check[] {
         (typeof check.threshold !== 'number' || !Number.isFinite(check.threshold) || check.threshold < 0 || check.threshold > 1)
       ) {
         throw new Error('model_graded.threshold must be within 0..1');
+      }
+      if (check.judge_env !== undefined) {
+        if (
+          !Array.isArray(check.judge_env) ||
+          check.judge_env.length === 0 ||
+          // A name that carries a value (`NAME=secret`) would put the
+          // credential in the suite file, so only bare variable names pass.
+          check.judge_env.some((name) => typeof name !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(name))
+        ) {
+          throw new Error('model_graded.judge_env must be a non-empty array of environment variable names');
+        }
       }
     } else if (kind === 'docs_links') {
       if (check.required !== undefined) {
@@ -1808,6 +1826,12 @@ interface JudgeGateOutcome {
     consistency: number | null;
     minimum_accuracy?: number;
     minimum_consistency?: number;
+    /** Scoring attempts that produced no verdict. */
+    errors?: number;
+    /** Samples the judge never graded. */
+    unmeasured_samples?: number;
+    /** Why the gate could not be decided. */
+    undecided_reason?: string;
     error?: string;
   };
 }
@@ -1834,10 +1858,12 @@ async function evaluateJudgeGate(
     };
   }
   // A missing measurement with a declared bar is a miss, not a pass: the gate
-  // cannot be satisfied by "we never got around to measuring".
+  // cannot be satisfied by "we never got around to measuring". A judge that
+  // skipped part of the gold set is equally uncertified.
   const missed =
     (gate.minimum_accuracy !== undefined && report.accuracy === null)
     || (gate.minimum_consistency !== undefined && report.consistency === null)
+    || (report.gate_declared && report.passed === null)
     || report.passed === false;
   return {
     calibrated: !missed,
@@ -1847,6 +1873,9 @@ async function evaluateJudgeGate(
       consistency: report.consistency,
       minimum_accuracy: gate.minimum_accuracy,
       minimum_consistency: gate.minimum_consistency,
+      errors: report.errors,
+      unmeasured_samples: report.unmeasured_samples,
+      ...(report.gate_undecided_reason === undefined ? {} : { undecided_reason: report.gate_undecided_reason }),
     },
   };
 }
@@ -1980,8 +2009,21 @@ async function check(
         ...(item.rubric === undefined ? {} : { CRAFT_EVAL_JUDGE_RUBRIC: String(item.rubric) }),
         ...(caseEnv ?? {}),
       };
+      // A real-model judge needs its gateway settings. The suite names the
+      // variables it needs; the values are read from the evaluator process, so
+      // a credential never has to be written into the suite file. A name that
+      // is not set in this environment is simply not forwarded, and the judge
+      // then reports the missing configuration itself.
+      for (const name of item.judge_env ?? []) {
+        const value = process.env[name];
+        if (value !== undefined && value !== '') judgeEnv[name] = value;
+      }
       const outcome = await runJudge(
-        (item.command as string[]) ?? [],
+        // The judge command is an evaluation asset, not part of the tested
+        // project, so it is resolved with the same placeholders as the other
+        // evaluator-owned paths. Without this, a suite can only reach a judge
+        // that was copied into the subject workspace.
+        ((item.command as string[]) ?? []).map((argument) => expandSubjects(argument)),
         sandbox,
         Math.max(1, Math.floor(timeoutSeconds)),
         judgeEnv,

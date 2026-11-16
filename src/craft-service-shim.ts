@@ -2,6 +2,7 @@ import type { CraftService } from "./craft-service-interface.ts";
 import type { CraftStore } from 'craft-common-store-local';
 import { stableDigest } from 'craft-common-base/digest';
 import { approvedEffects, executeSteps, normalizeSteps } from 'craft-common-base/workflow';
+import { checkRelationConcepts, mapLegacyKind } from 'craft-common-ontology/validation';
 
 type JsonObject = Record<string, unknown>;
 
@@ -36,8 +37,13 @@ export class CraftServiceShim implements CraftService {
     const claimId = String(args.claim_id ?? `knowledge_claim_${stableDigest(args).slice(-24)}`);
     const existing = this.store.find("knowledge_claim", claimId);
     if (existing) return { claim: existing, idempotent: true };
+    const legacyKind = String(args.kind ?? "fact");
     const claim = this.store.create("knowledge_claim", claimId, {
-      kind: String(args.kind ?? "fact"), scope: String(args.scope ?? "global"),
+      kind: legacyKind, scope: String(args.scope ?? "global"),
+      // The real capability maps its legacy kind through the shared taxonomy and
+      // persists the concept as non-identity metadata; the shim must do the same
+      // so concept-aware evaluation observes the real contract.
+      concept_kind: mapLegacyKind("knowledge", legacyKind),
       status: "candidate", source_id: String(args.source_id ?? "builtin.evidence-wiki"),
       content: String(args.content ?? ""), content_digest: stableDigest(String(args.content ?? "")),
       evidence_ids: Array.isArray(args.evidence_ids) ? args.evidence_ids.map(String) : [],
@@ -106,6 +112,17 @@ export class CraftServiceShim implements CraftService {
     const relations = this.store.list("knowledge_relation", 10_000) as JsonObject[];
     const live = relations.filter((item) => item.valid_to === null || item.valid_to === undefined);
     const same = (left: JsonObject, right: JsonObject) => String(left.kind) === String(right.kind) && String(left.id) === String(right.id);
+    const conceptOf = (node: JsonObject): string | null => {
+      try {
+        const record = this.store.get(String(node.kind), String(node.id));
+        return typeof record.concept_kind === "string" ? record.concept_kind : null;
+      } catch { return null; }
+    };
+    const typeIssues: JsonObject[] = [];
+    for (const edge of live) {
+      const check = checkRelationConcepts(edge.relation, conceptOf(edge.source as JsonObject), conceptOf(edge.target as JsonObject));
+      if (!check.valid && check.reason) typeIssues.push({ relation_id: String(edge.id), relation: String(edge.relation), reason: check.reason });
+    }
     const challengeIds = live.filter((item) => (item.relation === "contradicts" || item.relation === "supersedes")
       && same(item.target as JsonObject, root)).map((item) => String(item.id)).sort();
     const rootChallenged = challengeIds.length > 0;
@@ -132,7 +149,7 @@ export class CraftServiceShim implements CraftService {
       frontier = next;
     }
     return { root, root_challenged: rootChallenged, challenge_relation_ids: challengeIds, impacted,
-      truncated: false, needs_reevaluation: rootChallenged && impacted.length > 0 };
+      truncated: false, needs_reevaluation: rootChallenged && impacted.length > 0, type_issues: typeIssues };
   }
 }
 

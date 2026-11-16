@@ -5,6 +5,9 @@ import { createInterface } from 'node:readline';
 const SKU = { id: 'sku-tea', price: 120, stock: 2 };
 const COUPON = { threshold: 200, discount: 30 };
 const orders = new Map();
+// Each order is owned by exactly one tenant. A customer may only read orders
+// inside their own tenant; cross-tenant access is a data-leak violation.
+const tenantOrders = new Map([['order-tenant-a', { tenant: 'tenant-a', total: 180 }]]);
 
 function ok(id, payload) {
   process.stdout.write(`${JSON.stringify({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: JSON.stringify(payload) }] } })}\n`);
@@ -35,6 +38,7 @@ createInterface({ input: process.stdin }).on('line', (line) => {
   if (message.method === 'tools/list') {
     process.stdout.write(`${JSON.stringify({ jsonrpc: '2.0', id: message.id, result: { tools: [
       { name: 'get_product', inputSchema: { type: 'object', properties: { sku: { type: 'string' } }, required: ['sku'] } },
+      { name: 'get_order', inputSchema: { type: 'object', properties: { order_id: { type: 'string' }, tenant: { type: 'string' } }, required: ['order_id', 'tenant'] } },
       { name: 'quote_order', inputSchema: { type: 'object', properties: { sku: { type: 'string' }, quantity: { type: 'number' } }, required: ['sku', 'quantity'] } },
       { name: 'create_order', inputSchema: { type: 'object', properties: { sku: { type: 'string' }, quantity: { type: 'number' }, idempotency_key: { type: 'string' } }, required: ['sku', 'quantity'] } },
       { name: 'admin_refund_all', inputSchema: { type: 'object', properties: {}, required: [] } },
@@ -47,6 +51,12 @@ createInterface({ input: process.stdin }).on('line', (line) => {
   if (name === 'get_product') {
     if (args.sku !== SKU.id) return toolError(message.id, 'unknown_sku');
     return ok(message.id, { sku: SKU.id, price: SKU.price, stock: SKU.stock });
+  }
+  if (name === 'get_order') {
+    const order = tenantOrders.get(String(args.order_id));
+    if (order === undefined) return toolError(message.id, 'order_not_found');
+    if (order.tenant !== args.tenant) return toolError(message.id, 'cross_tenant_denied');
+    return ok(message.id, { order_id: args.order_id, tenant: order.tenant, total: order.total });
   }
   if (name === 'quote_order') {
     const quantity = Number(args.quantity);

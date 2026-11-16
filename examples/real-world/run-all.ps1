@@ -14,7 +14,10 @@ $suites = @(
   @{ name = 'mcp-filesystem'; workspace = '.' },
   @{ name = 'claude-seo';     workspace = 'workspace' },
   @{ name = 'pocketflow';     workspace = 'workspace' },
-  @{ name = 'craft-eval';     workspace = 'workspace' }
+  @{ name = 'craft-eval';     workspace = 'workspace' },
+  # The Workbench suite runs the checked-out craft-workbench tests, so its
+  # workspace is the sibling repository rather than a folder inside this one.
+  @{ name = 'craft-workbench-three-modes'; workspace = (Resolve-Path (Join-Path $root '..\craft-workbench')).Path }
 )
 
 $rows = foreach ($suite in $suites) {
@@ -22,7 +25,7 @@ $rows = foreach ($suite in $suites) {
   $suiteFile = Join-Path $dir 'suite.json'
   $cases = (Get-Content $suiteFile -Raw | ConvertFrom-Json).cases.Count
   $raw = & node $cli run $suiteFile (Join-Path $dir 'subject.json') (Join-Path $dir 'runtime.json') `
-      --workspace (Join-Path $dir $suite.workspace) --output (Join-Path $out $suite.name) --keep-traces 2>&1
+      --workspace $suite.workspace --output (Join-Path $out $suite.name) --keep-traces 2>&1
   $report = ($raw | ConvertFrom-Json).report
   [pscustomobject]@{
     Suite    = $suite.name

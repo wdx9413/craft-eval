@@ -71,6 +71,7 @@
   },
   "dependencies": {
     "craft-common-base": "0.20.4",
+    "craft-common-ontology": "0.20.4",
     "craft-common-store-local": "0.20.4"
   },
   "repository": {

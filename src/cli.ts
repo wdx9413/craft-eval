@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /** Command line interface for local evaluation runs and comparisons. */
 
-import { resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { realpathSync, existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
@@ -9,11 +9,11 @@ import { pathToFileURL } from 'node:url';
 import { auditSuiteFiles, coverageSuiteFiles } from './audit.js';
 import { diffSuites } from './suite-diff.js';
 import { attributeRun } from './attribution.js';
-import { compareRuns, loadSuite, reportRun, rescoreScripts, runSuite } from './evaluation.js';
+import { compareRuns, loadSuite, reportRun, rescoreScripts, runSuite, type Comparison } from './evaluation.js';
 import { runExperiment } from './experiment.js';
 import { loadScenario, runScenario, scenarioCases } from './scenario.js';
 import { writeHtmlReport } from './report-html.js';
-import { runMutations } from './mutation.js';
+import { runMutations, type MutationReport } from './mutation.js';
 import { calibrateJudge } from './calibration.js';
 import { auditContextPack } from './context-audit.js';
 
@@ -94,6 +94,13 @@ function parse(argv: string[]): { command: string; positional: string[]; options
         }
         options[name] = value;
         index += 1;
+      } else if (name === 'comparison' || name === 'mutation') {
+        const value = rest[index + 1];
+        if (value === undefined) {
+          throw new Error(`--${name} requires a value`);
+        }
+        options[name] = value;
+        index += 1;
       } else {
         throw new Error(`unrecognized argument: ${token}`);
       }
@@ -118,7 +125,7 @@ commands:
   rescore <run_dir> --workspace <dir> --output <dir>
   compare <baseline> <candidate> [--require-gain]
   analyze <run_dir>
-  report-html <run_dir> --output <file>
+  report-html <run_dir> --output <file> [--comparison <comparison.json>] [--mutation <mutation-report.json>]
   experiment <manifest> --workspace <dir> --output <dir>
   mutation <manifest> <suite> <runtime> --workspace <dir> --output <dir>
   calibrate <manifest> [--timeout-ms N] [--max-output-bytes N]
@@ -202,6 +209,13 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     } else if (command === 'compare') {
       requireArgs(positional, 2, USAGE);
       result = await compareRuns(positional[0]!, positional[1]!);
+      // The comparison is an artefact other tools (HTML report, archives)
+      // consume, so it can be written next to the runs it describes. It is
+      // written before the gate is applied: a refused gain still needs its
+      // numbers on disk.
+      if (options.output !== undefined) {
+        await writeFile(String(options.output), JSON.stringify(result, null, 2) + '\n', 'utf8');
+      }
       if (options['require-gain'] === true && (result as { skill_gain_supported: boolean }).skill_gain_supported !== true) {
         process.stdout.write(JSON.stringify(result) + '\n');
         return 1;
@@ -214,7 +228,16 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
       if (options.output === undefined) {
         throw new Error('report-html requires --output <file>');
       }
-      const path = await writeHtmlReport(positional[0]!, String(options.output));
+      const comparison = options.comparison === undefined
+        ? undefined
+        : await readJsonInput(String(options.comparison), 'comparison artefact');
+      const mutation = options.mutation === undefined
+        ? undefined
+        : await readJsonInput(String(options.mutation), 'mutation artefact');
+      const path = await writeHtmlReport(positional[0]!, String(options.output), {
+        ...(comparison === undefined ? {} : { comparison: comparison as Comparison }),
+        ...(mutation === undefined ? {} : { mutation: mutation as MutationReport }),
+      });
       result = { report: path };
     } else if (command === 'experiment') {
       requireArgs(positional, 1, USAGE);
@@ -230,14 +253,22 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
       if (options.workspace === undefined || options.output === undefined) {
         throw new Error('mutation requires --workspace and --output');
       }
-      result = await runMutations(positional[0]!, positional[1]!, positional[2]!, String(options.workspace), String(options.output));
+      const report = await runMutations(positional[0]!, positional[1]!, positional[2]!, String(options.workspace), String(options.output));
+      // The report is written next to the mutant runs so the HTML report and
+      // later reviews can cite the same numbers.
+      await writeFile(join(String(options.output), 'mutation-report.json'), JSON.stringify(report, null, 2) + '\n', 'utf8');
+      result = report;
     } else if (command === 'calibrate') {
       requireArgs(positional, 1, USAGE);
       result = await calibrateJudge(positional[0]!, { timeout_ms: options['timeout-ms'] === undefined ? undefined : Number(options['timeout-ms']), max_output_bytes: options['max-output-bytes'] === undefined ? undefined : Number(options['max-output-bytes']) });
       // A declared bar that was missed is a failing gate, but the report is still
       // printed first so the numbers can be inspected. No declared bar (`null`)
       // stays informational and keeps exit code 0.
-      if ((result as { passed?: boolean | null }).passed === false) {
+      // A declared bar that could not be decided (a judge that never graded
+      // part of the gold set) is also not a pass: the caller asked for a
+      // certification and did not get one.
+      const gate = result as { passed?: boolean | null; gate_declared?: boolean };
+      if (gate.passed === false || (gate.gate_declared === true && gate.passed !== true)) {
         process.stdout.write(JSON.stringify(result) + '\n');
         return 1;
       }

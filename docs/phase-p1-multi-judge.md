@@ -63,12 +63,18 @@
 
 ## 验收清单
 
-- [ ] `judge_policy` 三种 mode 的校验与执行（含 `weighted.min_score` 边界 0/1）。
-- [ ] `report.by_judge` 与 `judge_disagreements` 字段。
-- [ ] `compare.judge_agreements` 实际计算（不是仅有类型）。
-- [ ] `analyze` 的 `judge_disagreement` 分类。
-- [ ] 测试：三 mode ×（全一致 / 部分分歧 / 全分歧）×（judge 报错），共 ≥12 个用例。
-- [ ] 示例：`examples/gated-output/` 增加多 judge 版本。
+- [x] `judge_policy` 三种 mode 的校验与执行（含 `weighted.min_score` 边界 0/1）。
+- [x] `report.by_judge` 与 `judge_disagreements` 字段。
+- [x] `compare.judge_agreements` 实际计算（不是仅有类型）。
+- [x] `analyze` 的 `judge_disagreement` 分类。
+- [x] 测试：三 mode ×（全一致 / 部分分歧 / 全分歧）×（judge 报错），共 ≥12 个用例。
+- [x] 示例：`examples/gated-output/` 增加多 judge 版本。
+
+## 真实运行记录
+
+- `examples/gated-output/suite-multi-judge.json`：3 用例 × 2 judge（accuracy / brand），`all_required` 与 `any` 两种策略。
+- 离线 judge 资产 `examples/gated-output/judge.mjs` 写到 stdout，命令用 `{{craft-eval}}` 锚点定位，避免复制进被测工作区。
+- 实测：passed 2 / failed 1 / inconclusive 0；`report.by_judge` 分别列出两个 judge 的通过/失败，`judge_disagreements` 抓到 `split-verdict-any-passthrough` 上 brand 通过、accuracy 失败的分歧。
 
 ## 非目标
 

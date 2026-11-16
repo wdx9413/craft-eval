@@ -35,7 +35,18 @@ export interface RunReport {
   model_observations?: number;
   prompted_turns?: number;
   minimum_observations?: JsonObject;
-  results?: Array<{ case_id?: string; verdict?: string; reason?: string }>;
+  results?: Array<{
+    case_id?: string;
+    verdict?: string;
+    reason?: string;
+    /**
+     * Optional per-judge verdicts for this case. The three-ledger contract
+     * collapses a case to one verdict, so this field only exists when the
+     * producer really graded the case with named judges. Absent means "not
+     * measured", never "agreed".
+     */
+    judges?: Record<string, string>;
+  }>;
 }
 
 export interface LedgerDelta {
@@ -102,6 +113,49 @@ function verdictMap(report: RunReport): Map<string, string> {
   return map;
 }
 
+/**
+ * Per-judge agreement across the cases both runs graded with the same judge.
+ * A judge that only appears on one side contributes nothing: an absent
+ * verdict is not agreement, and reporting 1 for it would invent evidence.
+ */
+function judgeAgreements(baseline: RunReport, candidate: RunReport): Array<{
+  judge: string;
+  agreement: number | null;
+  cases: number;
+}> {
+  const left = new Map<string, Record<string, string>>();
+  const right = new Map<string, Record<string, string>>();
+  for (const report of [baseline, candidate]) {
+    const target = report === baseline ? left : right;
+    for (const result of report.results ?? []) {
+      if (typeof result.case_id !== "string") continue;
+      const judges = result.judges;
+      if (!judges || typeof judges !== "object" || Array.isArray(judges)) continue;
+      target.set(result.case_id, judges as Record<string, string>);
+    }
+  }
+  const tallies = new Map<string, { same: number; total: number }>();
+  for (const [caseId, leftJudges] of left) {
+    const rightJudges = right.get(caseId);
+    if (rightJudges === undefined) continue;
+    for (const [judge, verdict] of Object.entries(leftJudges)) {
+      const other = rightJudges[judge];
+      if (other === undefined) continue;
+      const bucket = tallies.get(judge) ?? { same: 0, total: 0 };
+      bucket.total += 1;
+      if (other === verdict) bucket.same += 1;
+      tallies.set(judge, bucket);
+    }
+  }
+  return [...tallies.entries()]
+    .map(([judge, bucket]) => ({
+      judge,
+      agreement: bucket.total === 0 ? null : bucket.same / bucket.total,
+      cases: bucket.total,
+    }))
+    .sort((a, b) => a.judge.localeCompare(b.judge));
+}
+
 /** Pure comparison function: the interface is the check surface, so callers
  *  only need to supply two parsed artifacts and one reason string is returned. */
 export function compareRunReports(baselineValue: unknown, candidateValue: unknown): Comparison {
@@ -124,7 +178,8 @@ export function compareRunReports(baselineValue: unknown, candidateValue: unknow
     const reasons = [...mismatches, ...(isolationMismatch ? ["isolation"] : [])];
     return { comparable: false, reason: `run identity differs: ${reasons.join(", ")}`, identity,
       suite_evolution: suiteEvolution, suite_digest_delta: suiteDigestDelta,
-      ledgers: [], regressions: [], improvements: [], newCases: [], removedCases: [] };
+      ledgers: [], regressions: [], improvements: [], newCases: [], removedCases: [],
+      judge_agreements: [] };
   }
 
   const ledgers: LedgerDelta[] = (LEDGERS as readonly string[]).map((ledger) => {
@@ -154,5 +209,6 @@ export function compareRunReports(baselineValue: unknown, candidateValue: unknow
   const evolutionNote = suiteEvolution ? "; suite evolved" : "; same suite";
   const reason = `same run identity; ${regressions.length} regression(s), ${improvements.length} improvement(s)${evolutionNote}`;
   return { comparable, reason, identity, suite_evolution: suiteEvolution, suite_digest_delta: suiteDigestDelta,
-    ledgers, regressions, improvements, newCases, removedCases };
+    ledgers, regressions, improvements, newCases, removedCases,
+    judge_agreements: judgeAgreements(baseline, candidate) };
 }

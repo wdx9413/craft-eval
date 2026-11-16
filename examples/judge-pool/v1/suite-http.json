@@ -1,0 +1,35 @@
+{
+  "schema": "craft-eval.eval.v1",
+  "suite_id": "judge-pool-http",
+  "subject_kind": "software",
+  "partition": "development",
+  "sanitized": true,
+  "claim": {
+    "statement": "A model-graded case can be graded end to end by a real model judge over an OpenAI-compatible gateway, with the credential supplied by the evaluator environment rather than by the suite file.",
+    "scope": "One business case with one real model judge, proving the model_graded execution path.",
+    "limitations": [
+      "Needs a reachable gateway and a credential in the evaluator process.",
+      "The judge is only as good as the gold set it was calibrated on; run `calibrate` first."
+    ]
+  },
+  "cases": [
+    {
+      "id": "coupon-answer",
+      "argv": ["node", "-e", "const fs=require('node:fs');const nl=String.fromCharCode(10);fs.mkdirSync('outputs',{recursive:true});fs.writeFileSync('outputs/answer.md',['优惠券规则：满199减20，满299减40。','本单商品应付 208 元，已满足满199门槛，按规则优惠 20 元。','因此本单应付金额为 188 元，未叠加其他优惠。','结论：应付金额 188 元，优惠 20 元。'].join(nl));"],
+      "timeout_s": 120,
+      "checks": [
+        { "id": "exit", "kind": "exit_code", "equals": 0 },
+        {
+          "id": "business-grade",
+          "kind": "model_graded",
+          "command": ["node", "{{craft-eval}}/examples/judge-workspace/judge-http.mjs"],
+          "answer": "outputs/answer.md",
+          "threshold": 1,
+          "judge": "gateway-judge",
+          "rubric": "The answer applies the coupon rule 满199减20 / 满299减40 to the cart subtotal it quotes: a subtotal of 208 gets the 199 threshold met and pays 188 after the 20 discount. An answer that applies a discount to a subtotal below the threshold it states, or whose payable total does not equal subtotal minus the discount actually applied, fails.",
+          "judge_env": ["CRAFT_EVAL_JUDGE_ENDPOINT", "CRAFT_EVAL_JUDGE_MODEL", "CRAFT_EVAL_JUDGE_API_KEY"]
+        }
+      ]
+    }
+  ]
+}

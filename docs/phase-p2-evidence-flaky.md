@@ -50,15 +50,22 @@
 
 ## 验收清单
 
-- [ ] `keep_traces` 三取值解析、执行、写入 `execution_controls`、旧布尔值兼容。
-- [ ] `on-failure` 下 passed case 无 captures 目录、failed case 有。
-- [ ] `report.flaky_cases` 计算（稳定通过/稳定失败/2 过 1 挂/单 trial 四组）。
-- [ ] `analyze` 的 `flaky` 分类。
-- [ ] `compareRuns` 排除 flaky 并影响 `skill_gain_supported`。
-- [ ] `rescore` 在无 captures 时输出 `not_rescorable` 而不是假结论。
-- [ ] 测试 ≥8 个，覆盖上述组合。
+- [x] `keep_traces` 三取值解析、执行、写入 `execution_controls`、旧布尔值兼容。
+- [x] `on-failure` 下 passed case 无 captures 目录、failed case 有。
+- [x] `report.flaky_cases` 计算（稳定通过/稳定失败/2 过 1 挂/单 trial 四组）。
+- [x] `analyze` 的 `flaky` 分类。
+- [x] `compareRuns` 排除 flaky 并影响 `skill_gain_supported`。
+- [x] `rescore` 在无 captures 时输出 `not_rescorable` 而不是假结论。
+- [x] 测试 ≥8 个，覆盖上述组合。
 
 ## 非目标
 
 - 不自动重试；重试仍由 `experiment.retry` 显式声明。
 - 不把 flaky 当失败；它是"证据不稳定"，单独报告。
+
+## 真实运行记录
+
+- `run --keep-traces on-failure`：仅非通过用例保留 captures；通过用例不产生 captures 目录（见 `tests/evidence-retention.test.ts`）。
+- `report.flaky_cases` / `analyze` 的 `flaky` 聚类 / `compareRuns.flaky_excluded` 与 `skill_gain_supported` 阻断在 `tests/flaky-detection.test.ts` 中用第三方宿主脚本实测。
+- `rescore` 在无 captures 时写 `rescore_skipped: no_captures`，不复制旧结论；见 `tests/evidence-retention.test.ts`。
+

@@ -50,14 +50,21 @@ examples/judge-pool/
 
 ## 验收清单
 
-- [ ] `examples/judge-pool/v1/` 金集（≥10 样本，含 provenance）。
-- [ ] `calibrate` 支持 `minimum_accuracy` / `minimum_consistency` 并输出 `passed`，未达标退出 1。
-- [ ] 规则式 stub 在金集上得到 `accuracy = 1`；故意写坏的 judge（恒 1.0）得到 `accuracy < 1`。
-- [ ] `judge-http.mjs` 在缺环境变量时明确报缺失项且不产生分数。
-- [ ] `model_graded.judge_calibrated` 实现：达标 → 正常判分；未达标 → `judge_uncalibrated`。
-- [ ] 测试 ≥10 个（校准门槛、缺环境、坏 judge、未校准 check）。
+- [x] `examples/judge-pool/v1/` 金集（≥10 样本，含 provenance）。
+- [x] `calibrate` 支持 `minimum_accuracy` / `minimum_consistency` 并输出 `passed`，未达标退出 1。
+- [x] 规则式 stub 在金集上得到 `accuracy = 1`；故意写坏的 judge（恒 1.0）得到 `accuracy < 1`。
+- [x] `judge-http.mjs` 在缺环境变量时明确报缺失项且不产生分数。
+- [x] `model_graded.judge_calibrated` 实现：达标 → 正常判分；未达标 → `judge_uncalibrated`。
+- [x] 测试 ≥10 个（校准门槛、缺环境、坏 judge、未校准 check）。
 
 ## 非目标
 
 - 不在 craft-eval 内引入模型 SDK 或内置默认模型。
 - 不自动挑选阈值；阈值由金集作者声明。
+
+## 真实运行记录
+
+- 规则式金集：`examples/judge-pool/v1/manifest.json` 在 10 样本上 accuracy=1 / consistency=1 / errors=0。
+- 真实模型金集：`examples/judge-pool/v1/manifest-http.json` 经本地 `group/free` 网关实测 accuracy=1 / consistency=1 / errors=0；rubric 修复了把超卖正例写成"通过"和空输出/超长输出的语义反转。
+- 真实模型端到端：`examples/judge-pool/v1/suite-http.json` 经 `judge_env` 转发网关凭证，run 实测 passed 1/1，judge 证据带模型分数与理由。
+

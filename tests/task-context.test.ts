@@ -31,7 +31,9 @@ test('task context validates bounded exact text and records submitted bytes with
 test('both host adapters receive the exact explicit intervention and reports bind it to the original task', async () => {
   const root = await mkdtemp(join(tmpdir(), 'craft-eval-context-')); const workspace = join(root, 'workspace'); await mkdir(workspace);
   const write = async (name: string, value: unknown) => { const path = join(root, name); await writeFile(path, JSON.stringify(value)); return path; };
-  const suite = { schema: 'craft-eval.eval.v1', suite_id: 'context', subject_kind: 'agent', partition: 'held_out', sanitized: true, approved_by: 'test', cases: [{ id: 'task', prompt: 'Only the original task', timeout_s: 3, checks: [{ id: 'exit', kind: 'exit_code', equals: 0 }] }] };
+  // The budget must outlive a host process spawn on a loaded machine; a tight
+  // one turns scheduler delay into a false "the intervention failed".
+  const suite = { schema: 'craft-eval.eval.v1', suite_id: 'context', subject_kind: 'agent', partition: 'held_out', sanitized: true, approved_by: 'test', cases: [{ id: 'task', prompt: 'Only the original task', timeout_s: 30, checks: [{ id: 'exit', kind: 'exit_code', equals: 0 }] }] };
   const suitePath = await write('suite.json', suite);
   const runtime = await write('runtime.json', Object.fromEntries(['environment_digest', 'budget_digest', 'host_digest', 'model_digest', 'tools_digest'].map(key => [key, 'fixed'])));
   await writeFile(join(workspace, 'host.mjs'), `import {mkdirSync, writeFileSync} from 'node:fs';

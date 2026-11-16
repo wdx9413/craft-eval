@@ -54,7 +54,8 @@ node dist/src/cli.js report /tmp/craft-eval-runs/<run-id>
 node dist/src/cli.js rescore /tmp/craft-eval-runs/<run-id> --workspace examples/workspace --output /tmp/craft-eval-rescore
 node dist/src/cli.js compare /tmp/craft-eval-runs/<baseline-id> /tmp/craft-eval-runs/<candidate-id>
 node dist/src/cli.js analyze /tmp/craft-eval-runs/<run-id>
-node dist/src/cli.js report-html /tmp/craft-eval-runs/<run-id> --output /tmp/report.html
+node dist/src/cli.js report-html /tmp/craft-eval-runs/<run-id> --output /tmp/report.html \
+  [--comparison /tmp/comparison.json] [--mutation /tmp/mutation-report.json]
 node dist/src/cli.js experiment experiment.json --workspace examples/workspace --output /tmp/craft-eval-experiments
 node dist/src/cli.js coverage examples/software-suite.json examples/agent-suite.json
 node dist/src/cli.js mutation mutation/manifest.json suite.json runtime.json \
@@ -76,9 +77,10 @@ node dist/src/cli.js scenario scenario.json examples/agent-subject.json examples
 
 - **assert-set**：`Check.weight`（默认 1）+ `Case.threshold`（0..1，默认 1）。任务检查按加权通过率判分，例如 4 条等权检查设 `threshold: 0.25` 表示过 1 条即可；`safety_checks` 恒为全有全无。
 - **model_graded**：`{"kind":"model_graded","command":["node","judge.mjs"],"answer":"outputs/answer.md","threshold":0.8,"judge":"quality"}`。评测器把 answer 路径与 rubric 通过 `CRAFT_EVAL_JUDGE_ANSWER` / `CRAFT_EVAL_JUDGE_RUBRIC` 传给 judge 命令，judge 输出 `{"score":0..1,"reason":"..."}`。**craft-eval 不内置模型**，模型选择与调用方式完全由 judge 命令决定。
+- **judge 拿到网关凭证**：`model_graded` 可声明 `judge_env: ["CRAFT_EVAL_JUDGE_ENDPOINT","CRAFT_EVAL_JUDGE_MODEL","CRAFT_EVAL_JUDGE_API_KEY"]`。评测器按**变量名**从自己的进程环境取值转发给 judge，密钥永远不写进 suite 文件；名字必须是不带值的合法变量名（`NAME=secret` 会被拒绝）。judge 命令里的路径支持 `{{craft-eval}}` / `{{subjects}}` 锚点，所以判分资产不必复制进被测工作区。
 - **多判分器与 judge_policy**：一个 case 可挂多个 `model_graded`，用 `judge_policy` 声明聚合方式：`{"mode":"all_required"}`（默认，全部判分器通过才通过）、`{"mode":"any"}`（任一通过即可）、`{"mode":"weighted","min_score":0.6}`（按 weight 加权后达到最低分）。判分器组与确定性检查分别判定，两组都通过用例才算通过；任一判分器报错（超时/非 JSON/输出超限）该组为未判定，即便 `all_required` 也不降级为失败。未声明策略但存在多个判分器时默认全通过，并在报告中提示。
 - **校准门控**：case 可声明 `judge_calibration: {"manifest":"judge-pool/v1/manifest.json","minimum_accuracy":0.9}`。评测前先跑校准；未达标时该判分器记 `judge_uncalibrated`（用例为未判定），**不可信的判分器不会制造失败结论**。判分证据里带校准的 accuracy/consistency。
-- **calibrate**：`calibrate <manifest>` 在 gold set 上多轮跑 judge，输出 `accuracy`（与已知答案一致率）、`consistency`（重复打分自一致率）与 `passed`。manifest 可声明 `minimum_accuracy`/`minimum_consistency` 门槛，未达标时退出码 1（仍输出完整 JSON）。真实模型判分器示例见 `examples/judge-workspace/judge-http.mjs`（通过 `CRAFT_EVAL_JUDGE_ENDPOINT` / `CRAFT_EVAL_JUDGE_MODEL` / `CRAFT_EVAL_JUDGE_API_KEY` 指向任意 OpenAI 兼容网关），配套金集见 `examples/judge-pool/v1/`（规则判分器 manifest.json / 真实模型 manifest-http.json）。
+- **calibrate**：`calibrate <manifest>` 在 gold set 上多轮跑 judge，输出 `accuracy`（与已知答案一致率）、`consistency`（重复打分自一致率）、`errors`（失败评分次数）、`measured_samples` / `unmeasured_samples` 与 `passed`。manifest 可声明 `minimum_accuracy`/`minimum_consistency` 门槛，未达标时退出码 1（仍输出完整 JSON）；**声明了门槛却无法判定**（例如有金集样本始终没被判分）同样退出码 1，因为"没量到"不是"量过了"。两个 manifest 可以用 `samples_file` 指向同一份金集（`examples/judge-pool/v1/samples.json`），rubric 写在样本上：同一条业务规则的正负样本共用一条"正确行为"rubric，标签只说明答案站在哪一侧。真实模型判分器示例见 `examples/judge-workspace/judge-http.mjs`（通过 `CRAFT_EVAL_JUDGE_ENDPOINT` / `CRAFT_EVAL_JUDGE_MODEL` / `CRAFT_EVAL_JUDGE_API_KEY` 指向任意 OpenAI 兼容网关）。
 
 ### 稳定性与证据
 

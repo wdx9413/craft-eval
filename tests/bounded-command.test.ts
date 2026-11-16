@@ -49,6 +49,9 @@ test('bounded commands validate budgets and reject pre-aborted execution without
 });
 
 test('silent managed commands discard diagnostics while preserving command availability', async () => {
-  const result = await runBoundedCommand(process.execPath, ['-e', "process.stdout.write('x'.repeat(4096));process.exit(3)"], { cwd: process.cwd(), env: {}, timeout_ms: 2_000, max_output_bytes: 1, capture: false });
+  // The budget only has to outlive a process spawn. It is deliberately loose:
+  // a tight budget turns a loaded machine into a false "command unavailable",
+  // which would blame the evaluator for the host's scheduling delay.
+  const result = await runBoundedCommand(process.execPath, ['-e', "process.stdout.write('x'.repeat(4096));process.exit(3)"], { cwd: process.cwd(), env: {}, timeout_ms: 30_000, max_output_bytes: 1, capture: false });
   assert.equal(result.status, 3); assert.equal(result.issue, null); assert.equal(result.stdout.length + result.stderr.length, 0);
 });

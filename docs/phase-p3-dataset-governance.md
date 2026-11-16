@@ -69,14 +69,20 @@ shingle：字符级 5-gram 集合；相似度 = Jaccard。
 
 ## 验收清单
 
-- [ ] `Suite.version` / `parent_digest` 校验（格式、自引用、循环）。
-- [ ] `audit.suite_lineage` 输出与三种 finding。
-- [ ] `diff` 命令（added / removed / modified / parent_matches）。
-- [ ] `near_duplicate_prompt`（0.95 命中、0.85 不命中、短文本跳过）。
-- [ ] `shared_source_cross_partition`。
-- [ ] 测试 ≥10 个。
+- [x] `Suite.version` / `parent_digest` 校验（格式、自引用、循环）。
+- [x] `audit.suite_lineage` 输出与三种 finding。
+- [x] `diff` 命令（added / removed / modified / parent_matches）。
+- [x] `near_duplicate_prompt`（0.95 命中、0.85 不命中、短文本跳过）。
+- [x] `shared_source_cross_partition`。
+- [x] 测试 ≥10 个。
 
 ## 非目标
 
 - 不做语义向量相似度（需引入模型/依赖）。
 - 不声称能证明"未污染"，只报告可观测的重复与同源。
+
+## 真实运行记录
+
+- `diff <old> <new>` 输出 added / removed / modified 与 `parent_matches`；`audit` 输出 `suite_lineage` 并检出 self-parent、parent cycle、version-unchanged 三类 finding。
+- 近似重复（5-gram Jaccard，默认 0.9）与跨分区同源污染 `shared_source_cross_partition` 在 `tests/near-duplicate.test.ts` / `tests/suite-lineage.test.ts` 中实测。
+

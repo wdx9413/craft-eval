@@ -1,0 +1,250 @@
+{
+  "schema": "craft-eval.eval.v1",
+  "suite_id": "craft-workbench-three-modes",
+  "subject_kind": "software",
+  "partition": "development",
+  "sanitized": true,
+  "claim": {
+    "statement": "Craft Workbench can ship the three surfaces (领航员 / 控制台 / 工作台) as separate desktop apps whose pages never depend on each other, while every mode still reads the same Runtime truth.",
+    "scope": "Deterministic regression checks over the Craft Workbench checkout: mode module boundaries, per-mode behaviour, single-surface pinning, page inventory, settings and design contract.",
+    "limitations": [
+      "These cases run the repository test suite, not an installed desktop app, so installer behaviour and real user sessions are not covered.",
+      "No model is involved: the checks prove the UI contract, not task quality or model accuracy."
+    ]
+  },
+  "metrics": {
+    "primary": {
+      "id": "case_pass_rate",
+      "kind": "binary_pass_rate",
+      "direction": "higher_is_better",
+      "minimum_sample": 6
+    }
+  },
+  "cases": [
+    {
+      "id": "mode-pages-are-independent-modules",
+      "category": "architecture",
+      "risk": "high",
+      "language": "javascript",
+      "in_place": true,
+      "argv": [
+        "node",
+        "--experimental-strip-types",
+        "--test",
+        "--test-isolation=none",
+        "tests/mode-shell.test.ts"
+      ],
+      "timeout_s": 120,
+      "expected_behavior": "Each mode page is its own module, no mode module imports a sibling, and the app fetches the owning mode page lazily so a single-surface build never downloads the other two projections.",
+      "provenance": {
+        "source": "craft-workbench/tests/mode-shell.test.ts",
+        "source_digest": "sha256:89e0ac64296d5febd7b7a70ac77ba03b60bb418e2dd7e098dc752703a1d9e859"
+      },
+      "checks": [
+        {
+          "id": "tests-pass",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "no-test-failures",
+          "kind": "stdout_contains",
+          "value": "ℹ fail 0"
+        },
+        {
+          "id": "module-boundary-asserted",
+          "kind": "stdout_contains",
+          "value": "each mode page is an independent module"
+        }
+      ]
+    },
+    {
+      "id": "pilot-control-workshop-behaviour",
+      "category": "behaviour",
+      "risk": "high",
+      "language": "javascript",
+      "in_place": true,
+      "argv": [
+        "node",
+        "--experimental-strip-types",
+        "--test",
+        "--test-isolation=none",
+        "tests/mode-pages.test.ts",
+        "tests/three-mode-consistency.test.ts",
+        "tests/three-mode-journey.test.ts"
+      ],
+      "timeout_s": 180,
+      "expected_behavior": "领航员 keeps its minimal surface for non-technical users, 控制台 shows the shared task board, and 工作台 keeps the plugin and Mod configuration surface; all three read the same Runtime truth.",
+      "provenance": {
+        "source": "craft-workbench/tests/mode-pages.test.ts",
+        "source_digest": "sha256:b6b88f06e12d672bded0be18bf8ef030eecb6208fab7d4880b2d0277476dc739"
+      },
+      "checks": [
+        {
+          "id": "tests-pass",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "no-test-failures",
+          "kind": "stdout_contains",
+          "value": "ℹ fail 0"
+        },
+        {
+          "id": "pilot-surface-asserted",
+          "kind": "stdout_contains",
+          "value": "viewPilot is a minimal superagent surface"
+        }
+      ]
+    },
+    {
+      "id": "single-surface-builds-pin-their-mode",
+      "category": "packaging",
+      "risk": "high",
+      "language": "javascript",
+      "in_place": true,
+      "argv": [
+        "node",
+        "--experimental-strip-types",
+        "--test",
+        "--test-isolation=none",
+        "tests/workbench-boot.test.ts"
+      ],
+      "timeout_s": 120,
+      "expected_behavior": "A single-surface desktop build pins its mode through CRAFT_MODE_ONLY, hides the mode switcher, and resolves cross-mode navigation back into its own projection.",
+      "provenance": {
+        "source": "craft-workbench/tests/workbench-boot.test.ts",
+        "source_digest": "sha256:9b435d0206e6002b4226ea3dc0bab4b1ad0006f719b4985665dd24405be0ec6f"
+      },
+      "checks": [
+        {
+          "id": "tests-pass",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "no-test-failures",
+          "kind": "stdout_contains",
+          "value": "ℹ fail 0"
+        },
+        {
+          "id": "single-surface-pinning-asserted",
+          "kind": "stdout_contains",
+          "value": "each flavor names its own window"
+        }
+      ]
+    },
+    {
+      "id": "page-inventory-renders-every-routable-page",
+      "category": "coverage",
+      "risk": "medium",
+      "language": "javascript",
+      "in_place": true,
+      "argv": [
+        "node",
+        "--experimental-strip-types",
+        "--test",
+        "--test-isolation=none",
+        "tests/page-inventory.test.ts"
+      ],
+      "timeout_s": 180,
+      "expected_behavior": "Every routable page of every mode renders a heading and at least one control without an unhandled page error.",
+      "provenance": {
+        "source": "craft-workbench/tests/page-inventory.test.ts",
+        "source_digest": "sha256:bf8ac46b18838a8ca123af4db91df1f3ec43b99a79631e0ae12fa0c3bcd0dd42"
+      },
+      "checks": [
+        {
+          "id": "tests-pass",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "no-test-failures",
+          "kind": "stdout_contains",
+          "value": "ℹ fail 0"
+        },
+        {
+          "id": "page-inventory-asserted",
+          "kind": "stdout_contains",
+          "value": "every mode exposes a non-empty routable page set"
+        }
+      ]
+    },
+    {
+      "id": "settings-keystore-and-navigation",
+      "category": "settings",
+      "risk": "high",
+      "language": "javascript",
+      "in_place": true,
+      "argv": [
+        "node",
+        "--experimental-strip-types",
+        "--test",
+        "--test-isolation=none",
+        "tests/workbench-model-setup.test.ts",
+        "tests/model-key-direct.test.ts"
+      ],
+      "timeout_s": 180,
+      "expected_behavior": "Settings are split into sections with a back button, and a pasted API key is stored as a value in the owner-only local keystore instead of an environment variable name.",
+      "provenance": {
+        "source": "craft-workbench/tests/workbench-model-setup.test.ts",
+        "source_digest": "sha256:7db82c50aaa789577aea6d23f64c9a53522729e922a384bd7290811c641ce27f"
+      },
+      "checks": [
+        {
+          "id": "tests-pass",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "no-test-failures",
+          "kind": "stdout_contains",
+          "value": "ℹ fail 0"
+        },
+        {
+          "id": "secret-value-flow-asserted",
+          "kind": "stdout_contains",
+          "value": "模型配置页直接接收密钥值"
+        }
+      ]
+    },
+    {
+      "id": "design-layer-has-no-contrast-or-type-violations",
+      "category": "design",
+      "risk": "medium",
+      "language": "javascript",
+      "in_place": true,
+      "argv": [
+        "node",
+        "--experimental-strip-types",
+        "--test",
+        "--test-isolation=none",
+        "tests/visual-layer.test.ts"
+      ],
+      "timeout_s": 120,
+      "expected_behavior": "The visual layer keeps the documented design tokens, contrast rules and composer visibility contract.",
+      "provenance": {
+        "source": "craft-workbench/tests/visual-layer.test.ts",
+        "source_digest": "sha256:3447b5fb139dad2b65dbac49d7be2dbbb0767359568f42c089293f712e665235"
+      },
+      "checks": [
+        {
+          "id": "tests-pass",
+          "kind": "exit_code",
+          "equals": 0
+        },
+        {
+          "id": "no-test-failures",
+          "kind": "stdout_contains",
+          "value": "ℹ fail 0"
+        },
+        {
+          "id": "design-tokens-asserted",
+          "kind": "stdout_contains",
+          "value": "every CSS custom property resolves to the design system"
+        }
+      ]
+    }
+  ]
+}

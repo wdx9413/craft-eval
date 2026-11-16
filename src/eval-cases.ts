@@ -240,6 +240,13 @@ const KNOWLEDGE_LINEAGE_CASES: GradedCase[] = [
     }),
     check: { kind: "equals", expected: "false/false" },
   },
+  {
+    case: defineEvalCase({
+      id: "knowledge_lineage.typed_relation_flags_incompatible_concepts", axis: "knowledge_lineage", evidence: "kernel", partition: "held_out", sanitized: true, approved_by: SUITE_REVIEWER,
+      description: "A typed relation between an incompatible concept pair (fact contradicts term) is reported as a diagnostic type issue, while a compatible pair produces none; inferred issues never mutate the graph.",
+    }),
+    check: { kind: "equals", expected: "1/0/hold" },
+  },
 ];
 
 /**
