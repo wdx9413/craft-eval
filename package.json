@@ -1,6 +1,6 @@
 {
   "name": "craft-eval",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "description": "Evidence-backed evaluation for software, agents and skills",
   "type": "module",
   "bin": {
@@ -71,8 +71,12 @@
   },
   "dependencies": {
     "craft-common-base": "0.20.4",
-    "craft-common-ontology": "0.20.4",
-    "craft-common-store-local": "0.20.4"
+    "craft-common-ontology": "0.20.5",
+    "craft-common-store-local": "0.20.4",
+    "@craft/capability-datasec": "0.1.7",
+    "@craft/capability-experience": "0.20.5",
+    "@craft/capability-knowledge": "0.20.5",
+    "@craft/capability-memory": "0.20.5"
   },
   "repository": {
     "type": "git",
