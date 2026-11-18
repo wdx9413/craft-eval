@@ -58,10 +58,10 @@
       "risk": "high",
       "language": "typescript",
       "in_place": true,
-      "argv": ["node", "--experimental-strip-types", "--test", "--test-isolation=none", "--test-concurrency=1", "tests/context-extensions.test.ts", "tests/context-distribution.test.ts", "tests/context-directory.test.ts", "tests/context-workflow-workbench.test.ts", "tests/host-context-dispatch.test.ts", "tests/context-host-evaluation.test.ts", "tests/craft-run-context.test.ts"],
+      "argv": ["node", "--experimental-strip-types", "--test", "--test-isolation=none", "--test-concurrency=1", "tests/context-extensions.test.ts", "tests/context-distribution.test.ts", "tests/context-notes.test.ts", "tests/context-workflow-workbench.test.ts", "tests/host-context-dispatch.test.ts", "tests/context-host-evaluation.test.ts", "tests/craft-run-context.test.ts"],
       "timeout_s": 360,
       "expected_behavior": "Context integrations preserve the explicit host, workbench, extension and evaluation boundaries.",
-      "provenance": { "source": "craft/tests/context-extensions.test.ts; context-distribution.test.ts; context-directory.test.ts; context-workflow-workbench.test.ts; host-context-dispatch.test.ts; context-host-evaluation.test.ts; craft-run-context.test.ts" },
+      "provenance": { "source": "craft/tests/context-extensions.test.ts; context-distribution.test.ts; context-notes.test.ts; context-workflow-workbench.test.ts; host-context-dispatch.test.ts; context-host-evaluation.test.ts; craft-run-context.test.ts" },
       "checks": [{ "id": "tests-pass", "kind": "exit_code", "equals": 0 }]
     },
     {
