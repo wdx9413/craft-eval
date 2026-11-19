@@ -790,6 +790,13 @@ for (const caseId of [
   "runtime_dependency.explicit_opt_in_restores",
   "message_source.pull_dedups_across_restart",
   "message_source.never_sends_outbound",
+  // General self-evolution observes real ledger/adapter state, which the
+  // standalone shim does not implement. Claiming a pass here would be fake.
+  "general_evolution.coding.write_recall", "general_evolution.coding.apply_forget_scope_leak",
+  "general_evolution.office.write_recall", "general_evolution.office.apply_forget_scope_leak",
+  "general_evolution.travel.write_recall", "general_evolution.travel.apply_forget_scope_leak",
+  "general_evolution.creation.write_recall", "general_evolution.creation.apply_forget_scope_leak",
+  "general_evolution.research.write_recall", "general_evolution.research.apply_forget_scope_leak",
 ]) {
   if (inScope(caseId)) unobserved(caseId, "requires a real CraftService; the standalone evaluator uses CraftServiceShim");
 }

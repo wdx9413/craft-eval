@@ -250,6 +250,23 @@ const KNOWLEDGE_LINEAGE_CASES: GradedCase[] = [
 ];
 
 /**
+ * General self-evolution cases, one pair per scenario. Both observe the same
+ * kernel behaviours: write/recall in scope, then apply/forget plus scope leak.
+ */
+const GENERAL_EVOLUTION_CASES: GradedCase[] = (["coding", "office", "travel", "creation", "research"] as const).flatMap((domain) => [
+  {
+    case: defineEvalCase({ id: `general_evolution.${domain}.write_recall`, axis: "general_evolution", evidence: "kernel", partition: "held_out", sanitized: true, approved_by: SUITE_REVIEWER,
+      description: `${domain} adapter writes one scoped candidate and recalls it inside the same scope.` }),
+    check: { kind: "equals", expected: "candidate/1/0" },
+  },
+  {
+    case: defineEvalCase({ id: `general_evolution.${domain}.apply_forget_scope_leak`, axis: "general_evolution", evidence: "kernel", partition: "held_out", sanitized: true, approved_by: SUITE_REVIEWER,
+      description: `${domain} adapter applies inside scope, forgets without deleting audit, and refuses cross-scope recall.` }),
+    check: { kind: "equals", expected: "applied/forgotten/0" },
+  },
+]);
+
+/**
  * Evaluation-governance cases.
  *
  * The comparison tool is what drives iteration, so its own contract must be
@@ -714,7 +731,7 @@ const MESSAGE_SOURCE_CASES: GradedCase[] = [
 /** Every graded case, in a stable order. */
 export function evalCases(): GradedCase[] {
   return [...MEMORY_CASES, ...KNOWLEDGE_CASES, ...WORKFLOW_CASES, ...DATASEC_CASES, ...GOVERNANCE_CASES, ...END_TO_END_CASES,
-    ...EXPERIENCE_DEDUP_CASES, ...KNOWLEDGE_LINEAGE_CASES, ...EVAL_GOVERNANCE_CASES, ...CONTEXT_SUPPLY_CASES, ...PROACTIVE_CASES,
+    ...EXPERIENCE_DEDUP_CASES, ...KNOWLEDGE_LINEAGE_CASES, ...GENERAL_EVOLUTION_CASES, ...EVAL_GOVERNANCE_CASES, ...CONTEXT_SUPPLY_CASES, ...PROACTIVE_CASES,
     ...LIFECYCLE_CASES, ...DOMAIN_ISOLATION_CASES, ...PLUGIN_CONTRIBUTION_CASES, ...PILOT_BOUNDARY_CASES,
     ...EXTERNAL_SYNC_CASES, ...RUNTIME_DEPENDENCY_CASES, ...MESSAGE_SOURCE_CASES];
 }

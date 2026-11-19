@@ -45,6 +45,10 @@
       "types": "./dist/src/abstraction.d.ts",
       "import": "./dist/src/abstraction.js"
     },
+    "./digest": {
+      "types": "./dist/src/digest.d.ts",
+      "import": "./dist/src/digest.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [
@@ -62,6 +66,8 @@
     "test:build-suite": "node --experimental-strip-types --test --experimental-test-coverage --test-coverage-lines=100 --test-coverage-functions=100 --test-coverage-branches=100 --test-coverage-include=examples/real-world/craft-eval/build-suite.mjs tests/build-suite.test.ts",
     "test:coverage:web-research": "node --test --experimental-test-coverage --test-coverage-lines=100 --test-coverage-functions=100 --test-coverage-branches=100 --test-coverage-include=dist/tests/craft-web-research-fixtures.test.js dist/tests/craft-web-research-fixtures.test.js",
     "test:coverage:context-audit": "node --test --test-isolation=none --experimental-test-coverage --test-coverage-lines=100 --test-coverage-functions=100 --test-coverage-branches=100 --test-coverage-include=dist/src/context-audit.js dist/tests/context-audit.test.js",
+    "test:coverage": "npm run test:build-suite && npm run test:coverage:context-audit && npm run test:coverage:web-research",
+    "test:e2e": "node ../.tools/verify-craft-coverage.mjs",
     "prepack": "npm run clean && npm run build"
   },
   "license": "MIT",
@@ -74,7 +80,7 @@
     "craft-common-ontology": "0.20.5",
     "craft-common-store-local": "0.20.4",
     "@craft/capability-datasec": "0.1.7",
-    "@craft/capability-experience": "0.20.5",
+    "@craft/capability-experience": "0.20.9",
     "@craft/capability-knowledge": "0.20.5",
     "@craft/capability-memory": "0.20.5"
   },
