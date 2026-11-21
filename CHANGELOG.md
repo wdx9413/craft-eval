@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.0
+
+- Require Node.js 24 or newer to match the updated Craft capability dependencies and CI runtime.
+- Align Craft capability and common package dependencies with the current storage release.
+- Keep npm as the package manager and preserve the npm lockfile workflow.
+
+
 ## 0.7.0
 
 - Preserve bounded partial-reason codes and Codebase omission counts in Context Audit reports.

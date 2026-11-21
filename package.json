@@ -1,6 +1,6 @@
 {
   "name": "craft-eval",
-  "version": "0.7.3",
+  "version": "0.8.0",
   "description": "Evidence-backed evaluation for software, agents and skills",
   "type": "module",
   "bin": {
@@ -56,7 +56,7 @@
     "docs/command-supervision.md"
   ],
   "engines": {
-    "node": ">=22"
+    "node": ">=24"
   },
   "scripts": {
     "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
@@ -72,17 +72,17 @@
   },
   "license": "MIT",
   "devDependencies": {
-    "@types/node": "^26.6.5",
-    "typescript": "^7.0.2"
+    "@types/node": "26.6.5",
+    "typescript": "7.0.2"
   },
   "dependencies": {
-    "craft-common-base": "0.20.4",
-    "craft-common-ontology": "0.20.5",
-    "craft-common-store-local": "0.20.4",
-    "@craft/capability-datasec": "0.1.7",
-    "@craft/capability-experience": "0.20.9",
-    "@craft/capability-knowledge": "0.20.5",
-    "@craft/capability-memory": "0.20.5"
+    "craft-common-base": "0.20.5",
+    "craft-common-ontology": "0.20.7",
+    "craft-common-store-local": "0.21.0",
+    "@craft/capability-datasec": "0.2.0",
+    "@craft/capability-experience": "0.21.0",
+    "@craft/capability-knowledge": "0.20.9",
+    "@craft/capability-memory": "0.20.9"
   },
   "repository": {
     "type": "git",

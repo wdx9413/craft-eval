@@ -34,7 +34,7 @@ node dist/src/cli.js context-audit examples/context-audit/pack.json examples/con
 
 ## 安装与运行
 
-需要 Node.js 22+。运行时零第三方依赖，仅用 devDependencies 里的 `typescript` 与 `@types/node` 做构建：
+需要 Node.js 24+。运行时零第三方依赖，仅用 devDependencies 里的 `typescript` 与 `@types/node` 做构建：
 
 ```bash
 npm install          # 仅装构建期依赖

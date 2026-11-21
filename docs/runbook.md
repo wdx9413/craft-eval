@@ -5,7 +5,7 @@
 ## 1. 前置检查
 
 ```bash
-node --version          # 需要 >= 22
+node --version          # 需要 >= 24
 npm install             # 仅构建期依赖
 npm run build
 ```
