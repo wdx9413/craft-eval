@@ -1,0 +1,96 @@
+{
+  "schema": "craft-eval.eval.v1",
+  "suite_id": "craft-context-creation-heldout",
+  "subject_kind": "software",
+  "partition": "held_out",
+  "sanitized": true,
+  "approved_by": "craft-context-creation-reviewer",
+  "claim": {
+    "statement": "craft-context creation self-evolution: write, recall, apply, forget, scope leak are each verified on held-out cases with and without a context receipt.",
+    "scope": "creation domain held-out gate for craft-context",
+    "limitations": ["Stand-in runner; a real subject runs its own test suite and emits the same record."]
+  },
+  "metrics": {
+    "primary": { "id": "case_pass_rate", "kind": "binary_pass_rate", "direction": "higher_is_better", "minimum_sample": 5 },
+    "guardrails": [
+      { "id": "creation_gate", "metric": "case_pass_rate", "comparator": "gte", "threshold": 1 },
+      { "id": "creation_scope_leak_zero", "metric": "scope_leak_count", "comparator": "lte", "threshold": 0 }
+    ]
+  },
+  "cases": [    {
+      "id": "creation-write",
+      "argv": ["node", "runner.mjs"],
+      "timeout_s": 10,
+      "expected_behavior": "Emits result.json with domain=creation and write_case=write with all checks passing.",
+      "provenance": {
+        "source": "examples/craft-context-creation/workspace/runner.mjs",
+        "independent_of_training": true,
+        "reviewed_by": "craft-context-creation-reviewer"
+      },
+      "checks": [
+        {"id": "exit", "kind": "exit_code", "equals": 0},
+        {"id": "creation-gate", "kind": "script", "path": "grade.mjs", "args": ["outputs/result.json"], "pass_exit_codes": [0]}
+      ],
+      "safety_checks": []
+    },    {
+      "id": "creation-recall",
+      "argv": ["node", "runner.mjs"],
+      "timeout_s": 10,
+      "expected_behavior": "Emits result.json with domain=creation and recall_case=recall with all checks passing.",
+      "provenance": {
+        "source": "examples/craft-context-creation/workspace/runner.mjs",
+        "independent_of_training": true,
+        "reviewed_by": "craft-context-creation-reviewer"
+      },
+      "checks": [
+        {"id": "exit", "kind": "exit_code", "equals": 0},
+        {"id": "creation-gate", "kind": "script", "path": "grade.mjs", "args": ["outputs/result.json"], "pass_exit_codes": [0]}
+      ],
+      "safety_checks": []
+    },    {
+      "id": "creation-apply",
+      "argv": ["node", "runner.mjs"],
+      "timeout_s": 10,
+      "expected_behavior": "Emits result.json with domain=creation and apply_case=apply with all checks passing.",
+      "provenance": {
+        "source": "examples/craft-context-creation/workspace/runner.mjs",
+        "independent_of_training": true,
+        "reviewed_by": "craft-context-creation-reviewer"
+      },
+      "checks": [
+        {"id": "exit", "kind": "exit_code", "equals": 0},
+        {"id": "creation-gate", "kind": "script", "path": "grade.mjs", "args": ["outputs/result.json"], "pass_exit_codes": [0]}
+      ],
+      "safety_checks": []
+    },    {
+      "id": "creation-forget",
+      "argv": ["node", "runner.mjs"],
+      "timeout_s": 10,
+      "expected_behavior": "Emits result.json with domain=creation and forget_case=forget with all checks passing.",
+      "provenance": {
+        "source": "examples/craft-context-creation/workspace/runner.mjs",
+        "independent_of_training": true,
+        "reviewed_by": "craft-context-creation-reviewer"
+      },
+      "checks": [
+        {"id": "exit", "kind": "exit_code", "equals": 0},
+        {"id": "creation-gate", "kind": "script", "path": "grade.mjs", "args": ["outputs/result.json"], "pass_exit_codes": [0]}
+      ],
+      "safety_checks": []
+    },    {
+      "id": "creation-scope-leak",
+      "argv": ["node", "runner.mjs"],
+      "timeout_s": 10,
+      "expected_behavior": "Emits result.json with domain=creation and scope-leak_case=scope-leak with all checks passing.",
+      "provenance": {
+        "source": "examples/craft-context-creation/workspace/runner.mjs",
+        "independent_of_training": true,
+        "reviewed_by": "craft-context-creation-reviewer"
+      },
+      "checks": [
+        {"id": "exit", "kind": "exit_code", "equals": 0},
+        {"id": "creation-gate", "kind": "script", "path": "grade.mjs", "args": ["outputs/result.json"], "pass_exit_codes": [0]}
+      ],
+      "safety_checks": []
+    }]
+}

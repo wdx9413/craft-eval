@@ -231,3 +231,47 @@ test('context audit accepts MCP wrappers and rejects malformed packs or manifest
   assert.throws(() => auditContextPack(pack(), manifest({ extra: true })), /unsupported field/u);
   assert.throws(() => auditContextPack(pack(), manifest({ required_refs: [], forbidden_refs: [], allowed_refs: [], max_items: undefined, max_chars: undefined, max_estimated_tokens: undefined, reference_only_members: [] })), /at least one/u);
 });
+test('craft-context receipt pack passes bounded context audit', () => {
+  const pack = {
+    asset_refs: [
+      { member: 'knowledge', id: 'claim.example', version: 1 },
+      { member: 'codebase', id: 'symbol.example', version: 1 },
+    ],
+    items: [],
+    contributions: [{ member: 'knowledge', items: [{ claim_id: 'claim.example', claim_version: 1, content_excerpt: '仅在独立任务验证通过后晋升。' }] }],
+    codebase: { references: [{ node_id: 'symbol.example', version: 1, path: 'src/example.ts', span: { start_line: 12, end_line: 19 } }] },
+    pack_receipt: { max_items: 3, max_chars: 1200, total_items: 2, total_used_chars: 72, partial: false },
+    injection_measurement: { estimated_tokens: 70, exact: false, host_measured_tokens: null },
+  };
+  const manifest = {
+    schema: 'craft-eval.context-audit.v1', case_id: 'craft-context-receipt',
+    required_refs: [ref('knowledge', 'claim.example', 1), ref('codebase', 'symbol.example', 1)],
+    forbidden_refs: [ref('memory', 'unrelated.example')],
+    allowed_refs: [ref('knowledge', 'claim.example', 1), ref('codebase', 'symbol.example', 1)],
+    max_items: 3, max_chars: 1200, max_estimated_tokens: 400, reference_only_members: ['codebase'],
+  };
+  const result = auditContextPack(pack, manifest);
+  assert.equal(result.status, 'passed');
+  assert.equal(result.metrics.required_ref_recall, 1);
+  assert.equal(result.metrics.forbidden_ref_count, 0);
+});
+test('craft-context receipt pack missing a required ref fails', () => {
+  const pack = {
+    asset_refs: [{ member: 'knowledge', id: 'claim.example', version: 1 }],
+    items: [],
+    contributions: [],
+    codebase: { references: [] },
+    pack_receipt: { max_items: 1, max_chars: 1200, total_items: 1, total_used_chars: 10, partial: false },
+    injection_measurement: { estimated_tokens: 10, exact: false, host_measured_tokens: null },
+  };
+  const manifest = {
+    schema: 'craft-eval.context-audit.v1', case_id: 'craft-context-missing-ref',
+    required_refs: [ref('experience', 'missing.example', 1)],
+    forbidden_refs: [],
+    allowed_refs: [ref('experience', 'missing.example', 1), ref('knowledge', 'claim.example', 1)],
+    max_items: 1, max_chars: 1200, max_estimated_tokens: 400, reference_only_members: [],
+  };
+  const result = auditContextPack(pack, manifest);
+  assert.equal(result.status, 'failed');
+  assert.equal(result.metrics.required_ref_recall, 0);
+});

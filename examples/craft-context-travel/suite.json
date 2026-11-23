@@ -1,0 +1,96 @@
+{
+  "schema": "craft-eval.eval.v1",
+  "suite_id": "craft-context-travel-heldout",
+  "subject_kind": "software",
+  "partition": "held_out",
+  "sanitized": true,
+  "approved_by": "craft-context-travel-reviewer",
+  "claim": {
+    "statement": "craft-context travel self-evolution: write, recall, apply, forget, scope leak are each verified on held-out cases with and without a context receipt.",
+    "scope": "travel domain held-out gate for craft-context",
+    "limitations": ["Stand-in runner; a real subject runs its own test suite and emits the same record."]
+  },
+  "metrics": {
+    "primary": { "id": "case_pass_rate", "kind": "binary_pass_rate", "direction": "higher_is_better", "minimum_sample": 5 },
+    "guardrails": [
+      { "id": "travel_gate", "metric": "case_pass_rate", "comparator": "gte", "threshold": 1 },
+      { "id": "travel_scope_leak_zero", "metric": "scope_leak_count", "comparator": "lte", "threshold": 0 }
+    ]
+  },
+  "cases": [    {
+      "id": "travel-write",
+      "argv": ["node", "runner.mjs"],
+      "timeout_s": 10,
+      "expected_behavior": "Emits result.json with domain=travel and write_case=write with all checks passing.",
+      "provenance": {
+        "source": "examples/craft-context-travel/workspace/runner.mjs",
+        "independent_of_training": true,
+        "reviewed_by": "craft-context-travel-reviewer"
+      },
+      "checks": [
+        {"id": "exit", "kind": "exit_code", "equals": 0},
+        {"id": "travel-gate", "kind": "script", "path": "grade.mjs", "args": ["outputs/result.json"], "pass_exit_codes": [0]}
+      ],
+      "safety_checks": []
+    },    {
+      "id": "travel-recall",
+      "argv": ["node", "runner.mjs"],
+      "timeout_s": 10,
+      "expected_behavior": "Emits result.json with domain=travel and recall_case=recall with all checks passing.",
+      "provenance": {
+        "source": "examples/craft-context-travel/workspace/runner.mjs",
+        "independent_of_training": true,
+        "reviewed_by": "craft-context-travel-reviewer"
+      },
+      "checks": [
+        {"id": "exit", "kind": "exit_code", "equals": 0},
+        {"id": "travel-gate", "kind": "script", "path": "grade.mjs", "args": ["outputs/result.json"], "pass_exit_codes": [0]}
+      ],
+      "safety_checks": []
+    },    {
+      "id": "travel-apply",
+      "argv": ["node", "runner.mjs"],
+      "timeout_s": 10,
+      "expected_behavior": "Emits result.json with domain=travel and apply_case=apply with all checks passing.",
+      "provenance": {
+        "source": "examples/craft-context-travel/workspace/runner.mjs",
+        "independent_of_training": true,
+        "reviewed_by": "craft-context-travel-reviewer"
+      },
+      "checks": [
+        {"id": "exit", "kind": "exit_code", "equals": 0},
+        {"id": "travel-gate", "kind": "script", "path": "grade.mjs", "args": ["outputs/result.json"], "pass_exit_codes": [0]}
+      ],
+      "safety_checks": []
+    },    {
+      "id": "travel-forget",
+      "argv": ["node", "runner.mjs"],
+      "timeout_s": 10,
+      "expected_behavior": "Emits result.json with domain=travel and forget_case=forget with all checks passing.",
+      "provenance": {
+        "source": "examples/craft-context-travel/workspace/runner.mjs",
+        "independent_of_training": true,
+        "reviewed_by": "craft-context-travel-reviewer"
+      },
+      "checks": [
+        {"id": "exit", "kind": "exit_code", "equals": 0},
+        {"id": "travel-gate", "kind": "script", "path": "grade.mjs", "args": ["outputs/result.json"], "pass_exit_codes": [0]}
+      ],
+      "safety_checks": []
+    },    {
+      "id": "travel-scope-leak",
+      "argv": ["node", "runner.mjs"],
+      "timeout_s": 10,
+      "expected_behavior": "Emits result.json with domain=travel and scope-leak_case=scope-leak with all checks passing.",
+      "provenance": {
+        "source": "examples/craft-context-travel/workspace/runner.mjs",
+        "independent_of_training": true,
+        "reviewed_by": "craft-context-travel-reviewer"
+      },
+      "checks": [
+        {"id": "exit", "kind": "exit_code", "equals": 0},
+        {"id": "travel-gate", "kind": "script", "path": "grade.mjs", "args": ["outputs/result.json"], "pass_exit_codes": [0]}
+      ],
+      "safety_checks": []
+    }]
+}

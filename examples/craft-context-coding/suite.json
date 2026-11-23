@@ -1,0 +1,102 @@
+{
+  "schema": "craft-eval.eval.v1",
+  "suite_id": "craft-context-coding-heldout",
+  "subject_kind": "software",
+  "partition": "held_out",
+  "sanitized": true,
+  "approved_by": "craft-context-coding-reviewer",
+  "claim": {
+    "statement": "craft-context coding self-evolution: write, recall, apply, forget, scope leak are each verified on held-out cases with and without a context receipt.",
+    "scope": "coding domain held-out gate for craft-context",
+    "limitations": ["Stand-in runner; a real subject runs its own test suite and emits the same record."]
+  },
+  "metrics": {
+    "primary": { "id": "case_pass_rate", "kind": "binary_pass_rate", "direction": "higher_is_better", "minimum_sample": 5 },
+    "guardrails": [
+      { "id": "coding_gate", "metric": "case_pass_rate", "comparator": "gte", "threshold": 1 },
+      { "id": "scope_leak_zero", "metric": "scope_leak_count", "comparator": "lte", "threshold": 0 }
+    ]
+  },
+  "cases": [
+    {
+      "id": "coding-write",
+      "argv": ["node", "runner.mjs"],
+      "timeout_s": 10,
+      "expected_behavior": "Emits result.json with domain=coding and write_case=write with all checks passing.",
+      "provenance": {
+        "source": "examples/craft-context-coding/workspace/runner.mjs",
+        "independent_of_training": true,
+        "reviewed_by": "craft-context-coding-reviewer"
+      },
+      "checks": [
+        {"id": "exit", "kind": "exit_code", "equals": 0},
+        {"id": "coding-gate", "kind": "script", "path": "grade.mjs", "args": ["outputs/result.json"], "pass_exit_codes": [0]}
+      ],
+      "safety_checks": []
+    },
+    {
+      "id": "coding-recall",
+      "argv": ["node", "runner.mjs"],
+      "timeout_s": 10,
+      "expected_behavior": "Emits result.json with domain=coding and recall_case=recall with all checks passing.",
+      "provenance": {
+        "source": "examples/craft-context-coding/workspace/runner.mjs",
+        "independent_of_training": true,
+        "reviewed_by": "craft-context-coding-reviewer"
+      },
+      "checks": [
+        {"id": "exit", "kind": "exit_code", "equals": 0},
+        {"id": "coding-gate", "kind": "script", "path": "grade.mjs", "args": ["outputs/result.json"], "pass_exit_codes": [0]}
+      ],
+      "safety_checks": []
+    },
+    {
+      "id": "coding-apply",
+      "argv": ["node", "runner.mjs"],
+      "timeout_s": 10,
+      "expected_behavior": "Emits result.json with domain=coding and apply_case=apply with all checks passing.",
+      "provenance": {
+        "source": "examples/craft-context-coding/workspace/runner.mjs",
+        "independent_of_training": true,
+        "reviewed_by": "craft-context-coding-reviewer"
+      },
+      "checks": [
+        {"id": "exit", "kind": "exit_code", "equals": 0},
+        {"id": "coding-gate", "kind": "script", "path": "grade.mjs", "args": ["outputs/result.json"], "pass_exit_codes": [0]}
+      ],
+      "safety_checks": []
+    },
+    {
+      "id": "coding-forget",
+      "argv": ["node", "runner.mjs"],
+      "timeout_s": 10,
+      "expected_behavior": "Emits result.json with domain=coding and forget_case=forget with all checks passing.",
+      "provenance": {
+        "source": "examples/craft-context-coding/workspace/runner.mjs",
+        "independent_of_training": true,
+        "reviewed_by": "craft-context-coding-reviewer"
+      },
+      "checks": [
+        {"id": "exit", "kind": "exit_code", "equals": 0},
+        {"id": "coding-gate", "kind": "script", "path": "grade.mjs", "args": ["outputs/result.json"], "pass_exit_codes": [0]}
+      ],
+      "safety_checks": []
+    },
+    {
+      "id": "coding-scope-leak",
+      "argv": ["node", "runner.mjs"],
+      "timeout_s": 10,
+      "expected_behavior": "Emits result.json with domain=coding and scope_leak_case=scope_leak with scope_leak_count=0.",
+      "provenance": {
+        "source": "examples/craft-context-coding/workspace/runner.mjs",
+        "independent_of_training": true,
+        "reviewed_by": "craft-context-coding-reviewer"
+      },
+      "checks": [
+        {"id": "exit", "kind": "exit_code", "equals": 0},
+        {"id": "coding-gate", "kind": "script", "path": "grade.mjs", "args": ["outputs/result.json"], "pass_exit_codes": [0]}
+      ],
+      "safety_checks": []
+    }
+  ]
+}
